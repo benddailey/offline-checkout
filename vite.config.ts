@@ -5,7 +5,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 
 // https://vite.dev/config/
 export default defineConfig({
-  fmt: {},
+  fmt: { ignorePatterns: ["docs/**", ".superpowers/**", ".claude/**"] },
   lint: {
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: { "vite-plus/prefer-vite-plus-imports": "error" },
