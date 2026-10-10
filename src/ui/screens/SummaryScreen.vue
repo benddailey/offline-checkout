@@ -18,18 +18,29 @@ const clerks = computed(() =>
 
 const canGenerate = computed(() => session.state.totals.patrons > 0);
 
-const confirming = ref(false);
+/** Which action the confirm dialog is asking about. */
+const confirming = ref<"close" | "pdf" | null>(null);
 const cancelButton = useTemplateRef<HTMLButtonElement>("cancel");
 
-async function askClose(): Promise<void> {
-  confirming.value = true;
+const missingNames = computed(() => session.notConnected.map((d) => d.employee || "Unnamed"));
+
+async function ask(what: "close" | "pdf"): Promise<void> {
+  confirming.value = what;
   await nextTick();
   cancelButton.value?.focus();
 }
 
-async function confirmClose(): Promise<void> {
-  confirming.value = false;
-  await session.closeSession();
+/** Scans on an unconnected workstation would be missing from the PDF: confirm first. */
+function generate(): void {
+  if (session.notConnected.length > 0) void ask("pdf");
+  else session.generatePdf();
+}
+
+async function confirm(): Promise<void> {
+  const what = confirming.value;
+  confirming.value = null;
+  if (what === "pdf") session.generatePdf();
+  else if (what === "close") await session.closeSession();
 }
 
 const dialog = useTemplateRef<HTMLElement>("dialog");
@@ -69,14 +80,34 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
 
     <div class="flex flex-wrap items-center gap-4">
       <h1 class="text-3xl font-extrabold text-slate-900">Session summary</h1>
-      <button type="button" :class="[secondary, 'ml-auto']" @click="session.screen = 'scan'">
-        Back to scanning
-      </button>
+      <div class="ml-auto flex flex-wrap gap-3">
+        <button
+          v-if="session.closed"
+          type="button"
+          :class="secondary"
+          @click="session.leaveSession()"
+        >
+          Back to start
+        </button>
+        <button type="button" :class="secondary" @click="session.screen = 'scan'">
+          Back to scanning
+        </button>
+      </div>
     </div>
 
-    <ScanInput :paused="confirming" @scan="onScan" />
+    <ScanInput :paused="confirming !== null" @scan="onScan" />
 
     <MessageBanner v-if="session.message" :message="session.message" />
+
+    <ul
+      v-if="session.notConnected.length"
+      class="flex flex-col gap-1 rounded-lg border-l-8 border-amber-600 bg-amber-100 p-3 text-xl font-semibold text-amber-950"
+      data-testid="not-connected"
+    >
+      <li v-for="d in session.notConnected" :key="d.deviceId">
+        Not connected: {{ d.employee || "Unnamed" }} — their latest scans may be missing
+      </li>
+    </ul>
 
     <section class="grid gap-4 md:grid-cols-2">
       <div class="rounded-xl border-2 border-slate-300 bg-white p-5">
@@ -103,7 +134,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
           :class="primary"
           :disabled="!canGenerate"
           :aria-describedby="canGenerate ? undefined : 'generate-hint'"
-          @click="session.generatePdf()"
+          @click="generate"
         >
           Generate PDF
         </button>
@@ -115,7 +146,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
         </button>
         <template v-if="!session.closed">
           <h2 class="mt-2 text-2xl font-bold">End the session</h2>
-          <button type="button" :class="danger" @click="askClose">Close session</button>
+          <button type="button" :class="danger" @click="ask('close')">Close session</button>
         </template>
       </div>
     </section>
@@ -159,24 +190,37 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
     <div
       v-if="confirming"
       class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6"
-      @keydown.esc="confirming = false"
+      @keydown.esc="confirming = null"
       @keydown.tab="trapTab"
     >
       <div
         ref="dialog"
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="close-title"
-        aria-describedby="close-text"
-        class="flex max-w-xl flex-col gap-5 rounded-xl border-4 border-red-700 bg-white p-6"
+        aria-labelledby="confirm-title"
+        aria-describedby="confirm-text"
+        class="flex max-w-xl flex-col gap-5 rounded-xl border-4 bg-white p-6"
+        :class="confirming === 'close' ? 'border-red-700' : 'border-amber-600'"
       >
-        <h2 id="close-title" class="text-3xl font-extrabold">Close session</h2>
-        <p id="close-text" class="text-2xl">
-          Close this session for all workstations? Scanning will stop everywhere.
-        </p>
+        <h2 id="confirm-title" class="text-3xl font-extrabold">
+          {{ confirming === "close" ? "Close session" : "Generate PDF" }}
+        </h2>
+        <div id="confirm-text" class="flex flex-col gap-3 text-2xl">
+          <p v-if="confirming === 'close'">
+            Close this session for all workstations? Scanning will stop everywhere.
+          </p>
+          <p v-if="missingNames.length">
+            Not connected: {{ missingNames.join(", ") }}. Their latest scans may be missing{{
+              confirming === "pdf" ? " from this PDF" : ""
+            }}.
+          </p>
+          <p v-if="confirming === 'pdf'">Generate the PDF anyway?</p>
+        </div>
         <div class="flex flex-wrap gap-3">
-          <button type="button" :class="danger" @click="confirmClose">Yes, close session</button>
-          <button ref="cancel" type="button" :class="secondary" @click="confirming = false">
+          <button type="button" :class="confirming === 'close' ? danger : primary" @click="confirm">
+            {{ confirming === "close" ? "Yes, close session" : "Generate anyway" }}
+          </button>
+          <button ref="cancel" type="button" :class="secondary" @click="confirming = null">
             Cancel
           </button>
         </div>

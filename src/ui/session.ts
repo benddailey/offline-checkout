@@ -89,6 +89,8 @@ export const useSession = defineStore("session", () => {
   const currentVisitId = ref<RecordId | null>(null);
   const message = ref<Message | null>(null);
   const fatal = ref<string | null>(null);
+  /** A calm, dismissable notice shown on Launch (e.g. the session is open in another tab). */
+  const notice = ref<string | null>(null);
   const peers = ref<PeerInfo[]>([]);
   const isolated = ref(true);
   /** A peer has been connected since this session was opened in this page. */
@@ -108,6 +110,23 @@ export const useSession = defineStore("session", () => {
     return hadPeer.value || records.value.some((r) => r.deviceId !== own);
   });
   const closed = computed(() => state.value.closed);
+  /**
+   * Other workstations in this session's log that are not connected now: their latest scans may
+   * be missing here. Named by the clerk on each one's latest (highest seq) record.
+   */
+  const notConnected = computed<{ deviceId: string; employee: string }[]>(() => {
+    const own = meta.value?.deviceId;
+    const connected = new Set(peers.value.filter((p) => p.connected).map((p) => p.deviceId));
+    const latest = new Map<string, LogRecord>();
+    for (const r of records.value) {
+      if (r.deviceId === own || connected.has(r.deviceId)) continue;
+      const prev = latest.get(r.deviceId);
+      if (!prev || r.seq > prev.seq) latest.set(r.deviceId, r);
+    }
+    return [...latest.values()]
+      .map((r) => ({ deviceId: r.deviceId, employee: r.employee }))
+      .sort((a, b) => a.employee.localeCompare(b.employee) || (a.deviceId < b.deviceId ? -1 : 1));
+  });
   const currentVisit = computed<VisitState | null>(() => {
     const id = currentVisitId.value;
     if (id === null) return null;
@@ -155,8 +174,15 @@ export const useSession = defineStore("session", () => {
     meta.value = null;
     currentVisitId.value = null;
     message.value = null;
+    notice.value = null;
     offerScannerCard.value = false;
     hadPeer.value = false;
+  }
+
+  /** Release the session here (lock, store, mesh) and go back to Launch. */
+  function leaveSession(): void {
+    teardown();
+    screen.value = "launch";
   }
 
   /** Lock, load and show the session; on a held lock or failure sets `fatal` and returns false. */
@@ -169,7 +195,8 @@ export const useSession = defineStore("session", () => {
     try {
       const release = await deps.acquireSessionLock(sessionId);
       if (!release) {
-        fatal.value = LOCKED_MESSAGE;
+        notice.value = LOCKED_MESSAGE;
+        screen.value = "launch";
         return false;
       }
       releaseLock = release;
@@ -542,6 +569,7 @@ export const useSession = defineStore("session", () => {
     currentVisitId,
     message,
     fatal,
+    notice,
     peers,
     isolated,
     disconnected,
@@ -550,7 +578,9 @@ export const useSession = defineStore("session", () => {
     state,
     currentVisit,
     closed,
+    notConnected,
     startSession,
+    leaveSession,
     resumeSession,
     scan,
     voidRecord,

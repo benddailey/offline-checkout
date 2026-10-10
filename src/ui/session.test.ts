@@ -387,20 +387,29 @@ describe("useSession scanning", () => {
     expect(r.currentVisitId).toBeNull();
   });
 
-  it("sets fatal when the session lock is held elsewhere", async () => {
+  it("a session open in another tab is a calm notice on Launch, not a fatal stop", async () => {
     const s = await started();
     const sessionId = s.meta!.sessionId;
     setActivePinia(createPinia());
     const other = useSession();
     await other.resumeSession(sessionId); // lock still held by the first store
-    expect(other.fatal).toBe("This session is already open in another tab");
+    expect(other.fatal).toBeNull();
+    expect(other.notice).toBe("This session is already open in another tab");
     expect(other.screen).toBe("launch");
+    expect(other.meta).toBeNull();
 
     db.lockAvailable(false);
     setActivePinia(createPinia());
     const third = useSession();
     await third.startSession("X", "Rae");
-    expect(third.fatal).toBe("This session is already open in another tab");
+    expect(third.fatal).toBeNull();
+    expect(third.notice).toBe("This session is already open in another tab");
+    expect(third.screen).toBe("launch");
+
+    db.lockAvailable(true);
+    await third.startSession("Y", "Rae");
+    expect(third.notice).toBeNull();
+    expect(third.screen).toBe("scan");
   });
 
   it("lists stored sessions", async () => {
@@ -503,6 +512,38 @@ describe("useSession mesh", () => {
 
     m.setPeers([{ deviceId: PEER, employee: "Sam", connected: false }]);
     expect(s.isolated).toBe(true);
+  });
+
+  it("lists workstations in the log that are not connected, by their latest clerk", async () => {
+    const s = await started();
+    const m = fakeMesh();
+    s.attachMesh(m.mesh);
+    expect(s.notConnected).toEqual([]);
+    const third = "devicecccc";
+    const rec = (deviceId: string, seq: number, employee: string): LogRecord => ({
+      sessionId: s.meta!.sessionId,
+      deviceId,
+      seq,
+      employee,
+      at: 9000 - seq, // `at` order is ignored: the latest record is the highest seq
+      type: "patron-started",
+      patron: `P${seq}`,
+    });
+    m.deliver(PEER, {
+      t: "recs",
+      records: [rec(PEER, 1, "Sam"), rec(PEER, 2, "Sue"), rec(third, 1, "Cy")],
+    });
+    await tick();
+    await tick();
+    expect(s.notConnected).toEqual([
+      { deviceId: third, employee: "Cy" },
+      { deviceId: PEER, employee: "Sue" },
+    ]);
+    m.setPeers([
+      { deviceId: PEER, employee: "Sue", connected: true },
+      { deviceId: third, employee: "Cy", connected: false },
+    ]);
+    expect(s.notConnected).toEqual([{ deviceId: third, employee: "Cy" }]);
   });
 
   it("a remote session-closed stops local scanning", async () => {
@@ -657,6 +698,20 @@ describe("useSession session lifecycle", () => {
     expect(db.logs.get(s.meta!.sessionId)!.map((r) => r.type)).toEqual(["session-created"]);
   });
 
+  it("leaveSession releases the session and returns to Launch", async () => {
+    const s = await started();
+    const sessionId = s.meta!.sessionId;
+    const m = db.meshes[0]!;
+    await s.closeSession();
+    s.leaveSession();
+    expect(s.screen).toBe("launch");
+    expect(s.meta).toBeNull();
+    expect(s.records).toEqual([]);
+    expect(db.locks.has(sessionId)).toBe(false);
+    expect(db.closes.get(sessionId)).toBe(1);
+    expect(m.state.closed).toBe(true);
+  });
+
   it("endPatron is refused once the session is closed", async () => {
     const s = await started();
     await s.scan("P1");
@@ -671,7 +726,7 @@ describe("useSession session lifecycle", () => {
     db.lockAvailable(false);
     const s = useSession();
     await s.startSession("X", "Rae");
-    expect(s.fatal).not.toBeNull();
+    expect(s.notice).not.toBeNull();
     expect([...db.closes.values()]).toEqual([1]);
   });
 
@@ -737,7 +792,8 @@ describe("useSession pairing", () => {
     const s = useSession();
     const joined = fakeMesh();
     await s.adoptJoinedSession(offerFor("joined0001"), "Lee", joined.mesh);
-    expect(s.fatal).not.toBeNull();
+    expect(s.notice).not.toBeNull();
+    expect(s.screen).toBe("launch");
     expect(joined.state.closed).toBe(true);
     expect(s.mesh).toBeNull();
   });

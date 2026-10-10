@@ -52,6 +52,18 @@ const secondary =
   <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
     <h1 class="text-4xl font-extrabold text-slate-900">Offline Checkout</h1>
 
+    <div
+      v-if="session.notice"
+      role="status"
+      class="flex flex-wrap items-center gap-4 rounded-lg border-l-8 border-blue-700 bg-blue-50 p-4 text-2xl font-semibold text-blue-900"
+      data-testid="notice"
+    >
+      <span>{{ session.notice }}</span>
+      <button type="button" :class="[secondary, 'ml-auto']" @click="session.notice = null">
+        Dismiss
+      </button>
+    </div>
+
     <div class="grid gap-6 md:grid-cols-2">
       <form
         class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
