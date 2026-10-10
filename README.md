@@ -56,6 +56,21 @@ camera, WebRTC on the local network). Build it with `npm run build:probe`. See
   browser, so a display is required. Screenshots of the main screens at 1366x768 are written to
   `test-results/screens/`.
 
+## Releasing
+
+1. Start from an up-to-date, clean `main`.
+2. Run the checks: `npm run check`, `npm test` and `npm run e2e` (needs a display). All must pass.
+3. If anything that touches the scanner, camera or WebRTC has changed, re-run the field probe on real
+   library PCs first (see [docs/field-probe.md](docs/field-probe.md)).
+4. Bump the version with `npm version <major|minor|patch>`. This updates `package.json` and
+   `package-lock.json`, commits, and creates a `vX.Y.Z` tag. Push both: `git push --follow-tags`.
+5. Build from the tagged commit with `npm run build` and take `dist/offline-checkout.html`.
+6. Open the built file once from `file://` and do a quick check: start a session, scan a patron and an
+   item, close the session and generate the PDF.
+7. Copy the file to each workstation, replacing the old copy. Sessions are stored in the browser
+   profile, not the file, so replacing it keeps them, unless the release changes the IndexedDB
+   schema (`src/store/db.ts`). That needs a migration. Don't swap the file during an outage.
+
 ## Known limitations
 
 - The field probe must be run on real library PCs before rollout.
