@@ -1,12 +1,11 @@
 import { CODE39_TEXT, CONTROL } from "./barcode";
+import { MAX_BARCODE, MAX_NAME } from "./limits";
 import type { LogRecord } from "./types";
 
 /** Device and session ids: randomId(10). */
 const ID = /^[0-9a-z]{10}$/;
 /** RecordId: `${deviceId}:${seq}`. */
 const RECORD_ID = /^[0-9a-z]{10}:[1-9][0-9]*$/;
-const MAX_BARCODE = 64;
-const MAX_NAME = 100;
 
 const isStr = (v: unknown): v is string => typeof v === "string";
 const isName = (v: unknown): v is string => isStr(v) && v.length <= MAX_NAME;

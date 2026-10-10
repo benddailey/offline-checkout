@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { MAX_NAME } from "../../log/limits";
 import type { SessionSummary } from "../../store/db";
 import { useSession, ymd } from "../session";
 
@@ -73,7 +74,13 @@ const secondary =
         <h2 id="start-title" class="text-2xl font-bold">Start new session</h2>
         <label class="flex flex-col gap-1 text-lg font-semibold">
           Session name
-          <input v-model="name" :class="field" type="text" autocomplete="off" />
+          <input
+            v-model="name"
+            :class="field"
+            type="text"
+            autocomplete="off"
+            :maxlength="MAX_NAME"
+          />
         </label>
         <label class="flex flex-col gap-1 text-lg font-semibold">
           Clerk name
@@ -82,6 +89,7 @@ const secondary =
             :class="field"
             type="text"
             autocomplete="off"
+            :maxlength="MAX_NAME"
             :aria-invalid="clerkError"
             aria-describedby="clerk-error"
           />

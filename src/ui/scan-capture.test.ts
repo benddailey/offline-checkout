@@ -57,4 +57,32 @@ describe("createScanCapture", () => {
     type(h, "\n");
     expect(onScan).not.toHaveBeenCalled();
   });
+
+  it("treats a read-only text box as not a text field", () => {
+    const readonlyBox = {
+      closest: (sel: string) => (sel.includes(":not([readonly])") ? null : {}),
+    };
+    const onScan = vi.fn();
+    const h = createScanCapture(onScan);
+    type(h, "P9\n", readonlyBox);
+    expect(onScan).toHaveBeenCalledWith("P9");
+  });
+
+  it("drops a stray key when the next keystroke comes after a pause", () => {
+    vi.useFakeTimers();
+    try {
+      const onScan = vi.fn();
+      const h = createScanCapture(onScan);
+      h(key("x"));
+      vi.advanceTimersByTime(500);
+      const enter = key("Enter");
+      h(enter);
+      expect(onScan).not.toHaveBeenCalled();
+      expect(enter.preventDefault).not.toHaveBeenCalled();
+      type(h, "P1\n");
+      expect(onScan).toHaveBeenCalledWith("P1");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

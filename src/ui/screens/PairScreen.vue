@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { normalizeScan } from "../../log/barcode";
+import { MAX_NAME } from "../../log/limits";
 import type { Invite, Mesh } from "../../mesh/mesh";
 import { PairingError, type PairingPayload } from "../../pairing/payload";
 import QrDisplay from "../../qr/QrDisplay.vue";
@@ -355,6 +356,7 @@ const step = "text-2xl font-bold text-slate-900";
           :class="field"
           type="text"
           autocomplete="off"
+          :maxlength="MAX_NAME"
           :aria-invalid="clerkError"
           aria-describedby="join-clerk-error"
         />

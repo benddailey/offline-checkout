@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { recordId } from "../log/ids";
+import { MAX_BARCODE, MAX_NAME } from "../log/limits";
+import { isLogRecord } from "../log/validate";
 import type { LogRecord, RecordBody, VersionVector } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
 import type { Mesh, MeshOptions, PeerInfo } from "../mesh/mesh";
@@ -8,6 +10,7 @@ import { encodePayload, type PairingPayload } from "../pairing/payload";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
 import { createSessionStoreDeps, setSessionDeps, useSession } from "./session";
 
+const CONTROL_END = "OC-END";
 const DEVICE = "deviceaaaa";
 const PEER = "devicebbbb";
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -252,6 +255,56 @@ describe("useSession scanning", () => {
     expect(s.records).toHaveLength(1);
     expect(s.message?.tone).toBe("error");
     expect(s.message?.text).toContain('"#"');
+  });
+
+  it("rejects a barcode over the length limit locally, with no record", async () => {
+    const s = await started();
+    await s.scan("A".repeat(MAX_BARCODE + 1));
+    expect(s.records).toHaveLength(1);
+    expect(s.message?.tone).toBe("error");
+    expect(s.message?.text).toContain("longer than 64 characters");
+    await s.scan("A".repeat(MAX_BARCODE));
+    expect(s.records).toHaveLength(2);
+  });
+
+  it("every record the store actions create passes isLogRecord, even for long or Unicode names", async () => {
+    const names = [
+      "x".repeat(MAX_NAME + 50),
+      "é".repeat(MAX_NAME),
+      "😀".repeat(MAX_NAME),
+      "😀".repeat(MAX_NAME / 2 + 1),
+      "  " + "N".repeat(MAX_NAME) + "  ",
+    ];
+    for (const name of names) {
+      db = fakeDb();
+      setSessionDeps(db.deps);
+      setActivePinia(createPinia());
+      const s = useSession();
+      await s.startSession(name, name);
+      await s.scan("P" + "1".repeat(MAX_BARCODE - 1));
+      await s.scan("I" + "2".repeat(MAX_BARCODE - 1));
+      await s.scan(CONTROL_END);
+      expect(s.records.length).toBeGreaterThanOrEqual(3);
+      expect(s.records.every(isLogRecord)).toBe(true);
+      expect(s.meta!.employee.length).toBeLessThanOrEqual(MAX_NAME);
+    }
+  });
+
+  it("a joined clerk name over the limit is truncated before it is stored", async () => {
+    const s = useSession();
+    const m = fakeMesh([{ deviceId: PEER, employee: "Sam", connected: true }]);
+    const offer = {
+      kind: "offer",
+      sessionId: "joined0002",
+      sessionName: "Outage",
+      deviceId: PEER,
+      employee: "Sam",
+      sdp: {},
+    } as unknown as PairingPayload;
+    await s.adoptJoinedSession(offer, "L".repeat(MAX_NAME + 20), m.mesh);
+    expect(s.meta!.employee).toBe("L".repeat(MAX_NAME));
+    await s.scan("P1");
+    expect(s.records.every(isLogRecord)).toBe(true);
   });
 
   it("warns and does not add the same item twice on one patron", async () => {
@@ -544,6 +597,34 @@ describe("useSession mesh", () => {
       { deviceId: third, employee: "Cy", connected: false },
     ]);
     expect(s.notConnected).toEqual([{ deviceId: third, employee: "Cy" }]);
+  });
+
+  it("also lists disconnected mesh peers that have no records, once each", async () => {
+    const s = await started();
+    const m = fakeMesh();
+    s.attachMesh(m.mesh);
+    m.setPeers([
+      { deviceId: PEER, employee: "Sam", connected: false },
+      { deviceId: "devicecccc", employee: "Cy", connected: true },
+    ]);
+    expect(s.notConnected).toEqual([{ deviceId: PEER, employee: "Sam" }]);
+    m.deliver("devicecccc", {
+      t: "recs",
+      records: [
+        {
+          sessionId: s.meta!.sessionId,
+          deviceId: PEER,
+          seq: 1,
+          employee: "Samuel",
+          at: 1,
+          type: "patron-started",
+          patron: "P1",
+        },
+      ],
+    });
+    await tick();
+    await tick();
+    expect(s.notConnected).toEqual([{ deviceId: PEER, employee: "Samuel" }]);
   });
 
   it("a remote session-closed stops local scanning", async () => {

@@ -8,7 +8,10 @@ export interface KeyLike {
   preventDefault(): void;
 }
 
-const TEXT_FIELD = "input, textarea, select";
+/** Editable fields only: a read-only box (the QR join code) doesn't take typing, so scans there are captured. */
+const TEXT_FIELD = "input:not([readonly]), textarea:not([readonly]), select";
+/** Scanners type fast; a longer pause between keys means a person, so earlier keys are dropped. */
+const MAX_KEY_GAP_MS = 100;
 
 /**
  * Keydown handler for screens without a scanner box: scanner keystrokes that land outside a
@@ -17,6 +20,7 @@ const TEXT_FIELD = "input, textarea, select";
  */
 export function createScanCapture(onScan: (code: string) => void): (e: KeyLike) => void {
   let buffer = "";
+  let lastKeyAt = 0;
   return (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const target = e.target as { closest?: (s: string) => unknown } | null;
@@ -24,6 +28,9 @@ export function createScanCapture(onScan: (code: string) => void): (e: KeyLike) 
       buffer = "";
       return;
     }
+    const now = Date.now();
+    if (now - lastKeyAt > MAX_KEY_GAP_MS) buffer = "";
+    lastKeyAt = now;
     if (e.key === "Enter") {
       const code = buffer.trim();
       buffer = "";

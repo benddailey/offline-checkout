@@ -24,4 +24,12 @@ describe("barcode", () => {
       if (!r.ok) expect(r.reason).toContain("reserved");
     }
   });
+
+  test("validateBarcode rejects more than 64 characters with a clear reason", () => {
+    expect(validateBarcode("A".repeat(64))).toEqual({ ok: true });
+    expect(validateBarcode("A".repeat(65))).toEqual({
+      ok: false,
+      reason: "Barcode is longer than 64 characters",
+    });
+  });
 });

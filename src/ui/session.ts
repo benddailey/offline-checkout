@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, shallowRef } from "vue";
 import { CONTROL, normalizeScan, validateBarcode } from "../log/barcode";
+import { clampName } from "../log/limits";
 import { checkItem } from "../log/duplicates";
 import { recordId } from "../log/ids";
 import { reduce } from "../log/reduce";
@@ -123,8 +124,16 @@ export const useSession = defineStore("session", () => {
       const prev = latest.get(r.deviceId);
       if (!prev || r.seq > prev.seq) latest.set(r.deviceId, r);
     }
-    return [...latest.values()]
-      .map((r) => ({ deviceId: r.deviceId, employee: r.employee }))
+    const out = new Map<string, string>();
+    for (const r of latest.values()) out.set(r.deviceId, r.employee);
+    // Peers seen this page load that dropped, even if none of their records have arrived.
+    for (const p of peers.value) {
+      if (!p.connected && p.deviceId !== own && !out.has(p.deviceId)) {
+        out.set(p.deviceId, p.employee);
+      }
+    }
+    return [...out]
+      .map(([deviceId, employee]) => ({ deviceId, employee }))
       .sort((a, b) => a.employee.localeCompare(b.employee) || (a.deviceId < b.deviceId ? -1 : 1));
   });
   const currentVisit = computed<VisitState | null>(() => {
@@ -185,7 +194,7 @@ export const useSession = defineStore("session", () => {
     screen.value = "launch";
   }
 
-  /** Lock, load and show the session; on a held lock or failure sets `fatal` and returns false. */
+  /** Lock, load and show the session; on a held lock sets `notice`, on failure sets `fatal`, and returns false. */
   async function open(
     sessionId: string,
     openStore: () => Promise<SessionStore>,
@@ -217,8 +226,8 @@ export const useSession = defineStore("session", () => {
   }
 
   async function startSession(name: string, employee: string): Promise<void> {
-    const sessionName = name.trim() || ymd(deps.now());
-    const clerk = employee.trim();
+    const sessionName = clampName(name) || ymd(deps.now());
+    const clerk = clampName(employee);
     if (!clerk) {
       message.value = { tone: "error", text: "Enter the clerk's name" };
       return;
@@ -269,7 +278,7 @@ export const useSession = defineStore("session", () => {
     employee: string,
     joined: Mesh,
   ): Promise<boolean> {
-    const clerk = employee.trim();
+    const clerk = clampName(employee);
     if (store?.sessionId === offer.sessionId) {
       // Re-pair of the session already open here: keep store and lock, swap the mesh.
       if (meta.value?.employee !== clerk) {
@@ -289,7 +298,7 @@ export const useSession = defineStore("session", () => {
         () =>
           deps.createSession({
             sessionId: offer.sessionId,
-            name: offer.sessionName,
+            name: clampName(offer.sessionName),
             employee: clerk,
             withCreatedRecord: false,
           }),
@@ -381,7 +390,7 @@ export const useSession = defineStore("session", () => {
   async function joinSession(offerText: string, employee: string) {
     readOffer(offerText);
     const deviceId = meta.value?.deviceId ?? (await deps.getDeviceId());
-    return deps.joinMesh(offerText, { deviceId, employee: employee.trim(), knownDevices });
+    return deps.joinMesh(offerText, { deviceId, employee: clampName(employee), knownDevices });
   }
 
   function knownDevices(): Set<string> {
