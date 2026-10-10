@@ -44,6 +44,8 @@ interface SessionSchema extends DBSchema {
 }
 
 const INDEX_DB = "offline-checkout";
+/** Records are flushed to disk before the write resolves: a scan on screen survives power loss. */
+const STRICT: IDBTransactionOptions = { durability: "strict" };
 const META_KEY = "meta";
 
 function openIndex(): Promise<IDBPDatabase<IndexSchema>> {
@@ -97,7 +99,7 @@ function makeStore(sessionId: string, db: IDBPDatabase<SessionSchema>): SessionS
       await tx.done;
     },
     async append(body) {
-      const tx = db.transaction(["records", "meta"], "readwrite");
+      const tx = db.transaction(["records", "meta"], "readwrite", STRICT);
       try {
         const m = await tx.objectStore("meta").get(META_KEY);
         if (!m) throw new Error(`Session ${sessionId} has no metadata`);
@@ -124,7 +126,7 @@ function makeStore(sessionId: string, db: IDBPDatabase<SessionSchema>): SessionS
       }
     },
     async put(records) {
-      const tx = db.transaction(["records", "meta"], "readwrite");
+      const tx = db.transaction(["records", "meta"], "readwrite", STRICT);
       const store = tx.objectStore("records");
       const own = (await tx.objectStore("meta").get(META_KEY))?.deviceId;
       const stored: LogRecord[] = [];

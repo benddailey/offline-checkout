@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { LogRecord } from "../log/types";
 import {
   acquireSessionLock,
@@ -84,6 +84,20 @@ describe("session store", () => {
     expect(await s.put([remote(s.sessionId, dev, 1)])).toEqual([]);
     expect((await s.append({ type: "session-closed" })).seq).toBe(1);
     expect(await s.all()).toHaveLength(1);
+  });
+
+  it("append and put commit with strict durability (a shown scan survives power loss)", async () => {
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
+    const spy = vi.spyOn(IDBDatabase.prototype, "transaction");
+    try {
+      await s.append({ type: "session-closed" });
+      await s.put([remote(s.sessionId, "x", 1)]);
+      const writes = spy.mock.calls.filter((c) => c[1] === "readwrite");
+      expect(writes).toHaveLength(2);
+      for (const c of writes) expect(c[2]).toEqual({ durability: "strict" });
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("since and vector", async () => {
