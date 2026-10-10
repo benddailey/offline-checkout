@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { decodePayload, encodePayload, PairingError } from "../pairing/payload";
 import { createFakeRtcNetwork, type FakeRtcNetwork } from "./fake-rtc";
+import { NO_ADDRESS } from "./link";
 import { Mesh, type MeshOptions, type PeerInfo } from "./mesh";
 
 const RETRY = 10_000;
@@ -348,5 +349,146 @@ describe("reconnection", () => {
     c.send("B", "one");
     await settle();
     expect(got).toEqual([["C", "one"]]);
+  });
+});
+
+/** Count connected→disconnected transitions of `peerId` seen by `m`'s subscribers. */
+function dropsOf(m: Mesh, peerId: string): () => number {
+  let last = m.peers().find((p) => p.deviceId === peerId)?.connected;
+  let drops = 0;
+  m.onPeerChange((peers) => {
+    const now = peers.find((p) => p.deviceId === peerId)?.connected;
+    if (last === true && now === false) drops++;
+    last = now;
+  });
+  return () => drops;
+}
+
+describe("one-sided failure", () => {
+  test("only B notices B–C died: B redials, C swaps to the newer link without flapping", async () => {
+    const a = founder();
+    const { mesh: b } = await pair(a, "B", "Bob");
+    const { mesh: c } = await pair(a, "C", "Cat"); // B offered the B–C link (intro)
+    const bDrops = dropsOf(b, "C");
+    const cDrops = dropsOf(c, "B");
+
+    net.fail("B", "C");
+    await settle();
+    expect(view(b)).toEqual({ A: true, C: false });
+    expect(view(c)).toEqual({ A: true, B: true }); // stale, C has not noticed
+
+    for (let i = 0; i < 4; i++) {
+      await vi.advanceTimersByTimeAsync(RETRY);
+      await settle();
+    }
+    expect(view(b)).toEqual({ A: true, C: true });
+    expect(view(c)).toEqual({ A: true, B: true });
+    expect(bDrops()).toBe(1);
+    expect(cDrops()).toBe(0);
+    expect(net.liveLinks("B")).toEqual(["A", "C"]);
+    expect(net.liveLinks("C")).toEqual(["A", "B"]); // stale link closed, new one kept
+
+    const atB: unknown[] = [];
+    const atC: unknown[] = [];
+    b.onMessage((from, msg) => atB.push([from, msg]));
+    c.onMessage((from, msg) => atC.push([from, msg]));
+    c.send("B", "c→b");
+    b.send("C", "b→c");
+    await settle();
+    expect(atB).toEqual([["C", "c→b"]]);
+    expect(atC).toEqual([["B", "b→c"]]);
+  });
+});
+
+describe("robustness", () => {
+  test("ICE gathering stalls with a host candidate: invite proceeds after 5 s", async () => {
+    const a = founder();
+    net.setGathering("A", "stall");
+    let invite: Awaited<ReturnType<Mesh["createInvite"]>> | undefined;
+    void a.createInvite().then((i) => (invite = i));
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(invite).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(invite?.payload).toMatch(/^OC1:/);
+  });
+
+  test("ICE gathering finds no address: createInvite and join fail clearly", async () => {
+    const a = founder();
+    const invite = await a.createInvite();
+    net.setGathering("A", "stall-empty");
+    net.setGathering("B", "stall-empty");
+    const failedInvite = a.createInvite();
+    const failedJoin = Mesh.join(invite.payload, opts("B", "Bob"));
+    const results = Promise.allSettled([failedInvite, failedJoin]);
+    await vi.advanceTimersByTimeAsync(5_000);
+    for (const r of await results) {
+      expect(r.status).toBe("rejected");
+      expect((r as PromiseRejectedResult).reason.message).toBe(NO_ADDRESS);
+    }
+    expect(net.pending("A")).toBe(1); // only the first, still-valid invite
+    expect(net.pending("B")).toBe(0);
+  });
+
+  test("answer that cannot be applied → malformed, invite used, connection closed", async () => {
+    const plain = net.factoryFor("A");
+    const a = founder("A", "Ann", {
+      rtc: (config) => {
+        const pc = plain(config);
+        pc.setRemoteDescription = () => Promise.reject(new Error("bad sdp"));
+        return pc;
+      },
+    });
+    const invite = await a.createInvite();
+    const j = await Mesh.join(invite.payload, opts("B", "Bob"));
+    track(j.mesh);
+    await expectPairingError(invite.accept(j.answer), "malformed");
+    await expectPairingError(invite.accept(j.answer), "expired");
+    expect(net.pending("A")).toBe(0);
+  });
+
+  test("invite TTL timers are cleared on cancel and on Mesh.close()", async () => {
+    const a = founder();
+    const baseline = vi.getTimerCount(); // the retry interval
+    const first = await a.createInvite();
+    await a.createInvite();
+    expect(vi.getTimerCount()).toBe(baseline + 2);
+    first.cancel();
+    expect(vi.getTimerCount()).toBe(baseline + 1);
+    a.close();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test("pending dials are dropped when no peer is left to relay them", async () => {
+    const a = founder("A", "Ann", { knownDevices: () => new Set(["Z"]) });
+    await pair(a, "B", "Bob");
+    await vi.advanceTimersByTimeAsync(RETRY);
+    await settle();
+    expect(net.pending("A")).toBe(1); // dial to Z, unanswerable
+    net.cut("A", "B");
+    await settle();
+    expect(net.pending("A")).toBe(0);
+  });
+
+  test("a throwing subscriber cannot break the mesh or other subscribers", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const a = founder();
+    a.onPeerChange(() => {
+      throw new Error("boom");
+    });
+    const seen: number[] = [];
+    a.onPeerChange((p) => seen.push(p.length));
+    const { mesh: b } = await pair(a, "B", "Bob");
+    b.onMessage(() => {
+      throw new Error("boom");
+    });
+    const got: unknown[] = [];
+    b.onMessage((_, msg) => got.push(msg));
+    a.send("B", "x");
+    await settle();
+    expect(seen).toEqual([1]);
+    expect(view(a)).toEqual({ B: true });
+    expect(got).toEqual(["x"]);
+    expect(errors).toHaveBeenCalledTimes(2);
+    errors.mockRestore();
   });
 });

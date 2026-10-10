@@ -5,7 +5,7 @@ import {
   encodePayload,
   type PairingPayload,
 } from "../pairing/payload";
-import { minifySdp, rebuildSdp } from "../pairing/sdp";
+import { minifySdp, rebuildSdp, type SdpParts } from "../pairing/sdp";
 import { Link } from "./link";
 import type { HelloMsg, IntroMsg, SignalMsg, WireMsg } from "./protocol";
 
@@ -38,6 +38,15 @@ export interface Invite {
   cancel(): void;
 }
 
+/** Subscriber errors are logged, never allowed to abort mesh state updates. */
+function safely(fn: () => void): void {
+  try {
+    fn();
+  } catch (e) {
+    console.error("mesh subscriber failed", e);
+  }
+}
+
 const RTC_CONFIG: RTCConfiguration = { iceServers: [] };
 const browserRtc: RtcFactory = (config) => new RTCPeerConnection(config);
 const expired = () =>
@@ -59,8 +68,12 @@ export class Mesh {
   private readonly active = new Map<string, Link>();
   /** Every device that completed hello this session → its latest employee name. */
   private readonly seen = new Map<string, string>();
-  /** Outgoing relayed offers awaiting answer + hello, by target device. */
-  private readonly dials = new Map<string, Link>();
+  /** Outgoing relayed offers awaiting answer + hello, by target device, with start time. */
+  private readonly dials = new Map<string, { link: Link; at: number }>();
+  /** TTL timers of open invites, cleared when their link closes. */
+  private readonly inviteTimers = new Map<Link, ReturnType<typeof setTimeout>>();
+  private linkSeq = 0;
+  private readonly retryMs: number;
   private readonly signalsHandled = new Set<string>();
   private readonly messageCbs = new Set<(peerId: string, msg: unknown) => void>();
   private readonly peerCbs = new Set<(peers: PeerInfo[]) => void>();
@@ -76,17 +89,27 @@ export class Mesh {
     this.knownDevices = o.knownDevices;
     this.ttl = o.offerTtlMs ?? 300_000;
     this.now = o.now ?? Date.now;
-    this.retryTimer = setInterval(() => this.reconnect(), o.retryMs ?? 10_000);
+    this.retryMs = o.retryMs ?? 10_000;
+    this.retryTimer = setInterval(() => this.reconnect(), this.retryMs);
   }
 
   /** "Add workstation": an offer QR, single-use, valid for offerTtlMs. */
   async createInvite(): Promise<Invite> {
-    const link = this.newLink({ offererId: this.deviceId, expectedId: null, linkId: "" });
+    const link = this.newLink({
+      offererId: this.deviceId,
+      expectedId: null,
+      linkId: this.nextLinkId(),
+    });
     link.invite = true;
-    link.createChannel();
-    await link.pc.setLocalDescription(await link.pc.createOffer());
-    const sdp = minifySdp(await link.localSdp());
-    link.linkId = sdp.ufrag;
+    let sdp: SdpParts;
+    try {
+      link.createChannel();
+      await link.pc.setLocalDescription(await link.pc.createOffer());
+      sdp = minifySdp(await link.localSdp());
+    } catch (e) {
+      link.close();
+      throw e;
+    }
     const payload = encodePayload({
       kind: "offer",
       sessionId: this.sessionId,
@@ -98,11 +121,17 @@ export class Mesh {
     const expiresAt = this.now() + this.ttl;
     let used = false;
     let cancelled = false;
-    const timer = setTimeout(() => link.close(expired()), this.ttl);
+    this.inviteTimers.set(
+      link,
+      setTimeout(() => link.close(expired()), this.ttl),
+    );
+    const stopTimer = () => {
+      clearTimeout(this.inviteTimers.get(link));
+      this.inviteTimers.delete(link);
+    };
     const cancel = () => {
       if (used) return;
       cancelled = true;
-      clearTimeout(timer);
       link.close(expired());
     };
     const accept = async (answerText: string): Promise<PeerInfo> => {
@@ -114,9 +143,18 @@ export class Mesh {
       const answer = decodePayload(answerText, "answer");
       if (answer.sessionId !== this.sessionId) throw wrongSession();
       used = true;
-      clearTimeout(timer);
+      stopTimer();
       link.expectedId = answer.deviceId;
-      await link.pc.setRemoteDescription({ type: "answer", sdp: rebuildSdp(answer.sdp, "answer") });
+      try {
+        await link.pc.setRemoteDescription({
+          type: "answer",
+          sdp: rebuildSdp(answer.sdp, "answer"),
+        });
+      } catch {
+        const err = new PairingError("malformed", "This pairing answer could not be used");
+        link.close(err);
+        throw err;
+      }
       await link.handshake;
       return this.peerInfo(answer.deviceId);
     };
@@ -131,10 +169,11 @@ export class Mesh {
     const offer = decodePayload(offerText, "offer");
     const mesh = new Mesh({ ...o, sessionId: offer.sessionId, sessionName: offer.sessionName });
     try {
+      // linkId is learnt from the inviter's hello.
       const link = mesh.newLink({
         offererId: offer.deviceId,
         expectedId: offer.deviceId,
-        linkId: offer.sdp.ufrag,
+        linkId: "",
       });
       await link.pc.setRemoteDescription({ type: "offer", sdp: rebuildSdp(offer.sdp, "offer") });
       await link.pc.setLocalDescription(await link.pc.createAnswer());
@@ -188,6 +227,8 @@ export class Mesh {
     if (this.closed) return;
     this.closed = true;
     clearInterval(this.retryTimer);
+    for (const timer of this.inviteTimers.values()) clearTimeout(timer);
+    this.inviteTimers.clear();
     for (const link of this.links) link.close(); // Set iteration tolerates deletion
     this.messageCbs.clear();
     this.peerCbs.clear();
@@ -197,21 +238,29 @@ export class Mesh {
     return { deviceId: id, employee: this.seen.get(id) ?? "", connected: this.active.has(id) };
   }
 
-  private hello(): HelloMsg {
+  private hello(link?: Link): HelloMsg {
     const { sessionId, deviceId, employee } = this;
-    return { t: "hello", sessionId, deviceId, employee };
+    const msg: HelloMsg = { t: "hello", sessionId, deviceId, employee };
+    if (link?.offererId === deviceId) msg.link = link.linkId;
+    return msg;
   }
 
   private emit(): void {
     if (this.closed) return;
     const peers = this.peers();
-    for (const cb of this.peerCbs) cb(peers);
+    for (const cb of this.peerCbs) safely(() => cb(peers));
+  }
+
+  /** Zero-padded time + per-mesh counter + random suffix: later ids from one offerer sort higher. */
+  private nextLinkId(): string {
+    const t = String(this.now()).padStart(15, "0");
+    return `${t}.${String(++this.linkSeq).padStart(6, "0")}.${randomId(4)}`;
   }
 
   private newLink(init: ConstructorParameters<typeof Link>[1]): Link {
     if (this.closed) throw new Error("Mesh is closed");
     const link = new Link(this.rtc(RTC_CONFIG), init, {
-      open: (l) => l.send(this.hello()),
+      open: (l) => l.send(this.hello(l)),
       message: (l, m) => this.onWire(l, m),
       closed: (l) => this.onLinkClosed(l),
     });
@@ -225,7 +274,7 @@ export class Mesh {
     if (!from || this.closed) return; // nothing but hello before the handshake
     if (msg.t === "intro") this.onIntro(msg);
     else if (msg.t === "signal") this.onSignal(from, msg);
-    else for (const cb of this.messageCbs) cb(from, msg.body);
+    else for (const cb of this.messageCbs) safely(() => cb(from, msg.body));
   }
 
   private onHello(link: Link, h: HelloMsg): void {
@@ -238,8 +287,18 @@ export class Mesh {
       if (nameChanged) this.emit(); // re-hello after setEmployee
       return;
     }
+    if (link.offererId === id) {
+      if (!h.link) return link.close();
+      link.linkId = h.link;
+    }
     link.helloReceived(id);
-    if (this.dials.get(id) === link) this.dials.delete(id);
+    const dial = this.dials.get(id);
+    if (dial) {
+      this.dials.delete(id);
+      // Connected another way. A dial whose channel is already open may have said hello at the
+      // far end, which then ranks it with the duplicate rule; only unopened dials are dropped.
+      if (dial.link !== link && !dial.link.isOpen) dial.link.close();
+    }
 
     const current = this.active.get(id);
     if (current && current !== link) {
@@ -265,9 +324,11 @@ export class Mesh {
 
   private onLinkClosed(link: Link): void {
     this.links.delete(link);
+    clearTimeout(this.inviteTimers.get(link));
+    this.inviteTimers.delete(link);
     const id = link.remoteId ?? link.expectedId;
     if (!id) return;
-    if (this.dials.get(id) === link) this.dials.delete(id);
+    if (this.dials.get(id)?.link === link) this.dials.delete(id);
     if (this.active.get(id) !== link) return;
     this.active.delete(id);
     // Hand over to another open link to the same device (its hello is in flight) without flapping.
@@ -276,6 +337,11 @@ export class Mesh {
         this.active.set(id, other);
         return;
       }
+    }
+    if (this.active.size === 0) {
+      // Nobody left to relay through: pending dials can never be answered.
+      for (const { link: dial } of this.dials.values()) dial.close();
+      this.dials.clear();
     }
     this.emit();
   }
@@ -300,10 +366,12 @@ export class Mesh {
 
   private async dial(target: string): Promise<void> {
     if (this.closed) return;
-    this.dials.get(target)?.close();
-    const id = randomId();
+    const pending = this.dials.get(target);
+    if (pending && this.now() - pending.at < this.retryMs) return;
+    pending?.link.close();
+    const id = this.nextLinkId();
     const link = this.newLink({ offererId: this.deviceId, expectedId: target, linkId: id });
-    this.dials.set(target, link);
+    this.dials.set(target, { link, at: this.now() });
     try {
       link.createChannel();
       await link.pc.setLocalDescription(await link.pc.createOffer());
@@ -345,7 +413,7 @@ export class Mesh {
   }
 
   private async applyAnswer(m: SignalMsg): Promise<void> {
-    const link = this.dials.get(m.from);
+    const link = this.dials.get(m.from)?.link;
     if (!link || link.linkId !== m.id) return;
     try {
       await link.pc.setRemoteDescription({ type: "answer", sdp: m.sdp });

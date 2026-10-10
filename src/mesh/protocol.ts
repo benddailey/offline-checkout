@@ -2,7 +2,8 @@
  * Mesh wire protocol: JSON text over one ordered, reliable data channel labelled "oc".
  *
  * - hello:  sent by both sides when the channel opens (and again after setEmployee).
- *           A mismatched sessionId closes the link.
+ *           A mismatched sessionId closes the link. The offerer's hello also carries
+ *           `link`, its time-sortable link id, so both ends rank duplicate links alike.
  * - intro:  the inviter tells its other peers about a newcomer; each one offers to it.
  * - signal: relayed offer/answer (full SDP, ICE gathering complete — no trickle).
  *           Forwarded one hop when `to` is not the receiver.
@@ -16,6 +17,8 @@ export interface HelloMsg {
   sessionId: string;
   deviceId: string;
   employee: string;
+  /** Sent by the link's offerer only. */
+  link?: string;
 }
 export interface IntroMsg {
   t: "intro";
@@ -56,9 +59,15 @@ export function decodeWire(data: unknown): WireMsg | null {
   }
   switch (m.t) {
     case "hello":
-      return str(m.sessionId) && str(m.deviceId) && typeof m.employee === "string"
-        ? { t: "hello", sessionId: m.sessionId, deviceId: m.deviceId, employee: m.employee }
-        : null;
+      if (!str(m.sessionId) || !str(m.deviceId) || typeof m.employee !== "string") return null;
+      if (m.link !== undefined && !str(m.link)) return null;
+      return {
+        t: "hello",
+        sessionId: m.sessionId,
+        deviceId: m.deviceId,
+        employee: m.employee,
+        ...(m.link ? { link: m.link } : {}),
+      };
     case "intro":
       return str(m.deviceId) && typeof m.employee === "string"
         ? { t: "intro", deviceId: m.deviceId, employee: m.employee }
