@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, useTemplateRef } from "vue";
+import { onBeforeUnmount, onMounted, useTemplateRef, watch } from "vue";
 
+/**
+ * `paused`: a modal dialog owns focus. Scanner keystrokes outside text fields are dropped (so a
+ * scan's Enter never presses a dialog button) and focus is not taken back until it closes.
+ */
+const props = defineProps<{ paused?: boolean }>();
 const emit = defineEmits<{ scan: [value: string] }>();
 const input = useTemplateRef<HTMLInputElement>("input");
 
@@ -11,7 +16,7 @@ function refocusSoon() {
   timer = setTimeout(() => {
     timer = null;
     const el = input.value;
-    if (!el) return;
+    if (!el || props.paused) return;
     const active = document.activeElement;
     // Never take focus from another text field the clerk is typing into.
     if (active && active !== el && active.matches("input, textarea, select")) return;
@@ -34,6 +39,10 @@ function onDocumentKeydown(e: KeyboardEvent) {
   const el = input.value;
   if (!el || e.target === el || e.ctrlKey || e.metaKey || e.altKey) return;
   if ((e.target as Element | null)?.closest?.("input, textarea, select")) return;
+  if (props.paused) {
+    if (e.key === "Enter" || e.key.length === 1) e.preventDefault();
+    return;
+  }
   if (e.key === "Enter") {
     e.preventDefault();
     el.focus();
@@ -52,6 +61,13 @@ function onEnter() {
   el.value = "";
   if (value.trim() !== "") emit("scan", value);
 }
+
+watch(
+  () => props.paused,
+  (paused) => {
+    if (!paused) refocusSoon();
+  },
+);
 
 onMounted(() => {
   input.value?.focus();

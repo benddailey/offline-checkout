@@ -27,6 +27,8 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
   try {
     const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
     for (const page of [a!, b!]) await page.goto(appUrl());
+    let downloadsOnA = 0;
+    a!.on("download", () => downloadsOnA++);
 
     await a!.getByLabel("Session name").fill("Outage");
     await a!.getByLabel("Clerk name").fill("Ann");
@@ -41,12 +43,22 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     await a!.getByRole("button", { name: "Summary" }).click();
     await expect(a!.getByRole("button", { name: "Generate PDF" })).toBeDisabled();
     await expect(a!.getByText("Scan at least one patron first")).toBeVisible();
-    await a!.getByRole("button", { name: "Back to scanning" }).click();
+    // The summary's own scanner card button.
+    await download(a!, "Print scanner card", "scanner-card-from-summary.pdf");
+    expect(downloadsOnA).toBe(2);
+
+    // A scan made on the summary is recorded on the scan screen; its Enter presses no button.
+    await a!.getByRole("button", { name: "Print scanner card" }).focus();
+    await scan(a!, "P1");
+    await expect(a!.getByRole("heading", { name: "Session summary" })).toBeHidden();
+    await expect(a!.getByTestId("patron")).toHaveText("P1");
+    await a!.waitForTimeout(500);
+    expect(downloadsOnA).toBe(2);
 
     await pairViaPaste(a!, b!, "Ben");
 
     // A: P1 with I1 and I2, then I2 voided.
-    await scan(a!, "P1", "I1", "I2");
+    await scan(a!, "I1", "I2");
     await expect(a!.getByTestId("item")).toHaveCount(2);
     await a!.getByRole("button", { name: "Void I2" }).click();
     await expect(a!.getByTestId("totals")).toHaveText("Patrons 1 · Items 1");
@@ -76,6 +88,16 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     await expect(a!.getByRole("alertdialog")).toContainText(
       "Close this session for all workstations? Scanning will stop everywhere.",
     );
+    // While the dialog is open a scan is dropped and presses no dialog button.
+    await expect(a!.getByRole("button", { name: "Cancel" })).toBeFocused();
+    await scan(a!, "P8");
+    await expect(a!.getByRole("alertdialog")).toBeVisible();
+    await expect(a!.getByTestId("totals")).toHaveText("Patrons 2 · Items 3");
+    // Tab stays inside the dialog.
+    await a!.keyboard.press("Tab");
+    await expect(a!.getByRole("button", { name: "Yes, close session" })).toBeFocused();
+    await a!.keyboard.press("Shift+Tab");
+    await expect(a!.getByRole("button", { name: "Cancel" })).toBeFocused();
     await a!.getByRole("button", { name: "Yes, close session" }).click();
     await expect(a!.getByText("Session closed", { exact: true })).toBeVisible();
     await expect(a!.getByRole("button", { name: "Close session" })).toBeHidden();

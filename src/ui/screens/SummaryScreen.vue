@@ -1,57 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useTemplateRef } from "vue";
-import type { RecordId } from "../../log/types";
-import { blocksFromState } from "../../pdf/blocks";
+import MessageBanner from "../components/MessageBanner.vue";
+import ScanInput from "../components/ScanInput.vue";
+import SessionClosedBanner from "../components/SessionClosedBanner.vue";
 import { useSession } from "../session";
+import { summaryPatrons } from "../summary";
 
 const session = useSession();
 
-interface Row {
-  id: RecordId;
-  barcode: string;
-  voided: boolean;
-}
-interface PatronRow {
-  patron: string;
-  /** Every visit for this patron was voided: it is left out of the PDF. */
-  voided: boolean;
-  rows: Row[];
-  /** Item count and clerks as printed on the PDF. */
-  items: number;
-  clerks: string[];
-  at: number;
-}
-
-/**
- * Patrons in PDF order (first non-voided scan), each with every item scanned for them, voided
- * ones included. Fully voided patrons are listed where their first visit was scanned.
- */
-const patrons = computed<PatronRow[]>(() => {
-  const st = session.state;
-  const blocks = new Map(blocksFromState(st).map((b) => [b.patron, b]));
-  const byPatron = new Map<string, PatronRow>();
-  for (const v of st.visits) {
-    let p = byPatron.get(v.patron);
-    if (!p) {
-      const block = blocks.get(v.patron);
-      p = {
-        patron: v.patron,
-        voided: !block,
-        rows: [],
-        items: block?.items.length ?? 0,
-        clerks: block?.clerks ?? [v.employee],
-        at: block?.firstAt ?? v.at,
-      };
-      byPatron.set(v.patron, p);
-    }
-    for (const i of v.items) {
-      p.rows.push({ id: i.id, barcode: i.barcode, voided: i.voided || v.voided });
-    }
-  }
-  return [...byPatron.values()].sort(
-    (a, b) => a.at - b.at || (a.patron < b.patron ? -1 : a.patron > b.patron ? 1 : 0),
-  );
-});
+const patrons = computed(() => summaryPatrons(session.state));
 
 const clerks = computed(() =>
   Object.keys(session.state.perClerk)
@@ -75,11 +32,29 @@ async function confirmClose(): Promise<void> {
   await session.closeSession();
 }
 
-const toneClass = {
-  info: "border-blue-700 bg-blue-50 text-blue-900",
-  warn: "border-amber-600 bg-amber-100 text-amber-950",
-  error: "border-red-700 bg-red-100 text-red-900",
-} as const;
+const dialog = useTemplateRef<HTMLElement>("dialog");
+
+/** Keep Tab and Shift+Tab inside the dialog. */
+function trapTab(e: KeyboardEvent): void {
+  const buttons = [...(dialog.value?.querySelectorAll("button") ?? [])];
+  const first = buttons[0];
+  const last = buttons.at(-1);
+  if (!first || !last) return;
+  const active = document.activeElement;
+  if (e.shiftKey && (active === first || !dialog.value?.contains(active))) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && (active === last || !dialog.value?.contains(active))) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
+/** A scan made while the summary is open is recorded on the scan screen as usual. */
+function onScan(code: string): void {
+  session.screen = "scan";
+  void session.scan(code);
+}
 
 const button =
   "min-h-12 rounded-lg border-2 px-5 text-xl font-semibold disabled:cursor-not-allowed disabled:opacity-40";
@@ -90,13 +65,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
 
 <template>
   <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
-    <div
-      v-if="session.closed"
-      role="status"
-      class="rounded-lg border-4 border-red-700 bg-red-100 p-4 text-center text-3xl font-extrabold text-red-900"
-    >
-      Session closed
-    </div>
+    <SessionClosedBanner v-if="session.closed" />
 
     <div class="flex flex-wrap items-center gap-4">
       <h1 class="text-3xl font-extrabold text-slate-900">Session summary</h1>
@@ -105,14 +74,9 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
       </button>
     </div>
 
-    <div
-      v-if="session.message"
-      role="alert"
-      class="rounded-lg border-l-8 p-3 text-2xl font-semibold"
-      :class="toneClass[session.message.tone]"
-    >
-      {{ session.message.text }}
-    </div>
+    <ScanInput :paused="confirming" @scan="onScan" />
+
+    <MessageBanner v-if="session.message" :message="session.message" />
 
     <section class="grid gap-4 md:grid-cols-2">
       <div class="rounded-xl border-2 border-slate-300 bg-white p-5">
@@ -138,7 +102,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
           type="button"
           :class="primary"
           :disabled="!canGenerate"
-          aria-describedby="generate-hint"
+          :aria-describedby="canGenerate ? undefined : 'generate-hint'"
           @click="session.generatePdf()"
         >
           Generate PDF
@@ -196,8 +160,10 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
       v-if="confirming"
       class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6"
       @keydown.esc="confirming = false"
+      @keydown.tab="trapTab"
     >
       <div
+        ref="dialog"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="close-title"

@@ -1,14 +1,10 @@
 <script setup lang="ts">
+import MessageBanner from "../components/MessageBanner.vue";
 import ScanInput from "../components/ScanInput.vue";
+import SessionClosedBanner from "../components/SessionClosedBanner.vue";
 import { useSession } from "../session";
 
 const session = useSession();
-
-const toneClass = {
-  info: "border-blue-700 bg-blue-50 text-blue-900",
-  warn: "border-amber-600 bg-amber-100 text-amber-950",
-  error: "border-red-700 bg-red-100 text-red-900",
-} as const;
 
 const button =
   "min-h-12 rounded-lg border-2 px-5 text-xl font-semibold disabled:cursor-not-allowed disabled:opacity-40";
@@ -21,13 +17,7 @@ function printCard() {
 
 <template>
   <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
-    <div
-      v-if="session.closed"
-      role="status"
-      class="rounded-lg border-4 border-red-700 bg-red-100 p-4 text-center text-3xl font-extrabold text-red-900"
-    >
-      Session closed
-    </div>
+    <SessionClosedBanner v-if="session.closed" />
 
     <div
       v-if="session.offerScannerCard"
@@ -56,15 +46,7 @@ function printCard() {
 
     <ScanInput @scan="session.scan" />
 
-    <div
-      v-if="session.message"
-      role="alert"
-      class="rounded-lg border-l-8 p-3 text-2xl font-semibold"
-      :class="toneClass[session.message.tone]"
-      data-testid="message"
-    >
-      {{ session.message.text }}
-    </div>
+    <MessageBanner v-if="session.message" :message="session.message" />
 
     <section
       v-if="!session.currentVisit"
