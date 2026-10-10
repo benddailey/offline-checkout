@@ -17,7 +17,7 @@ export default defineConfig({
     rollupOptions: { input: "offline-checkout.html" },
   },
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "probe/**/*.test.ts"],
     environment: "node",
     passWithNoTests: true,
   },

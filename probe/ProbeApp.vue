@@ -15,6 +15,7 @@ import { candidateSummary, runIndexedDbCheck, waitForGathering, type Status } fr
 const CAMERA_TEST_CODE = "FIELD-PROBE-QR-OK";
 const CONNECT_TIMEOUT_MS = 20_000;
 const GUEST_WAIT_MS = 120_000;
+const CAMERA_DECODE_TIMEOUT_MS = 60_000;
 const deviceId = randomId();
 
 function badgeClass(s: Status): string {
@@ -49,7 +50,10 @@ const cam = reactive({
   decode: "idle" as Status,
   decodeDetail: "",
 });
+let camTimer: ReturnType<typeof setTimeout> | undefined;
 async function testCamera() {
+  clearTimeout(camTimer);
+  cam.decodeDetail = "";
   cam.open = "running";
   cam.openDetail = "";
   cam.decode = "idle";
@@ -60,12 +64,19 @@ async function testCamera() {
     cam.openDetail = "The camera opened.";
     cam.scanning = true;
     cam.decode = "running";
+    camTimer = setTimeout(() => {
+      if (cam.decode !== "running") return;
+      cam.decode = "fail";
+      cam.decodeDetail =
+        "No code was read. Check the camera points at the code and it is in focus.";
+    }, CAMERA_DECODE_TIMEOUT_MS);
   } catch (e) {
     cam.open = "fail";
     cam.openDetail = describeError(e);
   }
 }
 function onCameraDecoded(text: string) {
+  clearTimeout(camTimer);
   cam.decode = "pass";
   cam.decodeDetail =
     text === CAMERA_TEST_CODE ? "Read the sample code." : "Read a code (not the sample one).";
@@ -78,6 +89,7 @@ const rtc = reactive({
   status: "idle" as Status,
   step: "",
   detail: "",
+  detailIsError: false,
   offerText: "",
   answerText: "",
   rttMs: null as number | null,
@@ -103,6 +115,7 @@ function resetRtc() {
     status: "idle",
     step: "",
     detail: "",
+    detailIsError: false,
     offerText: "",
     answerText: "",
     rttMs: null,
@@ -115,6 +128,7 @@ function failRtc(detail: string) {
   clearTimeout(timer);
   if (rtc.status === "pass") return;
   rtc.status = "fail";
+  rtc.detailIsError = true;
   rtc.detail = detail;
 }
 
@@ -190,7 +204,7 @@ async function startHost() {
 }
 
 async function onAnswer(text: string) {
-  if (!pc || rtc.role !== "host") return;
+  if (!pc || rtc.role !== "host" || pc.signalingState !== "have-local-offer") return;
   try {
     const answer = decodePayload(text, "answer");
     await pc.setRemoteDescription({ type: "answer", sdp: rebuildSdp(answer.sdp, "answer") });
@@ -198,6 +212,7 @@ async function onAnswer(text: string) {
     armTimeout(CONNECT_TIMEOUT_MS);
   } catch (e) {
     rtc.detail = e instanceof PairingError ? e.message : describeError(e);
+    rtc.detailIsError = true;
     scanner.value?.reset();
   }
 }
@@ -236,6 +251,7 @@ async function onOffer(text: string) {
     pc?.close();
     pc = null;
     rtc.detail = e instanceof PairingError ? e.message : describeError(e);
+    rtc.detailIsError = true;
     scanner.value?.reset();
   }
 }
@@ -244,7 +260,7 @@ async function onOffer(text: string) {
 const copied = ref(false);
 const summary = computed(() => {
   const line = (label: string, s: Status, detail: string) =>
-    `${label}: ${badgeText(s)}${detail ? ` - ${detail}` : ""}`;
+    `${label}: ${s === "idle" || s === "running" ? "NOT COMPLETED" : badgeText(s)}${detail ? ` - ${detail}` : ""}`;
   return [
     "FIELD PROBE RESULTS",
     `Time: ${new Date().toISOString()}`,
@@ -311,8 +327,10 @@ async function copyResults() {
         }}</span>
       </h2>
       <p class="text-sm">
-        Press the button. If Chrome asks to use the camera, click Allow. Then hold the sample code
-        below up to the camera (from a phone screen or a printout).
+        Press the button. If Chrome asks to use the camera, click Allow. Then point this PC's webcam
+        at the sample code shown on the OTHER PC's probe page (or at a printout of it). A code on
+        this PC's own screen cannot be seen by its own webcam. Scanning the connection code in step
+        3 also counts as a camera read test.
       </p>
       <button
         type="button"
@@ -384,7 +402,7 @@ async function copyResults() {
         v-if="rtc.detail"
         role="status"
         class="mt-2 rounded p-2 text-sm"
-        :class="rtc.status === 'fail' ? 'bg-red-100 text-red-900' : 'bg-slate-100'"
+        :class="rtc.detailIsError ? 'bg-red-100 text-red-900' : 'bg-slate-100'"
         data-testid="rtc-detail"
       >
         {{ rtc.detail }}
