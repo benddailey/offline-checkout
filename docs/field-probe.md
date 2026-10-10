@@ -10,7 +10,7 @@ Copy one file from the project to the USB stick: `dist-probe/probe.html`. Nothin
 
 1. Plug in the USB stick. Double-click `probe.html` (or drag it into Chrome or Edge). The address bar should start with `file:///`.
 2. Look at **1. Storage**. It should say **PASS** by itself.
-3. In **2. Camera**, press **Test camera**. If the browser asks to use the camera, click **Allow**. Point this PC's webcam at the sample code shown on the OTHER PC's probe page (or at a printout of it; a code on a PC's own screen cannot be seen by its own webcam) and check it says **PASS**. Scanning the connection code in section 3 also counts as a camera read test. If only one PC has a webcam, run the camera test on that one and note it.
+3. In **2. Camera**, press **Test camera**. If the browser asks to use the camera, click **Allow**. Point this PC's webcam at the sample code shown on the OTHER PC's probe page (or at a printout of it; a code on a PC's own screen cannot be seen by its own webcam) and check it says **PASS**. If only one PC has a webcam, run the camera test on that one and note it.
 
 ## Connecting the two PCs (section 3)
 

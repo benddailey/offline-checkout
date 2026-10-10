@@ -165,12 +165,14 @@ function wireChannel(dc: RTCDataChannel, role: Role) {
       rtc.status = "pass";
       rtc.step = "Done.";
       rtc.detail = "Connected to the other PC and exchanged messages.";
+      rtc.detailIsError = false;
     } else if (role === "host" && data.startsWith("pong:")) {
       clearTimeout(timer);
       rtc.rttMs = Math.max(1, Math.round(performance.now() - Number(data.slice(5))));
       rtc.status = "pass";
       rtc.step = "Done.";
       rtc.detail = "Connected to the other PC and exchanged messages.";
+      rtc.detailIsError = false;
     }
   };
 }
@@ -204,7 +206,12 @@ async function startHost() {
 }
 
 async function onAnswer(text: string) {
-  if (!pc || rtc.role !== "host" || pc.signalingState !== "have-local-offer") return;
+  if (!pc || rtc.role !== "host") return;
+  if (pc.signalingState !== "have-local-offer") {
+    rtc.detail = "This connection is already being set up - wait for the result.";
+    rtc.detailIsError = false;
+    return;
+  }
   try {
     const answer = decodePayload(text, "answer");
     await pc.setRemoteDescription({ type: "answer", sdp: rebuildSdp(answer.sdp, "answer") });
@@ -329,8 +336,7 @@ async function copyResults() {
       <p class="text-sm">
         Press the button. If Chrome asks to use the camera, click Allow. Then point this PC's webcam
         at the sample code shown on the OTHER PC's probe page (or at a printout of it). A code on
-        this PC's own screen cannot be seen by its own webcam. Scanning the connection code in step
-        3 also counts as a camera read test.
+        this PC's own screen cannot be seen by its own webcam.
       </p>
       <button
         type="button"
