@@ -3,7 +3,10 @@ import { isLogRecord } from "../log/validate";
 import type { Mesh } from "../mesh/mesh";
 import type { SessionStore } from "../store/db";
 
-export type MeshLike = Pick<Mesh, "send" | "broadcast" | "onMessage" | "onPeerChange" | "peers">;
+export type MeshLike = Pick<
+  Mesh,
+  "deviceId" | "send" | "broadcast" | "onMessage" | "onPeerChange" | "peers"
+>;
 export type StoreLike = Pick<SessionStore, "put" | "since" | "vector" | "sessionId">;
 
 type SyncMsg = { t: "vec"; vector: VersionVector } | { t: "recs"; records: unknown[] };
@@ -118,8 +121,11 @@ export class SyncEngine {
   }
 
   private enqueue(candidates: unknown[]): void {
+    // A peer never holds a record of ours that we lack: one with our deviceId is forged or stale
+    // and would collide with our next local append.
     const valid = candidates.filter(
-      (r): r is LogRecord => isLogRecord(r) && r.sessionId === this.store.sessionId,
+      (r): r is LogRecord =>
+        isLogRecord(r) && r.sessionId === this.store.sessionId && r.deviceId !== this.mesh.deviceId,
     );
     if (!valid.length) return;
     this.writes = this.writes.then(async () => {

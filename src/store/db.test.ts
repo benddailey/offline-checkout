@@ -78,6 +78,14 @@ describe("session store", () => {
     expect(await s.all()).toHaveLength(1);
   });
 
+  it("put skips records claiming this machine's deviceId, so the next append cannot collide", async () => {
+    const dev = await getDeviceId();
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
+    expect(await s.put([remote(s.sessionId, dev, 1)])).toEqual([]);
+    expect((await s.append({ type: "session-closed" })).seq).toBe(1);
+    expect(await s.all()).toHaveLength(1);
+  });
+
   it("since and vector", async () => {
     const dev = await getDeviceId();
     const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });

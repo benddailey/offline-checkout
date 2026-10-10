@@ -8,7 +8,8 @@ import { encodePayload, type PairingPayload } from "../pairing/payload";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
 import { createSessionStoreDeps, setSessionDeps, useSession } from "./session";
 
-const DEVICE = "dev-a";
+const DEVICE = "deviceaaaa";
+const PEER = "devicebbbb";
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 /** In-memory stand-in for src/store/db.ts; append resolves after a random 0–20 ms. */
@@ -78,7 +79,7 @@ function fakeDb() {
   const deps = createSessionStoreDeps({
     now: () => new Date(2026, 9, 10, 9, 30),
     async createSession(o) {
-      const sessionId = o.sessionId ?? `s${nextId++}`;
+      const sessionId = o.sessionId ?? `s${String(nextId++).padStart(9, "0")}`;
       if (!metas.has(sessionId)) {
         metas.set(sessionId, {
           sessionId,
@@ -414,6 +415,7 @@ function fakeMesh(initial: PeerInfo[] = []) {
   const employees: string[] = [];
   const state = { closed: false };
   const mesh = {
+    deviceId: DEVICE,
     send: (_id: string, msg: unknown) => (sent.push(msg), true),
     broadcast: (msg: unknown) => void sent.push(msg),
     onMessage(cb: (peer: string, msg: unknown) => void) {
@@ -454,8 +456,8 @@ describe("useSession mesh", () => {
     expect(s.isolated).toBe(true);
     expect(m.employees).toEqual(["Rae"]);
 
-    m.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
-    expect(s.peers).toEqual([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    m.setPeers([{ deviceId: PEER, employee: "Sam", connected: true }]);
+    expect(s.peers).toEqual([{ deviceId: PEER, employee: "Sam", connected: true }]);
     expect(s.isolated).toBe(false);
 
     await s.scan("P1");
@@ -464,35 +466,35 @@ describe("useSession mesh", () => {
     const sessionId = s.meta!.sessionId;
     const remote: LogRecord = {
       sessionId,
-      deviceId: "dev-b",
+      deviceId: PEER,
       seq: 1,
       employee: "Sam",
       at: 5000,
       type: "patron-started",
       patron: "P9",
     };
-    m.deliver("dev-b", { t: "recs", records: [remote] });
-    m.deliver("dev-b", { t: "recs", records: [remote] });
+    m.deliver(PEER, { t: "recs", records: [remote] });
+    m.deliver(PEER, { t: "recs", records: [remote] });
     await tick();
     await tick();
-    expect(s.records.filter((r) => r.deviceId === "dev-b")).toHaveLength(1);
+    expect(s.records.filter((r) => r.deviceId === PEER)).toHaveLength(1);
     expect(s.state.totals.patrons).toBe(2);
-    expect(s.knownDevices()).toEqual(new Set([DEVICE, "dev-b"]));
+    expect(s.knownDevices()).toEqual(new Set([DEVICE, PEER]));
 
-    m.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: false }]);
+    m.setPeers([{ deviceId: PEER, employee: "Sam", connected: false }]);
     expect(s.isolated).toBe(true);
   });
 
   it("a remote session-closed stops local scanning", async () => {
     const s = await started();
-    const m = fakeMesh([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    const m = fakeMesh([{ deviceId: PEER, employee: "Sam", connected: true }]);
     s.attachMesh(m.mesh);
-    m.deliver("dev-b", {
+    m.deliver(PEER, {
       t: "recs",
       records: [
         {
           sessionId: s.meta!.sessionId,
-          deviceId: "dev-b",
+          deviceId: PEER,
           seq: 1,
           employee: "Sam",
           at: 5000,
@@ -509,22 +511,22 @@ describe("useSession mesh", () => {
 
   it("adoptJoinedSession creates the local copy without a created record and attaches the mesh", async () => {
     const s = useSession();
-    const m = fakeMesh([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    const m = fakeMesh([{ deviceId: PEER, employee: "Sam", connected: true }]);
     const offer = {
       kind: "offer",
-      sessionId: "joined-1",
+      sessionId: "joined0001",
       sessionName: "Outage",
-      deviceId: "dev-b",
+      deviceId: PEER,
       employee: "Sam",
       sdp: {},
     } as unknown as PairingPayload;
     await s.adoptJoinedSession(offer, "Lee", m.mesh);
     expect(s.screen).toBe("scan");
-    expect(s.meta).toMatchObject({ sessionId: "joined-1", name: "Outage", employee: "Lee" });
+    expect(s.meta).toMatchObject({ sessionId: "joined0001", name: "Outage", employee: "Lee" });
     expect(s.records).toEqual([]);
     expect(s.isolated).toBe(false);
     expect(s.mesh).toBe(m.mesh);
-    expect(db.locks.has("joined-1")).toBe(true);
+    expect(db.locks.has("joined0001")).toBe(true);
     expect(db.persistCalls()).toBe(1);
   });
 });
@@ -536,7 +538,7 @@ function code(kind: "offer" | "answer", sessionId: string, sessionName = "Outage
     kind,
     sessionId,
     sessionName,
-    deviceId: "dev-b",
+    deviceId: PEER,
     employee: "Sam",
     sdp: {
       ufrag: "abcd",
@@ -552,7 +554,7 @@ function offerFor(sessionId: string): PairingPayload {
     kind: "offer",
     sessionId,
     sessionName: "Outage",
-    deviceId: "dev-b",
+    deviceId: PEER,
     employee: "Sam",
     sdp: {},
   } as unknown as PairingPayload;
@@ -560,7 +562,7 @@ function offerFor(sessionId: string): PairingPayload {
 
 const remoteRecord = (sessionId: string): LogRecord => ({
   sessionId,
-  deviceId: "dev-b",
+  deviceId: PEER,
   seq: 1,
   employee: "Sam",
   at: 5000,
@@ -602,9 +604,9 @@ describe("useSession session lifecycle", () => {
     expect(m.listeners()).toBe(0);
     expect(s.mesh).toBe(db.meshes[1]!.mesh);
 
-    m.deliver("dev-b", { t: "recs", records: [remoteRecord(first)] });
+    m.deliver(PEER, { t: "recs", records: [remoteRecord(first)] });
     await tick();
-    expect(s.records.some((r) => r.deviceId === "dev-b")).toBe(false);
+    expect(s.records.some((r) => r.deviceId === PEER)).toBe(false);
   });
 
   it("a scan in flight when the session switches is not shown in the new session", async () => {
@@ -667,11 +669,11 @@ describe("useSession pairing", () => {
   it("attachMesh replacing a mesh closes the old one and syncs over the new one", async () => {
     const s = await started();
     const old = db.meshes[0]!;
-    const next = fakeMesh([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    const next = fakeMesh([{ deviceId: PEER, employee: "Sam", connected: true }]);
     s.attachMesh(next.mesh);
     expect(old.state.closed).toBe(true);
     expect(old.listeners()).toBe(0);
-    expect(s.peers).toEqual([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    expect(s.peers).toEqual([{ deviceId: PEER, employee: "Sam", connected: true }]);
     expect(s.isolated).toBe(false);
     old.sent.length = 0;
     await s.scan("P1");
@@ -684,7 +686,7 @@ describe("useSession pairing", () => {
     await s.scan("P1");
     const sessionId = s.meta!.sessionId;
     const old = db.meshes[0]!;
-    const joined = fakeMesh([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    const joined = fakeMesh([{ deviceId: PEER, employee: "Sam", connected: true }]);
     await s.adoptJoinedSession(offerFor(sessionId), " Lee ", joined.mesh);
     expect(s.meta).toMatchObject({ sessionId, employee: "Lee" });
     expect(db.metas.get(sessionId)!.employee).toBe("Lee");
@@ -714,7 +716,7 @@ describe("useSession pairing", () => {
     db.lockAvailable(false);
     const s = useSession();
     const joined = fakeMesh();
-    await s.adoptJoinedSession(offerFor("joined-1"), "Lee", joined.mesh);
+    await s.adoptJoinedSession(offerFor("joined0001"), "Lee", joined.mesh);
     expect(s.fatal).not.toBeNull();
     expect(joined.state.closed).toBe(true);
     expect(s.mesh).toBeNull();
@@ -745,7 +747,7 @@ describe("useSession pairing", () => {
     setSessionDeps({ ...db.deps, joinMesh, getDeviceId: async () => "dev-new" });
     setActivePinia(createPinia());
     const s = useSession();
-    const text = code("offer", "joined-1");
+    const text = code("offer", "joined0001");
     expect(await s.joinSession(text, " Lee ")).toBe("joined");
     expect(calls[0]![0]).toBe(text);
     expect(calls[0]![1]).toMatchObject({ deviceId: "dev-new", employee: "Lee" });
@@ -773,23 +775,23 @@ describe("useSession disconnected notice", () => {
     const r = reload();
     await r.resumeSession(sessionId);
     expect(r.disconnected).toBe(true);
-    db.meshes.at(-1)!.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    db.meshes.at(-1)!.setPeers([{ deviceId: PEER, employee: "Sam", connected: true }]);
     expect(r.disconnected).toBe(false);
   });
 
   it("is on once a peer seen in this page load drops, even before any of its records arrive", async () => {
     const s = await started();
     const m = db.meshes[0]!;
-    m.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    m.setPeers([{ deviceId: PEER, employee: "Sam", connected: true }]);
     expect(s.disconnected).toBe(false);
-    m.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: false }]);
+    m.setPeers([{ deviceId: PEER, employee: "Sam", connected: false }]);
     expect(s.disconnected).toBe(true);
   });
 
   it("starts over when another session is opened", async () => {
     const s = await started();
-    db.meshes[0]!.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: false }]);
-    db.meshes[0]!.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    db.meshes[0]!.setPeers([{ deviceId: PEER, employee: "Sam", connected: false }]);
+    db.meshes[0]!.setPeers([{ deviceId: PEER, employee: "Sam", connected: true }]);
     await s.startSession("Second", "Rae");
     expect(s.disconnected).toBe(false);
   });
@@ -827,7 +829,7 @@ describe("useSession ensureMesh", () => {
 
   it("adoptJoinedSession reports whether the session was opened", async () => {
     const s = useSession();
-    expect(await s.adoptJoinedSession(offerFor("joined-1"), "Lee", fakeMesh().mesh)).toBe(true);
+    expect(await s.adoptJoinedSession(offerFor("joined0001"), "Lee", fakeMesh().mesh)).toBe(true);
     db.lockAvailable(false);
     const t = reload();
     expect(await t.adoptJoinedSession(offerFor("joined-2"), "Lee", fakeMesh().mesh)).toBe(false);

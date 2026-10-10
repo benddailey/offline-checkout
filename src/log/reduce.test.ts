@@ -1,7 +1,7 @@
 import { test, expect, describe } from "vite-plus/test";
 import { reduce } from "./reduce";
 import type { LogRecord, SessionState } from "./types";
-import { mk } from "./helpers.test-util";
+import { mk, SID } from "./helpers.test-util";
 
 const plain = (s: SessionState) => JSON.stringify({ ...s, patronIndex: [...s.patronIndex] });
 
@@ -54,7 +54,7 @@ describe("reduce", () => {
       mk("a", 2, { type: "session-closed" }),
     ]);
     expect(s.name).toBe("Book Fair");
-    expect(s.sessionId).toBe("S");
+    expect(s.sessionId).toBe(SID);
     expect(s.closed).toBe(true);
     expect(reduce([]).closed).toBe(false);
     expect(reduce([]).sessionId).toBeNull();

@@ -25,7 +25,7 @@ export interface SessionStore {
   setEmployee(name: string): Promise<void>;
   /** One readwrite tx over [records, meta]: seq = nextSeq, nextSeq++. Rejects on failure. */
   append(body: RecordBody): Promise<LogRecord>;
-  /** Ignores existing keys and foreign sessionId; returns newly stored records. */
+  /** Ignores existing keys, foreign sessionId and this machine's deviceId; returns newly stored records. */
   put(records: LogRecord[]): Promise<LogRecord[]>;
   all(): Promise<LogRecord[]>;
   since(theirs: VersionVector): Promise<LogRecord[]>;
@@ -124,12 +124,15 @@ function makeStore(sessionId: string, db: IDBPDatabase<SessionSchema>): SessionS
       }
     },
     async put(records) {
-      const tx = db.transaction("records", "readwrite");
+      const tx = db.transaction(["records", "meta"], "readwrite");
+      const store = tx.objectStore("records");
+      const own = (await tx.objectStore("meta").get(META_KEY))?.deviceId;
       const stored: LogRecord[] = [];
       for (const r of records) {
-        if (r.sessionId !== sessionId) continue;
-        if ((await tx.store.get([r.deviceId, r.seq])) !== undefined) continue;
-        await tx.store.add(r);
+        // Only append() writes this machine's records; a peer's copy would collide with it.
+        if (r.sessionId !== sessionId || r.deviceId === own) continue;
+        if ((await store.get([r.deviceId, r.seq])) !== undefined) continue;
+        await store.add(r);
         stored.push(r);
       }
       await tx.done;

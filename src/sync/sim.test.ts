@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { mk } from "../log/helpers.test-util";
+import { dev, mk, SID } from "../log/helpers.test-util";
 import { reduce } from "../log/reduce";
 import type { LogRecord } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
@@ -74,6 +74,7 @@ class FakeMeshNetwork {
       return true;
     };
     return {
+      deviceId: id,
       send,
       broadcast: (msg) => {
         for (const o of this.ids) if (o !== id) send(o, msg);
@@ -89,12 +90,12 @@ function memStore(): StoreLike & { records: Map<string, LogRecord> } {
   const records = new Map<string, LogRecord>();
   return {
     records,
-    sessionId: "S",
+    sessionId: SID,
     put: async (rs) => {
       const fresh: LogRecord[] = [];
       for (const r of rs) {
         const k = `${r.deviceId}:${r.seq}`;
-        if (r.sessionId !== "S" || records.has(k)) continue;
+        if (r.sessionId !== SID || records.has(k)) continue;
         records.set(k, r);
         fresh.push(r);
       }
@@ -114,12 +115,13 @@ describe("three-peer simulation", () => {
   for (const seed of [1, 2, 3, 4, 5]) {
     it(`converges despite link drops, reordering and duplicates (seed ${seed})`, async () => {
       const rand = mulberry32(seed);
-      const ids = ["a", "b", "c"];
+      const [a, b, c] = ["a", "b", "c"].map(dev);
+      const ids = [a, b, c];
       const net = new FakeMeshNetwork(rand, ids);
       for (const [x, y] of [
-        ["a", "b"],
-        ["b", "c"],
-        ["a", "c"],
+        [a, b],
+        [b, c],
+        [a, c],
       ])
         net.setLink(x, y, true);
 
@@ -143,31 +145,35 @@ describe("three-peer simulation", () => {
         nexts.set(id, seq + 1);
         const r =
           seq === 1
-            ? mk(id, 1, { type: "patron-started", patron: `P${id}` })
-            : mk(id, seq, { type: "item-scanned", visitId: `${id}:1`, item: `I${id}${seq}` });
+            ? mk(id, 1, { type: "patron-started", patron: `P${id.toUpperCase()}` })
+            : mk(id, seq, {
+                type: "item-scanned",
+                visitId: `${id}:1`,
+                item: `I${id.toUpperCase()}${seq}`,
+              });
         await stores.get(id)!.put([r]);
         engines.get(id)!.pushLocal(r);
       };
 
       for (let round = 0; round < 10; round++) {
-        if (round === 3) net.setLink("a", "c", false);
+        if (round === 3) net.setLink(a, c, false);
         if (round === 6) {
-          net.setLink("a", "c", true);
-          net.setLink("a", "b", false);
-          net.setLink("b", "c", false);
+          net.setLink(a, c, true);
+          net.setLink(a, b, false);
+          net.setLink(b, c, false);
         }
         if (round === 9) {
-          net.setLink("a", "b", true);
-          net.setLink("b", "c", true);
+          net.setLink(a, b, true);
+          net.setLink(b, c, true);
         }
         for (const id of ids) for (let i = 0; i < 3; i++) await append(id);
         await vi.advanceTimersByTimeAsync(1000);
       }
       await vi.advanceTimersByTimeAsync(30_000);
 
-      const ref = sorted(stores.get("a")!.records);
+      const ref = sorted(stores.get(a)!.records);
       expect(ref).toHaveLength(90);
-      for (const id of ["b", "c"]) expect(sorted(stores.get(id)!.records)).toEqual(ref);
+      for (const id of [b, c]) expect(sorted(stores.get(id)!.records)).toEqual(ref);
       const states = ids.map((id) => reduce(stores.get(id)!.records.values()));
       expect(states[1]).toEqual(states[0]);
       expect(states[2]).toEqual(states[0]);

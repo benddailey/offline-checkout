@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { decodePayload, encodePayload, PairingError } from "../pairing/payload";
 import { createFakeRtcNetwork, type FakeRtcNetwork } from "./fake-rtc";
 import { NO_ADDRESS } from "./link";
-import { mk } from "../log/helpers.test-util";
+import { dev, mk, SID } from "../log/helpers.test-util";
 import type { LogRecord } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
 import { SyncEngine, type StoreLike } from "../sync/sync";
@@ -515,7 +515,7 @@ describe("joining with sync", () => {
     const recs = new Map(initial.map((r) => [`${r.deviceId}:${r.seq}`, r]));
     return {
       recs,
-      sessionId: "S",
+      sessionId: SID,
       put: async (rs) => {
         const fresh = rs.filter((r) => !recs.has(`${r.deviceId}:${r.seq}`));
         for (const r of fresh) recs.set(`${r.deviceId}:${r.seq}`, r);
@@ -528,8 +528,9 @@ describe("joining with sync", () => {
 
   test("records from both sides are exchanged at connect, before any 10 s sync tick", async () => {
     const body = { type: "patron-started", patron: "P" } as const;
-    const atA = memStore([mk("A", 1, body)]);
-    const atB = memStore([mk("A", 1, body), mk("B", 1, body), mk("B", 2, body)]);
+    const [ra, rb] = [dev("a"), dev("b")];
+    const atA = memStore([mk(ra, 1, body)]);
+    const atB = memStore([mk(ra, 1, body), mk(rb, 1, body), mk(rb, 2, body)]);
     const a = founder();
     const syncA = new SyncEngine({ mesh: a, store: atA, onRecords: () => {} });
     syncA.start();
@@ -541,8 +542,9 @@ describe("joining with sync", () => {
     syncB.start();
     await settle();
     try {
-      expect([...atA.recs.keys()].sort()).toEqual(["A:1", "B:1", "B:2"]);
-      expect([...atB.recs.keys()].sort()).toEqual(["A:1", "B:1", "B:2"]);
+      const all = [`${ra}:1`, `${rb}:1`, `${rb}:2`];
+      expect([...atA.recs.keys()].sort()).toEqual(all);
+      expect([...atB.recs.keys()].sort()).toEqual(all);
     } finally {
       syncA.stop();
       syncB.stop();
