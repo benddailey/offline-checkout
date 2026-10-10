@@ -5,8 +5,8 @@ import { checkItem } from "../log/duplicates";
 import { recordId } from "../log/ids";
 import { reduce } from "../log/reduce";
 import type { LogRecord, RecordBody, RecordId, VisitState } from "../log/types";
-import type { Mesh, PeerInfo } from "../mesh/mesh";
-import type { PairingPayload } from "../pairing/payload";
+import { Mesh, type MeshOptions, type PeerInfo } from "../mesh/mesh";
+import { PairingError, decodePayload, type PairingPayload } from "../pairing/payload";
 import { downloadBlob, renderScannerCard, renderSessionPdf } from "../pdf/render";
 import * as db from "../store/db";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
@@ -24,6 +24,11 @@ export interface SessionDeps {
   renderSessionPdf: typeof renderSessionPdf;
   renderScannerCard: typeof renderScannerCard;
   downloadBlob: typeof downloadBlob;
+  getDeviceId: typeof db.getDeviceId;
+  /** The live mesh for a session opened here (start or resume). */
+  createMesh: (o: MeshOptions) => Mesh;
+  /** Answer a pairing offer (Mesh.join). */
+  joinMesh: typeof Mesh.join;
   /** Wall clock for default session names and PDF dates. */
   now: () => Date;
 }
@@ -39,6 +44,9 @@ export function createSessionStoreDeps(overrides: Partial<SessionDeps> = {}): Se
     renderSessionPdf,
     renderScannerCard,
     downloadBlob,
+    getDeviceId: db.getDeviceId,
+    createMesh: (o) => new Mesh(o),
+    joinMesh: (text, o) => Mesh.join(text, o),
     now: () => new Date(),
     ...overrides,
   };
@@ -188,16 +196,24 @@ export const useSession = defineStore("session", () => {
       fatal.value = `Could not create the session: ${err instanceof Error ? err.message : String(err)}`;
       return;
     }
-    if (!(await open(created.sessionId, async () => created))) {
-      created.close();
+    let taken = false;
+    const ok = await open(created.sessionId, async () => {
+      taken = true;
+      return created;
+    });
+    if (!ok) {
+      // Once open() has taken the store, its own teardown closes it.
+      if (!taken) created.close();
       return;
     }
+    startMesh();
     offerScannerCard.value = true;
     screen.value = "scan";
   }
 
   async function resumeSession(sessionId: string): Promise<void> {
     if (!(await open(sessionId, () => deps.openSessionStore(sessionId)))) return;
+    startMesh();
     const own = meta.value!.deviceId;
     let latest: VisitState | null = null;
     for (const v of state.value.visits) {
@@ -217,8 +233,15 @@ export const useSession = defineStore("session", () => {
     if (store?.sessionId === offer.sessionId) {
       // Re-pair of the session already open here: keep store and lock, swap the mesh.
       if (meta.value?.employee !== clerk) {
-        await store.setEmployee(clerk);
-        meta.value = await store.meta();
+        try {
+          await store.setEmployee(clerk);
+          meta.value = await store.meta();
+        } catch (err) {
+          console.error("session: could not save the clerk name", err);
+          fatal.value = `Could not save the clerk's name: ${err instanceof Error ? err.message : String(err)}`;
+          joined.close();
+          return;
+        }
       }
     } else {
       const ok = await open(
@@ -270,20 +293,62 @@ export const useSession = defineStore("session", () => {
     sync.start();
   }
 
+  /** Give a session opened here its own mesh, so Add workstation always has one to invite from. */
+  function startMesh(): void {
+    const m = meta.value;
+    if (!m) return;
+    try {
+      attachMesh(
+        deps.createMesh({
+          sessionId: m.sessionId,
+          sessionName: m.name,
+          deviceId: m.deviceId,
+          employee: m.employee,
+          knownDevices,
+        }),
+      );
+    } catch (err) {
+      console.error("session: could not start the mesh", err);
+    }
+  }
+
+  /**
+   * Decode a scanned join code. While a session is open here (re-pair) only that session's
+   * codes are accepted. Throws PairingError.
+   */
+  function readOffer(text: string): PairingPayload {
+    const offer = decodePayload(text, "offer");
+    if (meta.value && offer.sessionId !== meta.value.sessionId) {
+      throw new PairingError("wrong-session", "That code is for a different session.");
+    }
+    return offer;
+  }
+
+  /** Answer a join code as `employee`; the caller shows the answer and waits for `connected`. */
+  async function joinSession(offerText: string, employee: string) {
+    readOffer(offerText);
+    const deviceId = meta.value?.deviceId ?? (await deps.getDeviceId());
+    return deps.joinMesh(offerText, { deviceId, employee: employee.trim(), knownDevices });
+  }
+
   function knownDevices(): Set<string> {
     return new Set(records.value.map((r) => r.deviceId));
   }
 
   /** Append one record; it joins `records` only once committed. */
   async function commit(body: RecordBody, what: "scan" | "change"): Promise<LogRecord | null> {
-    if (!store) return null;
+    const target = store;
+    if (!target) return null;
     try {
-      const r = await store.append(body);
+      const r = await target.append(body);
+      // The session was switched while this append was in flight: it belongs to the old one.
+      if (store !== target) return null;
       merge([r]);
       sync?.pushLocal(r);
       return r;
     } catch (err) {
       console.error("session: append failed", err);
+      if (store !== target) return null;
       fatal.value = saveFailed(what, err);
       return null;
     }
@@ -291,8 +356,10 @@ export const useSession = defineStore("session", () => {
 
   /** Run `task` after every earlier scan/edit; never rejects. */
   function enqueue(task: () => Promise<void>): Promise<void> {
+    // A task queued for one session never runs against the next one opened here.
+    const owner = store;
     const run = queue.then(async () => {
-      if (fatal.value !== null || !store) return;
+      if (fatal.value !== null || !store || store !== owner) return;
       try {
         await task();
       } catch (err) {
@@ -378,6 +445,10 @@ export const useSession = defineStore("session", () => {
     return enqueue(async () => {
       const visit = currentVisit.value;
       if (!visit) return;
+      if (closed.value) {
+        message.value = { tone: "error", text: "Session closed" };
+        return;
+      }
       if (await commit({ type: "patron-ended", visitId: visit.id }, "change")) {
         currentVisitId.value = null;
         message.value = null;
@@ -457,6 +528,8 @@ export const useSession = defineStore("session", () => {
     printScannerCard,
     attachMesh,
     adoptJoinedSession,
+    readOffer,
+    joinSession,
     knownDevices,
     listSessions,
   };

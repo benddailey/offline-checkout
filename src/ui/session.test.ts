@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { recordId } from "../log/ids";
 import type { LogRecord, RecordBody, VersionVector } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
-import type { Mesh, PeerInfo } from "../mesh/mesh";
-import type { PairingPayload } from "../pairing/payload";
+import type { Mesh, MeshOptions, PeerInfo } from "../mesh/mesh";
+import { encodePayload, type PairingPayload } from "../pairing/payload";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
 import { createSessionStoreDeps, setSessionDeps, useSession } from "./session";
 
@@ -17,6 +17,11 @@ function fakeDb() {
   const logs = new Map<string, LogRecord[]>();
   const locks = new Set<string>();
   let failAppends = false;
+  let failSetEmployee = false;
+  let failMeta = false;
+  const closes = new Map<string, number>();
+  const meshes: ReturnType<typeof fakeMesh>[] = [];
+  const meshOptions: MeshOptions[] = [];
   let gate: Promise<void> = Promise.resolve();
   let lockAvailable = true;
   let persistCalls = 0;
@@ -27,8 +32,12 @@ function fakeDb() {
     const meta = metas.get(sessionId)!;
     return {
       sessionId,
-      meta: async () => ({ ...meta }),
+      async meta() {
+        if (failMeta) throw new Error("meta unreadable");
+        return { ...meta };
+      },
       async setEmployee(name) {
+        if (failSetEmployee) throw new Error("QuotaExceededError");
         meta.employee = name;
       },
       append(body: RecordBody) {
@@ -60,7 +69,9 @@ function fakeDb() {
       all: async () => [...log],
       since: async (theirs: VersionVector) => missingFor(log, theirs),
       vector: async () => vectorOf(log),
-      close() {},
+      close() {
+        closes.set(sessionId, (closes.get(sessionId) ?? 0) + 1);
+      },
     };
   }
 
@@ -108,6 +119,13 @@ function fakeDb() {
     renderSessionPdf: () => new Blob(["pdf"]),
     renderScannerCard: () => new Blob(["card"]),
     downloadBlob: (_blob, filename) => downloads.push(filename),
+    getDeviceId: async () => DEVICE,
+    createMesh(o) {
+      meshOptions.push(o);
+      const m = fakeMesh();
+      meshes.push(m);
+      return m.mesh;
+    },
   });
   const downloads: string[] = [];
 
@@ -117,6 +135,15 @@ function fakeDb() {
     logs,
     locks,
     downloads,
+    closes,
+    meshes,
+    meshOptions,
+    failSetEmployee(v: boolean) {
+      failSetEmployee = v;
+    },
+    failMeta(v: boolean) {
+      failMeta = v;
+    },
     failAppends(v: boolean) {
       failAppends = v;
     },
@@ -385,6 +412,7 @@ function fakeMesh(initial: PeerInfo[] = []) {
   let peers = initial;
   const sent: unknown[] = [];
   const employees: string[] = [];
+  const state = { closed: false };
   const mesh = {
     send: (_id: string, msg: unknown) => (sent.push(msg), true),
     broadcast: (msg: unknown) => void sent.push(msg),
@@ -398,10 +426,14 @@ function fakeMesh(initial: PeerInfo[] = []) {
     },
     peers: () => peers,
     setEmployee: (name: string) => void employees.push(name),
-    close() {},
+    close() {
+      state.closed = true;
+    },
   };
   return {
     mesh: mesh as unknown as Mesh,
+    state,
+    listeners: () => msgCbs.size + peerCbs.size,
     sent,
     employees,
     setPeers(p: PeerInfo[]) {
@@ -494,5 +526,235 @@ describe("useSession mesh", () => {
     expect(s.mesh).toBe(m.mesh);
     expect(db.locks.has("joined-1")).toBe(true);
     expect(db.persistCalls()).toBe(1);
+  });
+});
+
+const FINGERPRINT = Array.from({ length: 32 }, () => "AB").join(":");
+
+function code(kind: "offer" | "answer", sessionId: string, sessionName = "Outage"): string {
+  return encodePayload({
+    kind,
+    sessionId,
+    sessionName,
+    deviceId: "dev-b",
+    employee: "Sam",
+    sdp: {
+      ufrag: "abcd",
+      pwd: "0123456789abcdefghijkl",
+      fingerprint: FINGERPRINT,
+      candidates: [{ address: "10.0.0.2", port: 50000 }],
+    },
+  });
+}
+
+function offerFor(sessionId: string): PairingPayload {
+  return {
+    kind: "offer",
+    sessionId,
+    sessionName: "Outage",
+    deviceId: "dev-b",
+    employee: "Sam",
+    sdp: {},
+  } as unknown as PairingPayload;
+}
+
+const remoteRecord = (sessionId: string): LogRecord => ({
+  sessionId,
+  deviceId: "dev-b",
+  seq: 1,
+  employee: "Sam",
+  at: 5000,
+  type: "patron-started",
+  patron: "P9",
+});
+
+describe("useSession session lifecycle", () => {
+  it("start and resume give the session its own mesh", async () => {
+    const s = await started();
+    const sessionId = s.meta!.sessionId;
+    expect(db.meshOptions[0]).toMatchObject({
+      sessionId,
+      sessionName: "2026-10-10",
+      deviceId: DEVICE,
+      employee: "Rae",
+    });
+    expect(s.mesh).toBe(db.meshes[0]!.mesh);
+    expect(db.meshOptions[0]!.knownDevices()).toEqual(new Set([DEVICE]));
+    expect(s.isolated).toBe(true);
+
+    const r = reload();
+    await r.resumeSession(sessionId);
+    expect(db.meshOptions[1]).toMatchObject({ sessionId, employee: "Rae" });
+    expect(r.mesh).toBe(db.meshes[1]!.mesh);
+  });
+
+  it("switching sessions releases the old lock, stops its sync and closes its mesh", async () => {
+    const s = await started();
+    const first = s.meta!.sessionId;
+    const m = db.meshes[0]!;
+    expect(m.listeners()).toBeGreaterThan(0);
+
+    await s.startSession("Second", "Rae");
+    expect(s.meta!.sessionId).not.toBe(first);
+    expect(db.locks.has(first)).toBe(false);
+    expect(db.closes.get(first)).toBe(1);
+    expect(m.state.closed).toBe(true);
+    expect(m.listeners()).toBe(0);
+    expect(s.mesh).toBe(db.meshes[1]!.mesh);
+
+    m.deliver("dev-b", { t: "recs", records: [remoteRecord(first)] });
+    await tick();
+    expect(s.records.some((r) => r.deviceId === "dev-b")).toBe(false);
+  });
+
+  it("a scan in flight when the session switches is not shown in the new session", async () => {
+    const s = await started();
+    const first = s.meta!.sessionId;
+    const release = db.holdAppends();
+    const pending = s.scan("P1");
+    await tick();
+    const switching = s.startSession("Second", "Rae");
+    release();
+    await Promise.all([pending, switching]);
+    expect(s.meta!.name).toBe("Second");
+    expect(types(s.records)).toEqual(["session-created"]);
+    expect(s.currentVisit).toBeNull();
+    expect(db.logs.get(first)!.map((r) => r.type)).toContain("patron-started");
+  });
+
+  it("a scan queued for the old session does not run against the new one", async () => {
+    const s = await started();
+    const release = db.holdAppends();
+    const busy = s.scan("P1");
+    const queued = s.scan("P2");
+    await tick();
+    const switching = s.startSession("Second", "Rae");
+    release();
+    await Promise.all([busy, queued, switching]);
+    expect(types(s.records)).toEqual(["session-created"]);
+    expect(db.logs.get(s.meta!.sessionId)!.map((r) => r.type)).toEqual(["session-created"]);
+  });
+
+  it("endPatron is refused once the session is closed", async () => {
+    const s = await started();
+    await s.scan("P1");
+    await s.closeSession();
+    const count = s.records.length;
+    await s.endPatron();
+    expect(s.records).toHaveLength(count);
+    expect(s.message).toEqual({ tone: "error", text: "Session closed" });
+  });
+
+  it("closes a created store once when the lock is held", async () => {
+    db.lockAvailable(false);
+    const s = useSession();
+    await s.startSession("X", "Rae");
+    expect(s.fatal).not.toBeNull();
+    expect([...db.closes.values()]).toEqual([1]);
+  });
+
+  it("closes a created store once when loading it fails", async () => {
+    db.failMeta(true);
+    const s = useSession();
+    await s.startSession("X", "Rae");
+    expect(s.fatal).toMatch(/^Could not open the session/);
+    expect([...db.closes.values()]).toEqual([1]);
+    expect(db.locks.size).toBe(0);
+  });
+});
+
+describe("useSession pairing", () => {
+  it("attachMesh replacing a mesh closes the old one and syncs over the new one", async () => {
+    const s = await started();
+    const old = db.meshes[0]!;
+    const next = fakeMesh([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    s.attachMesh(next.mesh);
+    expect(old.state.closed).toBe(true);
+    expect(old.listeners()).toBe(0);
+    expect(s.peers).toEqual([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    expect(s.isolated).toBe(false);
+    old.sent.length = 0;
+    await s.scan("P1");
+    expect(old.sent).toEqual([]);
+    expect(next.sent).toContainEqual({ t: "recs", records: [s.records[1]] });
+  });
+
+  it("re-pair keeps the store, lock and records and swaps in the joined mesh", async () => {
+    const s = await started();
+    await s.scan("P1");
+    const sessionId = s.meta!.sessionId;
+    const old = db.meshes[0]!;
+    const joined = fakeMesh([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    await s.adoptJoinedSession(offerFor(sessionId), " Lee ", joined.mesh);
+    expect(s.meta).toMatchObject({ sessionId, employee: "Lee" });
+    expect(db.metas.get(sessionId)!.employee).toBe("Lee");
+    expect(types(s.records)).toEqual(["session-created", "patron-started"]);
+    expect(s.currentVisit?.patron).toBe("P1");
+    expect(db.locks.has(sessionId)).toBe(true);
+    expect(db.closes.get(sessionId)).toBeUndefined();
+    expect(old.state.closed).toBe(true);
+    expect(s.mesh).toBe(joined.mesh);
+    expect(joined.employees).toEqual(["Lee"]);
+    expect(s.isolated).toBe(false);
+    expect(s.screen).toBe("scan");
+  });
+
+  it("re-pair that cannot save the clerk name is fatal and drops the joined mesh", async () => {
+    const s = await started();
+    const sessionId = s.meta!.sessionId;
+    db.failSetEmployee(true);
+    const joined = fakeMesh();
+    await s.adoptJoinedSession(offerFor(sessionId), "Lee", joined.mesh);
+    expect(s.fatal).toMatch(/^Could not save the clerk's name/);
+    expect(joined.state.closed).toBe(true);
+    expect(s.mesh).toBe(db.meshes[0]!.mesh);
+  });
+
+  it("a failed join-open closes the joined mesh", async () => {
+    db.lockAvailable(false);
+    const s = useSession();
+    const joined = fakeMesh();
+    await s.adoptJoinedSession(offerFor("joined-1"), "Lee", joined.mesh);
+    expect(s.fatal).not.toBeNull();
+    expect(joined.state.closed).toBe(true);
+    expect(s.mesh).toBeNull();
+  });
+
+  it("readOffer accepts any session's join code until a session is open, then only its own", async () => {
+    const s = useSession();
+    expect(s.readOffer(code("offer", "other")).sessionName).toBe("Outage");
+    expect(() => s.readOffer(code("answer", "other"))).toThrow(
+      expect.objectContaining({ code: "wrong-kind" }),
+    );
+    expect(() => s.readOffer("hello")).toThrow(expect.objectContaining({ code: "malformed" }));
+
+    await s.startSession("Mine", "Rae");
+    const own = s.meta!.sessionId;
+    expect(s.readOffer(code("offer", own)).sessionId).toBe(own);
+    expect(() => s.readOffer(code("offer", "other"))).toThrow(
+      expect.objectContaining({ code: "wrong-session" }),
+    );
+  });
+
+  it("joinSession answers as this device and the given clerk, checking the session first", async () => {
+    const calls: unknown[][] = [];
+    const joinMesh = (async (...args: unknown[]) => {
+      calls.push(args);
+      return "joined";
+    }) as unknown as typeof db.deps.joinMesh;
+    setSessionDeps({ ...db.deps, joinMesh, getDeviceId: async () => "dev-new" });
+    setActivePinia(createPinia());
+    const s = useSession();
+    const text = code("offer", "joined-1");
+    expect(await s.joinSession(text, " Lee ")).toBe("joined");
+    expect(calls[0]![0]).toBe(text);
+    expect(calls[0]![1]).toMatchObject({ deviceId: "dev-new", employee: "Lee" });
+
+    await s.startSession("Mine", "Rae");
+    await expect(s.joinSession(text, "Lee")).rejects.toMatchObject({ code: "wrong-session" });
+    const own = code("offer", s.meta!.sessionId);
+    await s.joinSession(own, "Rae");
+    expect(calls[1]![1]).toMatchObject({ deviceId: DEVICE, employee: "Rae" });
+    expect(calls).toHaveLength(2);
   });
 });

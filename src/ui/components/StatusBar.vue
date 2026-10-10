@@ -23,9 +23,16 @@ const session = useSession();
         {{ p.employee }}
       </li>
     </ul>
-    <p v-if="session.isolated" class="text-lg font-semibold text-red-700">
-      Disconnected — re-pair with any workstation
-    </p>
+    <div v-if="session.isolated" class="flex items-center gap-3">
+      <p class="text-lg font-semibold text-red-700">Disconnected — re-pair with any workstation</p>
+      <button
+        type="button"
+        class="min-h-11 rounded-lg border-2 border-red-700 bg-white px-4 text-lg font-semibold text-red-800 hover:bg-red-50"
+        @click="session.screen = 'pair-join'"
+      >
+        Re-pair
+      </button>
+    </div>
     <p class="ml-auto text-xl font-bold text-slate-900" data-testid="totals">
       Patrons {{ session.state.totals.patrons }} · Items {{ session.state.totals.items }}
     </p>
