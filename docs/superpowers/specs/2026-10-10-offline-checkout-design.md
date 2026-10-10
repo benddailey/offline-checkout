@@ -1,7 +1,7 @@
 # Offline Checkout — Design
 
-**Date:** 2026-10-10
-**Status:** Draft for review
+**Date:** 2026-10-10\
+**Status:** Approved
 
 ## 1. Purpose
 
