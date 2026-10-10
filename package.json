@@ -10,7 +10,8 @@
     "test": "vp test run",
     "check": "vp check",
     "build:harness": "vp build -c vite.harness.config.ts",
-    "e2e": "vp build && npm run build:harness && playwright test"
+    "build:probe": "vp build -c vite.probe.config.ts",
+    "e2e": "vp build && npm run build:harness && npm run build:probe && playwright test"
   },
   "dependencies": {
     "idb": "^8.0.4",

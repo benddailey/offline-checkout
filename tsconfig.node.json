@@ -23,6 +23,7 @@
   "include": [
     "vite.config.ts",
     "vite.harness.config.ts",
+    "vite.probe.config.ts",
     "playwright.config.ts",
     "e2e/**/*.ts",
     "scripts/**/*.ts"
