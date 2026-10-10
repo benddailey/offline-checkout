@@ -758,3 +758,76 @@ describe("useSession pairing", () => {
     expect(calls).toHaveLength(2);
   });
 });
+
+describe("useSession disconnected notice", () => {
+  it("is off for a brand-new session that has only ever been on this machine", async () => {
+    const s = await started();
+    expect(s.isolated).toBe(true);
+    expect(s.disconnected).toBe(false);
+  });
+
+  it("is on when the session has records from other workstations but no peer is connected", async () => {
+    const s = await started();
+    const sessionId = s.meta!.sessionId;
+    db.logs.get(sessionId)!.push(remoteRecord(sessionId));
+    const r = reload();
+    await r.resumeSession(sessionId);
+    expect(r.disconnected).toBe(true);
+    db.meshes.at(-1)!.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    expect(r.disconnected).toBe(false);
+  });
+
+  it("is on once a peer seen in this page load drops, even before any of its records arrive", async () => {
+    const s = await started();
+    const m = db.meshes[0]!;
+    m.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    expect(s.disconnected).toBe(false);
+    m.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: false }]);
+    expect(s.disconnected).toBe(true);
+  });
+
+  it("starts over when another session is opened", async () => {
+    const s = await started();
+    db.meshes[0]!.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: false }]);
+    db.meshes[0]!.setPeers([{ deviceId: "dev-b", employee: "Sam", connected: true }]);
+    await s.startSession("Second", "Rae");
+    expect(s.disconnected).toBe(false);
+  });
+});
+
+describe("useSession ensureMesh", () => {
+  it("tells the clerk when the mesh cannot be created and retries on the next call", async () => {
+    let fail = true;
+    const createMesh = db.deps.createMesh;
+    setSessionDeps({
+      ...db.deps,
+      createMesh(o) {
+        if (fail) throw new Error("RTCPeerConnection is not defined");
+        return createMesh(o);
+      },
+    });
+    setActivePinia(createPinia());
+    const s = useSession();
+    await s.startSession("X", "Rae");
+    expect(s.screen).toBe("scan");
+    expect(s.mesh).toBeNull();
+    expect(s.message?.tone).toBe("error");
+    expect(s.message?.text).toMatch(/^Could not start networking on this workstation/);
+
+    expect(s.ensureMesh()).toBeNull();
+    fail = false;
+    const m = s.ensureMesh();
+    expect(m).toBe(db.meshes[0]!.mesh);
+    expect(s.mesh).toBe(m);
+    expect(s.ensureMesh()).toBe(m);
+    expect(db.meshes).toHaveLength(1);
+  });
+
+  it("adoptJoinedSession reports whether the session was opened", async () => {
+    const s = useSession();
+    expect(await s.adoptJoinedSession(offerFor("joined-1"), "Lee", fakeMesh().mesh)).toBe(true);
+    db.lockAvailable(false);
+    const t = reload();
+    expect(await t.adoptJoinedSession(offerFor("joined-2"), "Lee", fakeMesh().mesh)).toBe(false);
+  });
+});

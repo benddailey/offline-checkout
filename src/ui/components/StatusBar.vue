@@ -23,7 +23,7 @@ const session = useSession();
         {{ p.employee }}
       </li>
     </ul>
-    <div v-if="session.isolated" class="flex items-center gap-3">
+    <div v-if="session.disconnected" class="flex items-center gap-3">
       <p class="text-lg font-semibold text-red-700">Disconnected — re-pair with any workstation</p>
       <button
         type="button"

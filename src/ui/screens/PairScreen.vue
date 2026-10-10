@@ -81,8 +81,8 @@ function dropInvite(): void {
 async function startInvite(): Promise<void> {
   dropInvite();
   phase.value = "start";
-  const mesh = session.mesh;
-  if (!mesh) return fail("This workstation is not ready to add others. Go back and try again.");
+  const mesh = session.ensureMesh();
+  if (!mesh) return fail("This workstation is not ready to add others. Click Try again.");
   try {
     const created = await mesh.createInvite();
     if (!alive) return created.cancel();
@@ -133,6 +133,8 @@ const offer = ref<PairingPayload | null>(null);
 const clerk = ref(repair ? (session.meta?.employee ?? "") : "");
 const clerkError = ref(false);
 const answer = ref("");
+/** Set while the connected mesh is being handed to the session: leaving is not allowed. */
+const adopting = ref(false);
 /** The joined mesh until it is handed to the session; closed if we leave or fail first. */
 let pending: Mesh | null = null;
 
@@ -181,7 +183,16 @@ async function submitName(): Promise<void> {
   }
   if (pending !== joined.mesh || !alive) return;
   pending = null;
-  await session.adoptJoinedSession(joined.offer, name, joined.mesh);
+  phase.value = "working";
+  status.value = "Opening the session…";
+  adopting.value = true;
+  try {
+    if (!(await session.adoptJoinedSession(joined.offer, name, joined.mesh))) {
+      fail("Could not open the session on this workstation. Click Try again.");
+    }
+  } finally {
+    adopting.value = false;
+  }
 }
 
 function startJoin(): void {
@@ -202,6 +213,7 @@ function tryAgain(): void {
 }
 
 function leave(): void {
+  if (adopting.value) return;
   session.screen = backTo;
 }
 
@@ -236,7 +248,9 @@ const step = "text-2xl font-bold text-slate-900";
   <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
     <div class="flex flex-wrap items-center gap-4">
       <h1 class="text-3xl font-extrabold text-slate-900">{{ title }}</h1>
-      <button type="button" :class="[secondary, 'ml-auto']" @click="leave">Back</button>
+      <button v-if="!adopting" type="button" :class="[secondary, 'ml-auto']" @click="leave">
+        Back
+      </button>
     </div>
 
     <p v-if="phase === 'start'" class="text-xl text-slate-700">Preparing the join code…</p>

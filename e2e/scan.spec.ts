@@ -50,5 +50,6 @@ test("scan, void, end patron and resume after reload", async ({ page }) => {
     .click();
   await expect(page.getByText("Scan patron card")).toBeVisible();
   await expect(page.getByTestId("totals")).toHaveText("Patrons 1 · Items 1");
-  await expect(page.getByText("Disconnected — re-pair with any workstation")).toBeVisible();
+  // Only this workstation has ever been in the session: nothing to re-pair with.
+  await expect(page.getByText("Disconnected — re-pair with any workstation")).toBeHidden();
 });

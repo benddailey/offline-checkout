@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { decodePayload, encodePayload, PairingError } from "../pairing/payload";
 import { createFakeRtcNetwork, type FakeRtcNetwork } from "./fake-rtc";
 import { NO_ADDRESS } from "./link";
+import { mk } from "../log/helpers.test-util";
+import type { LogRecord } from "../log/types";
+import { missingFor, vectorOf } from "../log/vector";
+import { SyncEngine, type StoreLike } from "../sync/sync";
 import { Mesh, type MeshOptions, type PeerInfo } from "./mesh";
 
 const RETRY = 10_000;
@@ -490,5 +494,81 @@ describe("robustness", () => {
     expect(got).toEqual(["x"]);
     expect(errors).toHaveBeenCalledTimes(2);
     errors.mockRestore();
+  });
+});
+
+describe("joining with sync", () => {
+  test("app messages sent before the joiner subscribes reach its first subscriber, in order", async () => {
+    const a = founder();
+    const { mesh: b } = await pair(a, "B", "Bob");
+    a.send("B", 1);
+    a.send("B", 2);
+    await settle();
+    const got: unknown[] = [];
+    b.onMessage((_from, msg) => got.push(msg));
+    a.send("B", 3);
+    await settle();
+    expect(got).toEqual([1, 2, 3]);
+  });
+
+  function memStore(initial: LogRecord[]): StoreLike & { recs: Map<string, LogRecord> } {
+    const recs = new Map(initial.map((r) => [`${r.deviceId}:${r.seq}`, r]));
+    return {
+      recs,
+      sessionId: "S",
+      put: async (rs) => {
+        const fresh = rs.filter((r) => !recs.has(`${r.deviceId}:${r.seq}`));
+        for (const r of fresh) recs.set(`${r.deviceId}:${r.seq}`, r);
+        return fresh;
+      },
+      since: async (v) => missingFor(recs.values(), v),
+      vector: async () => vectorOf(recs.values()),
+    };
+  }
+
+  test("records from both sides are exchanged at connect, before any 10 s sync tick", async () => {
+    const body = { type: "patron-started", patron: "P" } as const;
+    const atA = memStore([mk("A", 1, body)]);
+    const atB = memStore([mk("A", 1, body), mk("B", 1, body), mk("B", 2, body)]);
+    const a = founder();
+    const syncA = new SyncEngine({ mesh: a, store: atA, onRecords: () => {} });
+    syncA.start();
+    // B re-pairs: its mesh connects first and the app attaches sync to it afterwards, so
+    // A's connect-time vector arrives before B is listening.
+    const { mesh: b } = await pair(a, "B", "Bob");
+    await settle();
+    const syncB = new SyncEngine({ mesh: b, store: atB, onRecords: () => {} });
+    syncB.start();
+    await settle();
+    try {
+      expect([...atA.recs.keys()].sort()).toEqual(["A:1", "B:1", "B:2"]);
+      expect([...atB.recs.keys()].sort()).toEqual(["A:1", "B:1", "B:2"]);
+    } finally {
+      syncA.stop();
+      syncB.stop();
+    }
+  });
+
+  test("cancelling an accepted invite that never connected closes its connection", async () => {
+    const a = founder();
+    const invite = await a.createInvite();
+    const other = await a.createInvite();
+    // An answer to a different offer: accepted, but the connection never opens.
+    const j = await Mesh.join(other.payload, opts("B", "Bob"));
+    track(j.mesh);
+    const accepting = invite.accept(j.answer);
+    await settle();
+    const before = net.pending("A");
+    invite.cancel();
+    await expectPairingError(accepting, "expired");
+    expect(net.pending("A")).toBe(before - 1);
+  });
+
+  test("cancelling a connected invite leaves the peer connected", async () => {
+    const a = founder();
+    const { invite } = await pair(a, "B", "Bob");
+    invite.cancel();
+    await settle();
+    expect(view(a)).toEqual({ B: true });
   });
 });

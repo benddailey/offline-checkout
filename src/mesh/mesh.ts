@@ -34,7 +34,7 @@ export interface Invite {
   expiresAt: number;
   /** Resolves when the joiner's hello arrives. PairingError: expired (TTL, cancelled or second use), wrong-session, malformed, wrong-kind. */
   accept(answerText: string): Promise<PeerInfo>;
-  /** Abandon an unaccepted invite and close its connection. */
+  /** Abandon the invite and close its connection, unless its joiner has already said hello. */
   cancel(): void;
 }
 
@@ -48,6 +48,8 @@ function safely(fn: () => void): void {
 }
 
 const RTC_CONFIG: RTCConfiguration = { iceServers: [] };
+/** Unsubscribed app messages kept for the first subscriber; the oldest are dropped beyond this. */
+const MAX_BACKLOG = 1000;
 const browserRtc: RtcFactory = (config) => new RTCPeerConnection(config);
 const expired = () =>
   new PairingError("expired", "This pairing code has expired. Create a new one.");
@@ -76,6 +78,12 @@ export class Mesh {
   private readonly retryMs: number;
   private readonly signalsHandled = new Set<string>();
   private readonly messageCbs = new Set<(peerId: string, msg: unknown) => void>();
+  /**
+   * App messages that arrived while nobody was subscribed (a joined mesh before the app adopts
+   * it), delivered in order to the first subscriber so nothing sent at connect is lost.
+   */
+  private backlog: [string, unknown][] = [];
+  private flushQueued = false;
   private readonly peerCbs = new Set<(peers: PeerInfo[]) => void>();
   private readonly retryTimer: ReturnType<typeof setInterval>;
   private closed = false;
@@ -130,7 +138,11 @@ export class Mesh {
       this.inviteTimers.delete(link);
     };
     const cancel = () => {
-      if (used) return;
+      if (used) {
+        // Accepted but never connected (e.g. the clerk gave up waiting): don't leave it open.
+        if (!link.remoteId) link.close(expired());
+        return;
+      }
       cancelled = true;
       link.close(expired());
     };
@@ -205,6 +217,7 @@ export class Mesh {
 
   onMessage(cb: (peerId: string, msg: unknown) => void): () => void {
     this.messageCbs.add(cb);
+    this.scheduleFlush();
     return () => this.messageCbs.delete(cb);
   }
 
@@ -232,6 +245,7 @@ export class Mesh {
     for (const link of this.links) link.close(); // Set iteration tolerates deletion
     this.messageCbs.clear();
     this.peerCbs.clear();
+    this.backlog = [];
   }
 
   private peerInfo(id: string): PeerInfo {
@@ -274,7 +288,31 @@ export class Mesh {
     if (!from || this.closed) return; // nothing but hello before the handshake
     if (msg.t === "intro") this.onIntro(msg);
     else if (msg.t === "signal") this.onSignal(from, msg);
-    else for (const cb of this.messageCbs) safely(() => cb(from, msg.body));
+    else this.deliver(from, msg.body);
+  }
+
+  private deliver(from: string, body: unknown): void {
+    if (this.messageCbs.size > 0 && this.backlog.length === 0) {
+      for (const cb of this.messageCbs) safely(() => cb(from, body));
+      return;
+    }
+    this.backlog.push([from, body]);
+    if (this.backlog.length > MAX_BACKLOG) this.backlog.shift();
+    this.scheduleFlush();
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushQueued || this.messageCbs.size === 0 || this.backlog.length === 0) return;
+    this.flushQueued = true;
+    queueMicrotask(() => {
+      this.flushQueued = false;
+      if (this.closed || this.messageCbs.size === 0) return;
+      const pending = this.backlog;
+      this.backlog = [];
+      for (const [from, body] of pending) {
+        for (const cb of this.messageCbs) safely(() => cb(from, body));
+      }
+    });
   }
 
   private onHello(link: Link, h: HelloMsg): void {

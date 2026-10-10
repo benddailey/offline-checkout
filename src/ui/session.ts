@@ -90,11 +90,22 @@ export const useSession = defineStore("session", () => {
   const fatal = ref<string | null>(null);
   const peers = ref<PeerInfo[]>([]);
   const isolated = ref(true);
+  /** A peer has been connected since this session was opened in this page. */
+  const hadPeer = ref(false);
   const mesh = shallowRef<Mesh | null>(null);
   /** Set after "Start new session" so the scan screen can offer the scanner card. */
   const offerScannerCard = ref(false);
 
   const state = computed(() => reduce(records.value));
+  /**
+   * Cut off from a session that has other workstations: after a reload, crash or sleep, or a
+   * lost link. A brand-new session that has only ever been on this machine is not "disconnected".
+   */
+  const disconnected = computed(() => {
+    if (!isolated.value || !meta.value) return false;
+    const own = meta.value.deviceId;
+    return hadPeer.value || records.value.some((r) => r.deviceId !== own);
+  });
   const closed = computed(() => state.value.closed);
   const currentVisit = computed<VisitState | null>(() => {
     const id = currentVisitId.value;
@@ -144,6 +155,7 @@ export const useSession = defineStore("session", () => {
     currentVisitId.value = null;
     message.value = null;
     offerScannerCard.value = false;
+    hadPeer.value = false;
   }
 
   /** Lock, load and show the session; on a held lock or failure sets `fatal` and returns false. */
@@ -206,14 +218,14 @@ export const useSession = defineStore("session", () => {
       if (!taken) created.close();
       return;
     }
-    startMesh();
+    ensureMesh();
     offerScannerCard.value = true;
     screen.value = "scan";
   }
 
   async function resumeSession(sessionId: string): Promise<void> {
     if (!(await open(sessionId, () => deps.openSessionStore(sessionId)))) return;
-    startMesh();
+    ensureMesh();
     const own = meta.value!.deviceId;
     let latest: VisitState | null = null;
     for (const v of state.value.visits) {
@@ -228,7 +240,7 @@ export const useSession = defineStore("session", () => {
     offer: PairingPayload,
     employee: string,
     joined: Mesh,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const clerk = employee.trim();
     if (store?.sessionId === offer.sessionId) {
       // Re-pair of the session already open here: keep store and lock, swap the mesh.
@@ -240,7 +252,7 @@ export const useSession = defineStore("session", () => {
           console.error("session: could not save the clerk name", err);
           fatal.value = `Could not save the clerk's name: ${err instanceof Error ? err.message : String(err)}`;
           joined.close();
-          return;
+          return false;
         }
       }
     } else {
@@ -257,11 +269,12 @@ export const useSession = defineStore("session", () => {
       );
       if (!ok) {
         joined.close();
-        return;
+        return false;
       }
     }
     attachMesh(joined);
     screen.value = "scan";
+    return true;
   }
 
   function attachMesh(m: Mesh): void {
@@ -275,6 +288,7 @@ export const useSession = defineStore("session", () => {
     const setPeers = (list: PeerInfo[]) => {
       peers.value = list;
       isolated.value = !list.some((p) => p.connected);
+      if (!isolated.value) hadPeer.value = true;
     };
     unsubPeers = m.onPeerChange(setPeers);
     setPeers(m.peers());
@@ -293,10 +307,14 @@ export const useSession = defineStore("session", () => {
     sync.start();
   }
 
-  /** Give a session opened here its own mesh, so Add workstation always has one to invite from. */
-  function startMesh(): void {
+  /**
+   * The open session's mesh, creating one if it has none, so Add workstation always has one to
+   * invite from. On failure tells the clerk and returns null (Add workstation retries).
+   */
+  function ensureMesh(): Mesh | null {
     const m = meta.value;
-    if (!m) return;
+    if (!m) return null;
+    if (mesh.value) return mesh.value;
     try {
       attachMesh(
         deps.createMesh({
@@ -307,8 +325,14 @@ export const useSession = defineStore("session", () => {
           knownDevices,
         }),
       );
+      return mesh.value;
     } catch (err) {
       console.error("session: could not start the mesh", err);
+      message.value = {
+        tone: "error",
+        text: `Could not start networking on this workstation (${err instanceof Error ? err.message : String(err)}). Scanning still works; other workstations cannot connect yet.`,
+      };
+      return null;
     }
   }
 
@@ -512,6 +536,7 @@ export const useSession = defineStore("session", () => {
     fatal,
     peers,
     isolated,
+    disconnected,
     mesh,
     offerScannerCard,
     state,
@@ -528,6 +553,7 @@ export const useSession = defineStore("session", () => {
     printScannerCard,
     attachMesh,
     adoptJoinedSession,
+    ensureMesh,
     readOffer,
     joinSession,
     knownDevices,
