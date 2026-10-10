@@ -6,6 +6,13 @@ const emit = defineEmits<{ decoded: [text: string] }>();
 
 const cameraError = ref(false);
 const pasted = ref("");
+// Camera frames repeat the same code; consumers are not idempotent, so scan once then pause.
+const paused = ref(false);
+
+function reset() {
+  paused.value = false;
+}
+defineExpose({ reset });
 
 function emitText(raw: string) {
   const text = raw.trim();
@@ -14,7 +21,10 @@ function emitText(raw: string) {
 
 function onDetect(codes: DetectedBarcode[]) {
   for (const code of codes) {
-    if (code.rawValue.trim()) return emitText(code.rawValue);
+    if (code.rawValue.trim()) {
+      paused.value = true;
+      return emitText(code.rawValue);
+    }
   }
 }
 
@@ -26,7 +36,12 @@ function usePasted() {
 <template>
   <div class="flex flex-col gap-3">
     <div class="relative h-72 w-full overflow-hidden rounded bg-slate-900">
-      <QrcodeStream :formats="['qr_code']" @detect="onDetect" @error="cameraError = true" />
+      <QrcodeStream
+        :formats="['qr_code']"
+        :paused="paused"
+        @detect="onDetect"
+        @error="cameraError = true"
+      />
     </div>
     <p v-if="cameraError" role="alert" class="rounded bg-amber-100 p-2 text-sm text-amber-900">
       Camera unavailable. Click Allow on the camera prompt in the address bar, or paste the code

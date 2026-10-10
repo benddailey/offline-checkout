@@ -1,7 +1,5 @@
 import { setZXingModuleOverrides } from "vue-qrcode-reader";
-// Must be the zxing-wasm copy that barcode-detector (inside vue-qrcode-reader) pins: the wasm
-// import table is tied to that glue code, so the top-level zxing-wasm 3.x binary does not link.
-import wasmDataUrl from "../../node_modules/barcode-detector/node_modules/zxing-wasm/dist/reader/zxing_reader.wasm?url";
+import wasmDataUrl from "zxing-wasm/reader/zxing_reader.wasm?url";
 
 /** Decode a `data:...;base64,` URL into bytes without any network access. */
 function dataUrlToBytes(url: string): Uint8Array {

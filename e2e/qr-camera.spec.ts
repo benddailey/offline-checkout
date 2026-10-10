@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { test, expect, type Page } from "@playwright/test";
+import { chromium, test, expect, type Page } from "@playwright/test";
 import { launchChromium } from "./helpers/app";
 import { writeQrY4m } from "./helpers/y4m";
 
@@ -41,6 +41,27 @@ test("pasted code is emitted trimmed without a camera", async () => {
     await page.getByLabel("Pasted code").fill("  OC1:pasted  \n");
     await page.getByRole("button", { name: "Use pasted code" }).click();
     await expect(page.locator("#out")).toHaveText("OC1:pasted");
+  } finally {
+    await browser.close();
+  }
+});
+
+test("shows the camera-unavailable message when permission is denied, paste still works", async () => {
+  const browser = await chromium.launch({
+    headless: false,
+    args: ["--deny-permission-prompts", "--use-fake-device-for-media-stream"],
+  });
+  try {
+    const page = await (await browser.newContext()).newPage();
+    await page.goto(harnessUrl);
+    await expect(
+      page.getByText(
+        "Camera unavailable. Click Allow on the camera prompt in the address bar, or paste the code below.",
+      ),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.getByLabel("Pasted code").fill("OC1:fallback");
+    await page.getByRole("button", { name: "Use pasted code" }).click();
+    await expect(page.locator("#out")).toHaveText("OC1:fallback");
   } finally {
     await browser.close();
   }
