@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import { normalizeScan } from "../../log/barcode";
 import type { Invite, Mesh } from "../../mesh/mesh";
 import { PairingError, type PairingPayload } from "../../pairing/payload";
 import QrDisplay from "../../qr/QrDisplay.vue";
 import QrScan from "../../qr/QrScan.vue";
-import { useSession } from "../session";
+import MessageBanner from "../components/MessageBanner.vue";
+import { createScanCapture, type KeyLike } from "../scan-capture";
+import { useSession, type Message } from "../session";
 
 /** "invite": Add workstation on a machine in the session. "join": a new or isolated machine. */
 const props = defineProps<{ mode: "invite" | "join" }>();
@@ -207,6 +210,28 @@ function startJoin(): void {
   phase.value = "scan";
 }
 
+// ---- Scans while pairing ----
+
+/** Outcome of the last scan made on this screen (recorded in the open session). */
+const scanNote = ref<Message | null>(null);
+
+/** A scanner used while this screen is up still records into the open session. */
+const capture = createScanCapture((code) => void recordScan(code));
+
+function onKeydown(e: KeyboardEvent): void {
+  if (session.meta) capture(e as KeyLike);
+}
+
+async function recordScan(code: string): Promise<void> {
+  session.message = null;
+  await session.scan(code);
+  if (!alive) return;
+  scanNote.value = session.message ?? {
+    tone: "info",
+    text: `Scan recorded: ${normalizeScan(code)}`,
+  };
+}
+
 // ---- Common ----
 
 function tryAgain(): void {
@@ -222,11 +247,13 @@ function leave(): void {
 }
 
 onMounted(() => {
+  document.addEventListener("keydown", onKeydown, true);
   if (props.mode === "invite") void startInvite();
   else startJoin();
 });
 
 onUnmounted(() => {
+  document.removeEventListener("keydown", onKeydown, true);
   alive = false;
   dropInvite();
   dropPending();
@@ -256,6 +283,8 @@ const step = "text-2xl font-bold text-slate-900";
         Back
       </button>
     </div>
+
+    <MessageBanner v-if="scanNote" :message="scanNote" />
 
     <p v-if="phase === 'start'" class="text-xl text-slate-700">Preparing the join code…</p>
 

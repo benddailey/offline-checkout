@@ -11,7 +11,11 @@ const area = useTemplateRef<HTMLTextAreaElement>("area");
 watchEffect(async (onCleanup) => {
   let stale = false;
   onCleanup(() => (stale = true));
-  const url = await QRCode.toDataURL(props.text, { errorCorrectionLevel: "M", margin: 4 });
+  const url = await QRCode.toDataURL(props.text, {
+    errorCorrectionLevel: "M",
+    margin: 4,
+    width: 840,
+  });
   if (!stale) dataUrl.value = url;
 });
 
@@ -33,7 +37,7 @@ async function copy() {
       v-if="dataUrl"
       :src="dataUrl"
       :alt="`QR code: ${label}`"
-      class="h-72 w-72 bg-white [image-rendering:pixelated]"
+      class="aspect-square w-full max-w-[min(60vh,420px)] bg-white [image-rendering:pixelated]"
     />
     <label class="flex w-full flex-col gap-1 text-base font-semibold">
       {{ label }}
