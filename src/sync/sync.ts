@@ -1,4 +1,5 @@
 import type { LogRecord, VersionVector } from "../log/types";
+import { isLogRecord } from "../log/validate";
 import type { Mesh } from "../mesh/mesh";
 import type { SessionStore } from "../store/db";
 
@@ -13,7 +14,11 @@ function isObject(v: unknown): v is Record<string, unknown> {
 
 function parseMsg(msg: unknown): SyncMsg | null {
   if (!isObject(msg)) return null;
-  if (msg.t === "vec" && isObject(msg.vector)) {
+  if (
+    msg.t === "vec" &&
+    isObject(msg.vector) &&
+    Object.values(msg.vector).every((n) => typeof n === "number" && Number.isInteger(n) && n >= 0)
+  ) {
     return { t: "vec", vector: msg.vector as VersionVector };
   }
   if (msg.t === "recs" && Array.isArray(msg.records)) {
@@ -88,8 +93,8 @@ export class SyncEngine {
       if (!this.running) return;
       const targets = to ?? this.connectedIds(this.mesh.peers());
       for (const id of targets) this.mesh.send(id, { t: "vec", vector });
-    } catch {
-      // store unavailable; the next periodic exchange retries
+    } catch (err) {
+      console.error("sync: could not send version vector", err);
     }
   }
 
@@ -107,32 +112,31 @@ export class SyncEngine {
         if (!this.running) return;
         this.mesh.send(peerId, { t: "recs", records: records.slice(i, i + this.batch) });
       }
-    } catch {
-      // retried on the next vector exchange
+    } catch (err) {
+      console.error("sync: could not reply to version vector", err);
     }
   }
 
   private enqueue(candidates: unknown[]): void {
-    const valid = candidates.filter((r) => this.isValid(r)) as LogRecord[];
+    const valid = candidates.filter(
+      (r): r is LogRecord => isLogRecord(r) && r.sessionId === this.store.sessionId,
+    );
     if (!valid.length) return;
     this.writes = this.writes.then(async () => {
+      let fresh: LogRecord[];
       try {
-        const fresh = await this.store.put(valid);
-        if (fresh.length) this.onRecords(fresh);
-      } catch {
-        // dropped batch is re-requested by the next vector exchange
+        fresh = await this.store.put(valid);
+      } catch (err) {
+        // the next vector exchange re-requests these records
+        console.error("sync: store.put failed", err);
+        return;
+      }
+      if (!fresh.length || !this.running) return;
+      try {
+        this.onRecords(fresh);
+      } catch (err) {
+        console.error("sync: onRecords threw", err);
       }
     });
-  }
-
-  private isValid(r: unknown): boolean {
-    return (
-      isObject(r) &&
-      r.sessionId === this.store.sessionId &&
-      typeof r.deviceId === "string" &&
-      typeof r.seq === "number" &&
-      Number.isInteger(r.seq) &&
-      r.seq > 0
-    );
   }
 }

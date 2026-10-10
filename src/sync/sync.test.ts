@@ -2,15 +2,17 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { mk } from "../log/helpers.test-util";
 import type { LogRecord } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
+import type { PeerInfo } from "../mesh/mesh";
 import { SyncEngine, type MeshLike, type StoreLike } from "./sync";
 
 type Handler = (peerId: string, msg: unknown) => void;
 
-function setup(initial: LogRecord[] = [], opts: { batch?: number } = {}) {
+function setup(initial: LogRecord[] = [], opts: { batch?: number; putGate?: Promise<void> } = {}) {
   const recs = new Map(initial.map((r) => [`${r.deviceId}:${r.seq}`, r]));
   const store: StoreLike = {
     sessionId: "S",
     put: async (rs) => {
+      await opts.putGate;
       const fresh: LogRecord[] = [];
       for (const r of rs) {
         const k = `${r.deviceId}:${r.seq}`;
@@ -34,7 +36,7 @@ function setup(initial: LogRecord[] = [], opts: { batch?: number } = {}) {
     peers: () => [],
   };
   const onRecords = vi.fn();
-  const engine = new SyncEngine({ mesh, store, onRecords, ...opts });
+  const engine = new SyncEngine({ mesh, store, onRecords, batch: opts.batch });
   engine.start();
   return { engine, deliver: (m: unknown) => handler("p", m), sent, broadcasts, onRecords };
 }
@@ -89,6 +91,16 @@ describe("SyncEngine", () => {
     deliver({ t: "nope" });
     deliver({ t: "recs", records: "bad" });
     deliver({ t: "vec", vector: [] });
+    deliver({ t: "vec", vector: { a: -1 } });
+    deliver({ t: "vec", vector: { a: 1.5 } });
+    deliver({ t: "vec", vector: { a: "1" } });
+    deliver({
+      t: "recs",
+      records: [
+        { ...mk("a", 1, body), type: "bogus" },
+        { ...mk("a", 2, body), patron: undefined },
+      ],
+    });
     deliver({
       t: "recs",
       records: [
@@ -103,15 +115,87 @@ describe("SyncEngine", () => {
     expect(sent.filter((s) => s.msg.t === "recs")).toEqual([]);
   });
 
-  it("pushLocal broadcasts immediately; stop is idempotent and silences handlers", async () => {
-    const { engine, deliver, broadcasts, onRecords } = setup();
+  it("pushLocal broadcasts immediately", () => {
+    const { engine, broadcasts } = setup();
     const r = mk("a", 1, body);
     engine.pushLocal(r);
     expect(broadcasts).toEqual([{ t: "recs", records: [r] }]);
-    engine.stop();
-    engine.stop();
+  });
+
+  it("stop is idempotent and queued writes do not notify after stop", async () => {
+    let open!: () => void;
+    const putGate = new Promise<void>((r) => (open = r));
+    const { engine, deliver, onRecords } = setup([], { putGate });
     deliver({ t: "recs", records: [mk("b", 1, body)] });
+    engine.stop();
+    engine.stop();
+    open();
     await flush();
     expect(onRecords).not.toHaveBeenCalled();
+  });
+
+  it("keeps notifying after onRecords throws, and logs it", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { deliver, onRecords } = setup();
+    onRecords.mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+    deliver({ t: "recs", records: [mk("a", 1, body)] });
+    deliver({ t: "recs", records: [mk("a", 2, body)] });
+    await flush();
+    expect(onRecords).toHaveBeenCalledTimes(2);
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+});
+
+describe("SyncEngine vec scheduling", () => {
+  it("sends vec on start, on newly connected peers only, and on the interval", async () => {
+    vi.useFakeTimers();
+    try {
+      let peers: PeerInfo[] = [{ deviceId: "b", employee: "B", connected: true }];
+      let notify: (p: PeerInfo[]) => void = () => {};
+      const sent: Array<{ to: string; msg: any }> = [];
+      const mesh: MeshLike = {
+        send: (to, msg) => (sent.push({ to, msg }), true),
+        broadcast: () => {},
+        onMessage: () => () => {},
+        onPeerChange: (cb) => ((notify = cb), () => {}),
+        peers: () => peers,
+      };
+      const store: StoreLike = {
+        sessionId: "S",
+        put: async () => [],
+        since: async () => [],
+        vector: async () => ({ a: 1 }),
+      };
+      const engine = new SyncEngine({ mesh, store, onRecords: () => {}, intervalMs: 10_000 });
+      const vecTo = () => sent.filter((s) => s.msg.t === "vec").map((s) => s.to);
+      engine.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vecTo()).toEqual(["b"]);
+      expect(sent[0].msg.vector).toEqual({ a: 1 });
+
+      sent.length = 0;
+      peers = [
+        { deviceId: "b", employee: "B", connected: true },
+        { deviceId: "c", employee: "C", connected: true },
+      ];
+      notify(peers);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vecTo()).toEqual(["c"]);
+
+      sent.length = 0;
+      peers = peers.map((p) => ({ ...p, employee: p.employee + "!" }));
+      notify(peers);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vecTo()).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(vecTo()).toEqual(["b", "c"]);
+      engine.stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
