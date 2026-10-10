@@ -341,7 +341,9 @@ export class Mesh {
     const current = this.active.get(id);
     if (current && current !== link) {
       // Duplicate link to a connected device: both ends keep the same one, peer stays connected.
-      if (Link.compare(link, current) < 0) {
+      // A QR pairing that just completed wins outright: the joiner is a fresh mesh with no other
+      // link, so the existing one is stale (e.g. the joiner's page reloaded unnoticed).
+      if (link.invite || Link.compare(link, current) < 0) {
         this.active.set(id, link);
         current.close();
       } else {

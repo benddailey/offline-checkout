@@ -402,6 +402,28 @@ describe("one-sided failure", () => {
     expect(atB).toEqual([["C", "c→b"]]);
     expect(atC).toEqual([["B", "b→c"]]);
   });
+
+  test("a fresh QR re-pair wins over the inviter's stale link to the same device", async () => {
+    const a = founder();
+    const { mesh: b } = await pair(a, "B", "Bob");
+    const { mesh: c } = await pair(a, "C", "Cat"); // B offered the B–C link (intro)
+    // B's page reloads: its links die without C noticing; C keeps a stale, silent link to B,
+    // which the duplicate rule would otherwise prefer (lower offerer id).
+    net.fail("B", "C");
+    net.fail("B", "A");
+    b.close();
+    await settle();
+    expect(view(c)).toEqual({ A: true, B: true });
+
+    const { mesh: b2 } = await pair(c, "B", "Bob");
+    expect(view(b2)).toEqual({ C: true });
+    expect(view(c)).toEqual({ A: true, B: true });
+    const atB: unknown[] = [];
+    b2.onMessage((from, msg) => atB.push([from, msg]));
+    expect(c.send("B", "hi")).toBe(true);
+    await settle();
+    expect(atB).toEqual([["C", "hi"]]);
+  });
 });
 
 describe("robustness", () => {
