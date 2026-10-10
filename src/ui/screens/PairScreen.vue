@@ -190,6 +190,10 @@ async function submitName(): Promise<void> {
     if (!(await session.adoptJoinedSession(joined.offer, name, joined.mesh))) {
       fail("Could not open the session on this workstation. Click Try again.");
     }
+  } catch (err) {
+    console.error("pair: could not adopt the joined session", err);
+    if (session.mesh !== joined.mesh) joined.mesh.close();
+    fail("Could not open the session on this workstation. Click Try again.");
   } finally {
     adopting.value = false;
   }

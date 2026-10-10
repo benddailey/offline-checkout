@@ -818,6 +818,8 @@ describe("useSession ensureMesh", () => {
     fail = false;
     const m = s.ensureMesh();
     expect(m).toBe(db.meshes[0]!.mesh);
+    // The retry worked: the networking error no longer stands.
+    expect(s.message).toBeNull();
     expect(s.mesh).toBe(m);
     expect(s.ensureMesh()).toBe(m);
     expect(db.meshes).toHaveLength(1);

@@ -60,6 +60,7 @@ export function setSessionDeps(deps: SessionDeps): void {
 }
 
 export const LOCKED_MESSAGE = "This session is already open in another tab";
+const MESH_FAILED = "Could not start networking on this workstation";
 
 /** Local date as YYYY-MM-DD. */
 export function ymd(d: Date): string {
@@ -325,12 +326,13 @@ export const useSession = defineStore("session", () => {
           knownDevices,
         }),
       );
+      if (message.value?.text.startsWith(MESH_FAILED)) message.value = null;
       return mesh.value;
     } catch (err) {
       console.error("session: could not start the mesh", err);
       message.value = {
         tone: "error",
-        text: `Could not start networking on this workstation (${err instanceof Error ? err.message : String(err)}). Scanning still works; other workstations cannot connect yet.`,
+        text: `${MESH_FAILED} (${err instanceof Error ? err.message : String(err)}). Scanning still works; other workstations cannot connect yet.`,
       };
       return null;
     }
