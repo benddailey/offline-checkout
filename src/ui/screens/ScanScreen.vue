@@ -7,7 +7,7 @@ import { useSession } from "../session";
 const session = useSession();
 
 const button =
-  "min-h-12 rounded-lg border-2 px-5 text-xl font-semibold disabled:cursor-not-allowed disabled:opacity-40";
+  "min-h-11 rounded-lg border-2 px-5 text-xl font-semibold disabled:cursor-not-allowed disabled:opacity-40";
 
 function printCard() {
   session.printScannerCard();
@@ -16,7 +16,7 @@ function printCard() {
 </script>
 
 <template>
-  <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
+  <main class="mx-auto flex w-full max-w-5xl flex-col gap-3 p-4">
     <SessionClosedBanner v-if="session.closed" />
 
     <div
@@ -90,7 +90,7 @@ function printCard() {
         <li
           v-for="item in session.currentVisit.items"
           :key="item.id"
-          class="flex items-center gap-4 px-4 py-2"
+          class="flex items-center gap-4 px-4 py-1"
           data-testid="item"
         >
           <span

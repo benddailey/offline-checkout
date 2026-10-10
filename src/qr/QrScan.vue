@@ -43,21 +43,21 @@ function usePasted() {
         @error="cameraError = true"
       />
     </div>
-    <p v-if="cameraError" role="alert" class="rounded bg-amber-100 p-2 text-sm text-amber-900">
+    <p v-if="cameraError" role="alert" class="rounded bg-amber-100 p-2 text-base text-amber-900">
       Camera unavailable. Click Allow on the camera prompt in the address bar, or paste the code
       below.
     </p>
-    <label class="flex flex-col gap-1 text-sm font-medium">
+    <label class="flex flex-col gap-1 text-base font-semibold">
       Pasted code
       <textarea
         v-model="pasted"
         rows="4"
-        class="w-full rounded border border-slate-300 p-2 font-mono text-xs"
+        class="w-full rounded border-2 border-slate-500 p-2 font-mono text-xs"
       />
     </label>
     <button
       type="button"
-      class="rounded bg-slate-800 px-4 py-2 text-white hover:bg-slate-700"
+      class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
       @click="usePasted"
     >
       Use pasted code

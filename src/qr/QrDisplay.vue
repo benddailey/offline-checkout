@@ -35,20 +35,20 @@ async function copy() {
       :alt="`QR code: ${label}`"
       class="h-72 w-72 bg-white [image-rendering:pixelated]"
     />
-    <label class="flex w-full flex-col gap-1 text-sm font-medium">
+    <label class="flex w-full flex-col gap-1 text-base font-semibold">
       {{ label }}
       <textarea
         ref="area"
         readonly
         rows="4"
         :value="text"
-        class="w-full rounded border border-slate-300 p-2 font-mono text-xs break-all"
+        class="w-full rounded border-2 border-slate-500 p-2 font-mono text-xs break-all"
         @focus="area?.select()"
       />
     </label>
     <button
       type="button"
-      class="rounded bg-slate-800 px-4 py-2 text-white hover:bg-slate-700"
+      class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
       @click="copy"
     >
       {{ copied ? "Copied" : "Copy" }}
