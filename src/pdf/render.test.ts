@@ -44,7 +44,7 @@ describe("render", () => {
     expect(t).toContain("Spring Sale - 2026-10-10 - Page 1 of 1");
     expect(t).toContain("Patrons: 3");
     expect(t).toContain("Items: 4");
-    expect(t.indexOf("Amy: 2 patrons, 3 items")).toBeLessThan(t.indexOf("Zed: 1 patrons, 1 items"));
+    expect(t.indexOf("Amy: 2 patrons, 3 items")).toBeLessThan(t.indexOf("Zed: 1 patron, 1 item"));
   });
 
   test("barcode A is one rect per bar run", () => {

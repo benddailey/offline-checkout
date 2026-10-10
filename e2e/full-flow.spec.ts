@@ -116,8 +116,8 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     await expect(summary.getByTestId("summary-patron").nth(1)).toContainText("P2");
     await expect(summary.locator(".line-through", { hasText: "I2" })).toBeVisible();
     await expect(summary.locator(".line-through", { hasText: "P3" })).toBeVisible();
-    await expect(b!.getByTestId("per-clerk")).toContainText("Ann: 1 patrons, 1 items");
-    await expect(b!.getByTestId("per-clerk")).toContainText("Ben: 1 patrons, 2 items");
+    await expect(b!.getByTestId("per-clerk")).toContainText("Ann: 1 patron, 1 item");
+    await expect(b!.getByTestId("per-clerk")).toContainText("Ben: 1 patron, 2 items");
 
     const [file] = await Promise.all([
       b!.waitForEvent("download"),

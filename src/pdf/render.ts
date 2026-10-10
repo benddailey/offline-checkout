@@ -47,7 +47,10 @@ export function buildSessionPdf(state: SessionState, opts: { date: Date }, compr
     `Items: ${state.totals.items}`,
     ...Object.keys(state.perClerk)
       .sort()
-      .map((c) => `${c}: ${state.perClerk[c].patrons} patrons, ${state.perClerk[c].items} items`),
+      .map((c) => {
+        const { patrons, items } = state.perClerk[c];
+        return `${c}: ${patrons} patron${patrons === 1 ? "" : "s"}, ${items} item${items === 1 ? "" : "s"}`;
+      }),
   ];
   const { pages, elements } = layout(blocksFromState(state), summary);
   const doc = newDoc(compress);

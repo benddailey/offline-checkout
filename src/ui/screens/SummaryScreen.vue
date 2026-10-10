@@ -120,7 +120,9 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
         <p v-if="clerks.length === 0" class="text-lg text-slate-600">Nothing scanned yet.</p>
         <ul v-else class="text-lg" data-testid="per-clerk">
           <li v-for="c in clerks" :key="c.name">
-            {{ c.name }}: {{ c.patrons }} patrons, {{ c.items }} items
+            {{ c.name }}: {{ c.patrons }} {{ c.patrons === 1 ? "patron" : "patrons" }},
+            {{ c.items }}
+            {{ c.items === 1 ? "item" : "items" }}
           </li>
         </ul>
       </div>
