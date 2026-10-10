@@ -46,9 +46,12 @@ export interface SessionState {
   visits: VisitState[];
   /** Patron barcode to visit ids (including voided visits). */
   patronIndex: Map<string, RecordId[]>;
-  /** Distinct patrons with at least one non-voided visit; non-voided items in non-voided visits. */
+  /**
+   * Distinct patrons with at least one non-voided visit; distinct (patron, item) pairs among
+   * non-voided items in non-voided visits — the PDF's blocks and lines.
+   */
   totals: { patrons: number; items: number };
-  /** Non-voided visits / items by employee. */
+  /** By employee: distinct patrons they started a non-voided visit for; non-voided items. */
   perClerk: Record<string, { patrons: number; items: number }>;
 }
 

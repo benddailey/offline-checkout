@@ -27,6 +27,8 @@ function fakeDb() {
   let lockAvailable = true;
   let persistCalls = 0;
   let nextId = 1;
+  /** Wall-clock time stamped on the next append (seq → at). */
+  let clock = (seq: number) => 1000 + seq;
 
   function makeStore(sessionId: string): SessionStore {
     const log = logs.get(sessionId)!;
@@ -52,7 +54,7 @@ function fakeDb() {
           deviceId: meta.deviceId,
           seq: meta.nextSeq++,
           employee: meta.employee,
-          at: 1000 + meta.nextSeq,
+          at: clock(meta.nextSeq),
           ...body,
         } as LogRecord;
         log.push(record);
@@ -150,6 +152,9 @@ function fakeDb() {
     },
     lockAvailable(v: boolean) {
       lockAvailable = v;
+    },
+    setClock(fn: (seq: number) => number) {
+      clock = fn;
     },
     persistCalls: () => persistCalls,
     /** Hold every append until the returned function is called. */
@@ -284,6 +289,21 @@ describe("useSession scanning", () => {
     await s.scan("oc-voidlast");
     expect(s.message).toEqual({ tone: "info", text: "Nothing to void" });
     expect(s.records.filter((r) => r.type === "voided")).toHaveLength(2);
+  });
+
+  it("OC-VOIDLAST picks the last item scanned (highest seq), not the latest clock time", async () => {
+    const s = await started();
+    await s.scan("P1");
+    await s.scan("I1");
+    db.setClock(() => 0); // the PC clock stepped back before I2
+    await s.scan("I2");
+    await s.scan("OC-VOIDLAST");
+    expect(s.message).toEqual({ tone: "info", text: "Voided I2" });
+    const items = s.currentVisit!.items;
+    expect(Object.fromEntries(items.map((i) => [i.barcode, i.voided]))).toEqual({
+      I1: false,
+      I2: true,
+    });
   });
 
   it("OC-END ends the current visit; with no visit it only informs", async () => {

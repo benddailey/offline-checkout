@@ -80,17 +80,24 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
   const livePatrons = new Set<string>();
   const perClerk: SessionState["perClerk"] = {};
   const clerk = (e: string) => (perClerk[e] ??= { patrons: 0, items: 0 });
-  let items = 0;
+  // Counted as the PDF prints them: one block per patron, each item once per patron.
+  const clerkPatrons = new Set<string>();
+  const patronItems = new Set<string>();
+  const key = (...parts: string[]) => JSON.stringify(parts);
   for (const v of visitList) {
     const ids = patronIndex.get(v.patron) ?? [];
     ids.push(v.id);
     patronIndex.set(v.patron, ids);
     if (v.voided) continue;
     livePatrons.add(v.patron);
-    clerk(v.employee).patrons++;
+    const cp = key(v.employee, v.patron);
+    if (!clerkPatrons.has(cp)) {
+      clerkPatrons.add(cp);
+      clerk(v.employee).patrons++;
+    }
     for (const i of v.items) {
       if (i.voided) continue;
-      items++;
+      patronItems.add(key(v.patron, i.barcode));
       clerk(i.employee).items++;
     }
   }
@@ -104,7 +111,7 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
     closed,
     visits: visitList,
     patronIndex,
-    totals: { patrons: livePatrons.size, items },
+    totals: { patrons: livePatrons.size, items: patronItems.size },
     perClerk: sortedClerks,
   };
 }

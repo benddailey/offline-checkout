@@ -4,7 +4,7 @@ import { CONTROL, normalizeScan, validateBarcode } from "../log/barcode";
 import { checkItem } from "../log/duplicates";
 import { recordId } from "../log/ids";
 import { reduce } from "../log/reduce";
-import type { LogRecord, RecordBody, RecordId, VisitState } from "../log/types";
+import type { ItemState, LogRecord, RecordBody, RecordId, VisitState } from "../log/types";
 import { Mesh, type MeshOptions, type PeerInfo } from "../mesh/mesh";
 import { PairingError, decodePayload, type PairingPayload } from "../pairing/payload";
 import { downloadBlob, renderScannerCard, renderSessionPdf } from "../pdf/render";
@@ -421,7 +421,13 @@ export const useSession = defineStore("session", () => {
       return;
     }
     if (code === CONTROL.VOIDLAST) {
-      const last = visit?.items.filter((i) => !i.voided).at(-1);
+      // The last item this workstation scanned: seq order, never `at` (the clock can step back).
+      const own = meta.value?.deviceId;
+      let last: ItemState | undefined;
+      for (const i of visit?.items ?? []) {
+        if (i.voided || deviceOf(i.id) !== own) continue;
+        if (!last || seqOf(i.id) > seqOf(last.id)) last = i;
+      }
       if (!last) {
         message.value = { tone: "info", text: "Nothing to void" };
         return;
@@ -565,4 +571,8 @@ export const useSession = defineStore("session", () => {
 
 function seqOf(id: RecordId): number {
   return Number(id.slice(id.lastIndexOf(":") + 1));
+}
+
+function deviceOf(id: RecordId): string {
+  return id.slice(0, id.lastIndexOf(":"));
 }

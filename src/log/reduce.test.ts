@@ -69,6 +69,21 @@ describe("reduce", () => {
     ]);
     expect(s.perClerk).toEqual({ A: { patrons: 1, items: 1 }, B: { patrons: 0, items: 1 } });
   });
+  test("counts match the PDF: distinct patrons per clerk, distinct (patron, item) pairs", () => {
+    const s = reduce([
+      mk("a", 1, { type: "patron-started", patron: "P1" }),
+      mk("a", 2, { type: "item-scanned", visitId: "a:1", item: "I1" }),
+      mk("a", 3, { type: "patron-ended", visitId: "a:1" }),
+      mk("a", 4, { type: "patron-started", patron: "P1" }),
+      mk("a", 5, { type: "item-scanned", visitId: "a:4", item: "I1" }),
+      mk("a", 6, { type: "item-scanned", visitId: "a:4", item: "I2" }),
+      mk("a", 7, { type: "patron-started", patron: "P2" }),
+      mk("a", 8, { type: "item-scanned", visitId: "a:7", item: "I1" }),
+    ]);
+    // P1 twice and P2 once; I1 on P1 twice prints once, I1 on P2 is a separate block line.
+    expect(s.totals).toEqual({ patrons: 2, items: 3 });
+    expect(s.perClerk.A?.patrons).toBe(2);
+  });
   test("orphan items attach when the visit arrives", () => {
     const item = mk("b", 1, { type: "item-scanned", visitId: "a:1", item: "I1" });
     const visit = mk("a", 1, { type: "patron-started", patron: "P1" });
