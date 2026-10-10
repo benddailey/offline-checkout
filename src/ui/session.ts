@@ -1,0 +1,467 @@
+import { defineStore } from "pinia";
+import { computed, ref, shallowRef } from "vue";
+import { CONTROL, normalizeScan, validateBarcode } from "../log/barcode";
+import { checkItem } from "../log/duplicates";
+import { recordId } from "../log/ids";
+import { reduce } from "../log/reduce";
+import type { LogRecord, RecordBody, RecordId, VisitState } from "../log/types";
+import type { Mesh, PeerInfo } from "../mesh/mesh";
+import type { PairingPayload } from "../pairing/payload";
+import { downloadBlob, renderScannerCard, renderSessionPdf } from "../pdf/render";
+import * as db from "../store/db";
+import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
+import { SyncEngine } from "../sync/sync";
+
+export type Screen = "launch" | "pair-invite" | "pair-join" | "scan" | "summary";
+export type Message = { tone: "info" | "warn" | "error"; text: string };
+
+export interface SessionDeps {
+  createSession: typeof db.createSession;
+  openSessionStore: typeof db.openSessionStore;
+  listSessions: typeof db.listSessions;
+  acquireSessionLock: typeof db.acquireSessionLock;
+  requestPersistence: typeof db.requestPersistence;
+  renderSessionPdf: typeof renderSessionPdf;
+  renderScannerCard: typeof renderScannerCard;
+  downloadBlob: typeof downloadBlob;
+  /** Wall clock for default session names and PDF dates. */
+  now: () => Date;
+}
+
+/** Real dependencies, with any of them replaced (tests pass an in-memory store and a fixed clock). */
+export function createSessionStoreDeps(overrides: Partial<SessionDeps> = {}): SessionDeps {
+  return {
+    createSession: db.createSession,
+    openSessionStore: db.openSessionStore,
+    listSessions: db.listSessions,
+    acquireSessionLock: db.acquireSessionLock,
+    requestPersistence: db.requestPersistence,
+    renderSessionPdf,
+    renderScannerCard,
+    downloadBlob,
+    now: () => new Date(),
+    ...overrides,
+  };
+}
+
+let activeDeps = createSessionStoreDeps();
+
+/** Deps used by stores created after this call. */
+export function setSessionDeps(deps: SessionDeps): void {
+  activeDeps = deps;
+}
+
+export const LOCKED_MESSAGE = "This session is already open in another tab";
+
+/** Local date as YYYY-MM-DD. */
+export function ymd(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function fileSafe(name: string): string {
+  return name.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "session";
+}
+
+function saveFailed(what: "scan" | "change", err: unknown): string {
+  const reason = err instanceof Error ? err.message : String(err);
+  return (
+    `Could not save the ${what} — this computer's browser storage refused it (${reason}). ` +
+    "Do not continue scanning on this workstation."
+  );
+}
+
+export const useSession = defineStore("session", () => {
+  const deps = activeDeps;
+
+  const screen = ref<Screen>("launch");
+  const meta = ref<SessionMeta | null>(null);
+  const records = shallowRef<LogRecord[]>([]);
+  const currentVisitId = ref<RecordId | null>(null);
+  const message = ref<Message | null>(null);
+  const fatal = ref<string | null>(null);
+  const peers = ref<PeerInfo[]>([]);
+  const isolated = ref(true);
+  const mesh = shallowRef<Mesh | null>(null);
+  /** Set after "Start new session" so the scan screen can offer the scanner card. */
+  const offerScannerCard = ref(false);
+
+  const state = computed(() => reduce(records.value));
+  const closed = computed(() => state.value.closed);
+  const currentVisit = computed<VisitState | null>(() => {
+    const id = currentVisitId.value;
+    if (id === null) return null;
+    const v = state.value.visits.find((x) => x.id === id);
+    return v && !v.ended && !v.voided ? v : null;
+  });
+
+  let store: SessionStore | null = null;
+  let releaseLock: (() => void) | null = null;
+  let sync: SyncEngine | null = null;
+  let unsubPeers: (() => void) | null = null;
+  const known = new Set<RecordId>();
+  /** Every scan and edit runs in arrival order, one append at a time. */
+  let queue: Promise<void> = Promise.resolve();
+
+  function merge(fresh: LogRecord[]): void {
+    const add = fresh.filter((r) => {
+      const id = recordId(r);
+      if (known.has(id)) return false;
+      known.add(id);
+      return true;
+    });
+    if (add.length) records.value = records.value.concat(add);
+  }
+
+  function detachMesh(): void {
+    sync?.stop();
+    sync = null;
+    unsubPeers?.();
+    unsubPeers = null;
+    mesh.value?.close();
+    mesh.value = null;
+    peers.value = [];
+    isolated.value = true;
+  }
+
+  function teardown(): void {
+    detachMesh();
+    store?.close();
+    store = null;
+    releaseLock?.();
+    releaseLock = null;
+    known.clear();
+    records.value = [];
+    meta.value = null;
+    currentVisitId.value = null;
+    message.value = null;
+    offerScannerCard.value = false;
+  }
+
+  /** Lock, load and show the session; on a held lock or failure sets `fatal` and returns false. */
+  async function open(
+    sessionId: string,
+    openStore: () => Promise<SessionStore>,
+    employee?: string,
+  ): Promise<boolean> {
+    teardown();
+    try {
+      const release = await deps.acquireSessionLock(sessionId);
+      if (!release) {
+        fatal.value = LOCKED_MESSAGE;
+        return false;
+      }
+      releaseLock = release;
+      store = await openStore();
+      if (employee !== undefined && (await store.meta()).employee !== employee) {
+        await store.setEmployee(employee);
+      }
+      meta.value = await store.meta();
+      merge(await store.all());
+      void deps.requestPersistence();
+      return true;
+    } catch (err) {
+      console.error("session: could not open", err);
+      fatal.value = `Could not open the session: ${err instanceof Error ? err.message : String(err)}`;
+      teardown();
+      return false;
+    }
+  }
+
+  async function startSession(name: string, employee: string): Promise<void> {
+    const sessionName = name.trim() || ymd(deps.now());
+    const clerk = employee.trim();
+    if (!clerk) {
+      message.value = { tone: "error", text: "Enter the clerk's name" };
+      return;
+    }
+    teardown();
+    let created: SessionStore;
+    try {
+      created = await deps.createSession({
+        name: sessionName,
+        employee: clerk,
+        withCreatedRecord: true,
+      });
+    } catch (err) {
+      console.error("session: could not create", err);
+      fatal.value = `Could not create the session: ${err instanceof Error ? err.message : String(err)}`;
+      return;
+    }
+    if (!(await open(created.sessionId, async () => created))) {
+      created.close();
+      return;
+    }
+    offerScannerCard.value = true;
+    screen.value = "scan";
+  }
+
+  async function resumeSession(sessionId: string): Promise<void> {
+    if (!(await open(sessionId, () => deps.openSessionStore(sessionId)))) return;
+    const own = meta.value!.deviceId;
+    let latest: VisitState | null = null;
+    for (const v of state.value.visits) {
+      if (v.deviceId !== own || v.ended || v.voided) continue;
+      if (!latest || seqOf(v.id) > seqOf(latest.id)) latest = v;
+    }
+    currentVisitId.value = latest?.id ?? null;
+    screen.value = "scan";
+  }
+
+  async function adoptJoinedSession(
+    offer: PairingPayload,
+    employee: string,
+    joined: Mesh,
+  ): Promise<void> {
+    const clerk = employee.trim();
+    if (store?.sessionId === offer.sessionId) {
+      // Re-pair of the session already open here: keep store and lock, swap the mesh.
+      if (meta.value?.employee !== clerk) {
+        await store.setEmployee(clerk);
+        meta.value = await store.meta();
+      }
+    } else {
+      const ok = await open(
+        offer.sessionId,
+        () =>
+          deps.createSession({
+            sessionId: offer.sessionId,
+            name: offer.sessionName,
+            employee: clerk,
+            withCreatedRecord: false,
+          }),
+        clerk,
+      );
+      if (!ok) {
+        joined.close();
+        return;
+      }
+    }
+    attachMesh(joined);
+    screen.value = "scan";
+  }
+
+  function attachMesh(m: Mesh): void {
+    if (!store) throw new Error("attachMesh needs an open session");
+    if (mesh.value !== m) detachMesh();
+    else {
+      sync?.stop();
+      unsubPeers?.();
+    }
+    mesh.value = m;
+    const setPeers = (list: PeerInfo[]) => {
+      peers.value = list;
+      isolated.value = !list.some((p) => p.connected);
+    };
+    unsubPeers = m.onPeerChange(setPeers);
+    setPeers(m.peers());
+    if (meta.value) m.setEmployee(meta.value.employee);
+    sync = new SyncEngine({
+      mesh: m,
+      store,
+      onRecords: (fresh) => {
+        try {
+          merge(fresh);
+        } catch (err) {
+          console.error("session: could not merge synced records", err);
+        }
+      },
+    });
+    sync.start();
+  }
+
+  function knownDevices(): Set<string> {
+    return new Set(records.value.map((r) => r.deviceId));
+  }
+
+  /** Append one record; it joins `records` only once committed. */
+  async function commit(body: RecordBody, what: "scan" | "change"): Promise<LogRecord | null> {
+    if (!store) return null;
+    try {
+      const r = await store.append(body);
+      merge([r]);
+      sync?.pushLocal(r);
+      return r;
+    } catch (err) {
+      console.error("session: append failed", err);
+      fatal.value = saveFailed(what, err);
+      return null;
+    }
+  }
+
+  /** Run `task` after every earlier scan/edit; never rejects. */
+  function enqueue(task: () => Promise<void>): Promise<void> {
+    const run = queue.then(async () => {
+      if (fatal.value !== null || !store) return;
+      try {
+        await task();
+      } catch (err) {
+        console.error("session: action failed", err);
+        message.value = { tone: "error", text: "Something went wrong — try again" };
+      }
+    });
+    queue = run;
+    return run;
+  }
+
+  function scan(raw: string): Promise<void> {
+    return enqueue(() => processScan(raw));
+  }
+
+  async function processScan(raw: string): Promise<void> {
+    const code = normalizeScan(raw);
+    if (code === "") return;
+    if (closed.value) {
+      message.value = { tone: "error", text: "Session closed" };
+      return;
+    }
+    const visit = currentVisit.value;
+    if (code === CONTROL.END) {
+      if (!visit) {
+        message.value = { tone: "info", text: "No patron in progress" };
+        return;
+      }
+      if (await commit({ type: "patron-ended", visitId: visit.id }, "scan")) {
+        currentVisitId.value = null;
+        message.value = null;
+      }
+      return;
+    }
+    if (code === CONTROL.VOIDLAST) {
+      const last = visit?.items.filter((i) => !i.voided).at(-1);
+      if (!last) {
+        message.value = { tone: "info", text: "Nothing to void" };
+        return;
+      }
+      if (await commit({ type: "voided", target: last.id }, "scan")) {
+        message.value = { tone: "info", text: `Voided ${last.barcode}` };
+      }
+      return;
+    }
+    const valid = validateBarcode(code);
+    if (!valid.ok) {
+      message.value = { tone: "error", text: `Not accepted: ${valid.reason}` };
+      return;
+    }
+    if (!visit) {
+      const r = await commit({ type: "patron-started", patron: code }, "scan");
+      if (r) {
+        currentVisitId.value = recordId(r);
+        message.value = null;
+      }
+      return;
+    }
+    const dup = checkItem(state.value, visit.id, code);
+    if (dup.kind === "dup-this-patron") {
+      message.value = { tone: "warn", text: "Already on this patron — not added" };
+      return;
+    }
+    const r = await commit({ type: "item-scanned", visitId: visit.id, item: code }, "scan");
+    if (!r) return;
+    message.value =
+      dup.kind === "dup-other-patron"
+        ? { tone: "warn", text: `Also on patron ${dup.patrons.join(", ")}` }
+        : null;
+  }
+
+  function voidRecord(id: RecordId): Promise<void> {
+    return enqueue(async () => {
+      if (closed.value) {
+        message.value = { tone: "error", text: "Session closed" };
+        return;
+      }
+      await commit({ type: "voided", target: id }, "change");
+    });
+  }
+
+  function endPatron(): Promise<void> {
+    return enqueue(async () => {
+      const visit = currentVisit.value;
+      if (!visit) return;
+      if (await commit({ type: "patron-ended", visitId: visit.id }, "change")) {
+        currentVisitId.value = null;
+        message.value = null;
+      }
+    });
+  }
+
+  function voidPatron(): Promise<void> {
+    return enqueue(async () => {
+      const visit = currentVisit.value;
+      if (!visit) return;
+      if (closed.value) {
+        message.value = { tone: "error", text: "Session closed" };
+        return;
+      }
+      if (await commit({ type: "voided", target: visit.id }, "change")) {
+        currentVisitId.value = null;
+        message.value = { tone: "info", text: `Voided patron ${visit.patron}` };
+      }
+    });
+  }
+
+  function closeSession(): Promise<void> {
+    return enqueue(async () => {
+      if (closed.value) return;
+      await commit({ type: "session-closed" }, "change");
+    });
+  }
+
+  function generatePdf(): void {
+    if (!meta.value || state.value.totals.patrons === 0) return;
+    try {
+      const date = deps.now();
+      const blob = deps.renderSessionPdf(state.value, { date });
+      deps.downloadBlob(blob, `offline-checkout-${fileSafe(meta.value.name)}-${ymd(date)}.pdf`);
+    } catch (err) {
+      console.error("session: PDF failed", err);
+      message.value = { tone: "error", text: "Could not create the PDF" };
+    }
+  }
+
+  function printScannerCard(): void {
+    try {
+      deps.downloadBlob(deps.renderScannerCard(), "offline-checkout-scanner-card.pdf");
+    } catch (err) {
+      console.error("session: scanner card failed", err);
+      message.value = { tone: "error", text: "Could not create the scanner card" };
+    }
+  }
+
+  function listSessions(): Promise<SessionSummary[]> {
+    return deps.listSessions();
+  }
+
+  return {
+    screen,
+    meta,
+    records,
+    currentVisitId,
+    message,
+    fatal,
+    peers,
+    isolated,
+    mesh,
+    offerScannerCard,
+    state,
+    currentVisit,
+    closed,
+    startSession,
+    resumeSession,
+    scan,
+    voidRecord,
+    endPatron,
+    voidPatron,
+    closeSession,
+    generatePdf,
+    printScannerCard,
+    attachMesh,
+    adoptJoinedSession,
+    knownDevices,
+    listSessions,
+  };
+});
+
+function seqOf(id: RecordId): number {
+  return Number(id.slice(id.lastIndexOf(":") + 1));
+}
