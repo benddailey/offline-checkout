@@ -6,6 +6,9 @@ export function normalizeScan(raw: string): string {
 
 export type BarcodeCheck = { ok: true } | { ok: false; reason: string };
 
+/** A non-empty string made only of Code 39 characters. */
+export const CODE39_TEXT = /^[0-9A-Z\-. $/+%]+$/;
+
 const BAD_CHARS = /[^0-9A-Z\-. $/+%]/g;
 
 export function validateBarcode(code: string): BarcodeCheck {

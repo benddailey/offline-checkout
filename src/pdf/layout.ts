@@ -8,9 +8,9 @@ export const GEOMETRY = {
   headerH: 0.45,
   gutter: 0.25,
   barH: 0.25,
-  textH: 0.13,
+  textH: 0.12,
   patronRowH: 0.55,
-  itemRowH: 0.36,
+  itemRowH: 0.4,
   captionH: 0.2,
   boxPad: 0.08,
   blockGap: 0.15,
@@ -39,6 +39,7 @@ export type Placed =
   | { kind: "caption"; page: number; x: number; y: number; text: string }
   | { kind: "summary"; page: number; x: number; y: number; lines: string[] };
 
+// Known limits: a summary taller than a column, or a barcode wider than the usable width, overflows.
 export function layout(
   blocks: Block[],
   summaryLines: string[],

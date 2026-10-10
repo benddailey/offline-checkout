@@ -1,4 +1,5 @@
 import JsBarcode from "jsbarcode";
+import { CODE39_TEXT } from "../log/barcode";
 
 export const NARROW_IN = 0.0075;
 export const QUIET_MODULES = 10;
@@ -9,6 +10,7 @@ const cache = new Map<string, string>();
 export function code39Modules(text: string): string {
   const hit = cache.get(text);
   if (hit !== undefined) return hit;
+  if (!CODE39_TEXT.test(text)) throw new Error(`Not a Code 39 string: ${JSON.stringify(text)}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const target: any = {};
   JsBarcode(target, text, { format: "CODE39", mod43: false } as JsBarcode.BaseOptions);

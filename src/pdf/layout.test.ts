@@ -13,6 +13,8 @@ const blk = (n: number, items: number, len = 14): Block => ({
 const barcodes = (els: Placed[]) =>
   els.filter((e): e is Extract<Placed, { kind: "barcode" }> => e.kind === "barcode");
 
+const EPS = 1e-9;
+
 describe("layout", () => {
   test("14-digit barcodes give 3 columns; a 20-char one gives 2", () => {
     const blocks = Array.from({ length: 20 }, (_, i) => blk(i + 1, 3));
@@ -20,28 +22,43 @@ describe("layout", () => {
     blocks[4].items[1] = "A".repeat(20);
     expect(layout(blocks, ["x"]).columns).toBe(2);
   });
-  test("everything stays inside the content area and column", () => {
-    const blocks = Array.from({ length: 40 }, (_, i) => blk(i + 1, (i % 7) + 1));
+  test("everything stays inside the content area, its column and its box", () => {
+    const blocks = [...Array.from({ length: 40 }, (_, i) => blk(i + 1, (i % 7) + 1)), blk(99, 60)];
     const r = layout(blocks, ["a", "b", "c"]);
     expect(r.pages).toBeGreaterThan(1);
+    const L = g.margin - EPS;
+    const T = g.margin + g.headerH - EPS;
+    const R = g.pageW - g.margin + EPS;
+    const B = g.pageH - g.margin + EPS;
+    const rowH = { patron: g.patronRowH, item: g.itemRowH };
+    const colRight = (x: number) => {
+      const c = Math.round((x - g.margin) / (r.colW + g.gutter));
+      return g.margin + c * (r.colW + g.gutter) + r.colW + EPS;
+    };
+    const boxes = r.elements.filter((e) => e.kind === "box");
     for (const e of r.elements) {
       if (e.kind === "page-header") continue;
-      expect(e.x).toBeGreaterThanOrEqual(g.margin - 1e-9);
-      expect(e.y).toBeGreaterThanOrEqual(g.margin + g.headerH - 1e-9);
+      expect(e.x).toBeGreaterThanOrEqual(L);
+      expect(e.y).toBeGreaterThanOrEqual(T);
       if (e.kind === "barcode") {
-        expect(e.x + code39Width(e.text)).toBeLessThanOrEqual(g.pageW - g.margin + 1e-9);
-        expect(
-          e.y + g.patronRowH * (e.role === "patron" ? 1 : 0) + (e.role === "item" ? g.itemRowH : 0),
-        ).toBeLessThanOrEqual(g.pageH - g.margin + 1e-9);
+        const right = e.x + code39Width(e.text);
+        expect(right).toBeLessThanOrEqual(R);
+        expect(right).toBeLessThanOrEqual(colRight(e.x));
+        expect(e.y + rowH[e.role]).toBeLessThanOrEqual(B);
+        if (e.role === "item") {
+          const box = boxes.find(
+            (b) => b.page === e.page && b.x === e.x && e.y >= b.y - EPS && e.y < b.y + b.h,
+          )!;
+          expect(box).toBeDefined();
+          expect(e.y + g.itemRowH).toBeLessThanOrEqual(box.y + box.h - g.boxPad + EPS);
+        }
       }
       if (e.kind === "box") {
-        expect(e.x + e.w).toBeLessThanOrEqual(g.pageW - g.margin + 1e-9);
-        expect(e.y + e.h).toBeLessThanOrEqual(g.pageH - g.margin + 1e-9);
+        expect(e.x + e.w).toBeLessThanOrEqual(R);
+        expect(e.y + e.h).toBeLessThanOrEqual(B);
       }
-      if (e.kind === "caption")
-        expect(e.y + g.captionH).toBeLessThanOrEqual(g.pageH - g.margin + 1e-9);
-      if (e.kind === "summary")
-        expect(e.y + e.lines.length * 0.2).toBeLessThanOrEqual(g.pageH - g.margin + 1e-9);
+      if (e.kind === "caption") expect(e.y + g.captionH).toBeLessThanOrEqual(B);
+      if (e.kind === "summary") expect(e.y + e.lines.length * 0.2).toBeLessThanOrEqual(B);
     }
   });
   test("blocks that fit are never split across columns", () => {
@@ -83,7 +100,9 @@ describe("layout", () => {
     expect(Math.max(...r.elements.map((e) => e.page))).toBe(r.pages);
   });
   test("summary moves on when it does not fit", () => {
-    const blocks = [blk(1, 24)];
+    const colH = g.pageH - g.margin - (g.margin + g.headerH);
+    const full = Math.floor((colH - g.patronRowH - 2 * g.boxPad - g.captionH) / g.itemRowH);
+    const blocks = [blk(1, full)];
     const r = layout(
       blocks,
       Array.from({ length: 10 }, () => "l"),

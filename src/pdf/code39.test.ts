@@ -5,6 +5,9 @@ import { code39Modules, code39Width, NARROW_IN, QUIET_MODULES } from "./code39";
 const STAR = "100010111011101";
 
 describe("code39", () => {
+  test("rejects text outside the Code 39 charset", () => {
+    for (const t of ["", "abc", "A*B", "A\u00e9"]) expect(() => code39Modules(t)).toThrow();
+  });
   test("single char: 3 characters of 16 modules plus 2 inter-character gaps", () => {
     const m = code39Modules("A");
     expect(m).toHaveLength(3 * 16 - 1);
