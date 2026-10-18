@@ -7,6 +7,7 @@ import type { LogRecord, RecordBody, VersionVector } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
 import type { Mesh, MeshOptions, PeerInfo } from "../mesh/mesh";
 import { encodePayload, type PairingPayload } from "../pairing/payload";
+import type { VisitReceipt } from "../print/receipt";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
 import { createSessionStoreDeps, setSessionDeps, useSession } from "./session";
 
@@ -29,6 +30,8 @@ function fakeDb() {
   let gate: Promise<void> = Promise.resolve();
   let lockAvailable = true;
   let persistCalls = 0;
+  const prints: { receipt: VisitReceipt; endedInLog: boolean }[] = [];
+  let failPrint = false;
   let nextId = 1;
   /** Wall-clock time stamped on the next append (seq → at). */
   let clock = (seq: number) => 1000 + seq;
@@ -126,6 +129,13 @@ function fakeDb() {
     renderScannerCard: () => new Blob(["card"]),
     downloadBlob: (_blob, filename) => downloads.push(filename),
     getDeviceId: async () => DEVICE,
+    printVisitReceipt(receipt) {
+      const endedInLog = [...logs.values()].some((log) =>
+        log.some((r) => r.type === "patron-ended"),
+      );
+      prints.push({ receipt, endedInLog });
+      if (failPrint) throw new Error("print failed");
+    },
     createMesh(o) {
       meshOptions.push(o);
       const m = fakeMesh();
@@ -141,6 +151,7 @@ function fakeDb() {
     logs,
     locks,
     downloads,
+    prints,
     closes,
     meshes,
     meshOptions,
@@ -152,6 +163,9 @@ function fakeDb() {
     },
     failAppends(v: boolean) {
       failAppends = v;
+    },
+    failPrint(v: boolean) {
+      failPrint = v;
     },
     lockAvailable(v: boolean) {
       lockAvailable = v;
@@ -469,6 +483,85 @@ describe("useSession scanning", () => {
     await started();
     const list = await useSession().listSessions();
     expect(list.map((x) => x.name)).toEqual(["2026-10-10"]);
+  });
+});
+
+describe("useSession receipts", () => {
+  const receipt = { session: "2026-10-10", when: "2026-10-10 09:30", clerk: "Rae", patron: "P1" };
+
+  async function withVisit() {
+    const s = await started();
+    await s.scan("P1");
+    await s.scan("I1");
+    await s.scan("I2");
+    await s.voidRecord(s.currentVisit!.items[1].id);
+    return s;
+  }
+
+  it("endPatron prints the ended visit after its record is saved", async () => {
+    const s = await withVisit();
+    let committed: boolean | null = null;
+    const visitId = s.currentVisitId;
+    const print = db.deps.printVisitReceipt;
+    db.deps.printVisitReceipt = (r) => {
+      committed = s.records.some((x) => x.type === "patron-ended" && x.visitId === visitId);
+      print(r);
+    };
+    await s.endPatron();
+    expect(db.prints).toEqual([{ receipt: { ...receipt, items: ["I1"] }, endedInLog: true }]);
+    expect(committed).toBe(true);
+    expect(s.currentVisitId).toBeNull();
+  });
+
+  it("scanning OC-END prints the ended visit", async () => {
+    const s = await withVisit();
+    await s.scan(CONTROL_END);
+    expect(db.prints).toEqual([{ receipt: { ...receipt, items: ["I1"] }, endedInLog: true }]);
+  });
+
+  it("does not print until a slow append has finished", async () => {
+    const s = await withVisit();
+    const release = db.holdAppends();
+    const p = s.endPatron();
+    await tick();
+    await tick();
+    expect(db.prints).toHaveLength(0);
+    release();
+    await p;
+    expect(db.prints).toHaveLength(1);
+  });
+
+  it("prints nothing with no visit in progress", async () => {
+    const s = await started();
+    await s.endPatron();
+    await s.scan(CONTROL_END);
+    expect(s.message).toEqual({ tone: "info", text: "No patron in progress" });
+    expect(db.prints).toHaveLength(0);
+  });
+
+  it("prints nothing when the save fails", async () => {
+    const s = await withVisit();
+    db.failAppends(true);
+    await s.endPatron();
+    expect(s.fatal).toMatch(/^Could not save the change/);
+    expect(db.prints).toHaveLength(0);
+  });
+
+  it("prints nothing when the patron is voided", async () => {
+    const s = await withVisit();
+    await s.voidPatron();
+    expect(db.prints).toHaveLength(0);
+  });
+
+  it("keeps the visit ended and tells the clerk when printing fails", async () => {
+    const s = await withVisit();
+    db.failPrint(true);
+    await s.scan(CONTROL_END);
+    expect(db.prints).toHaveLength(1);
+    expect(s.currentVisit).toBeNull();
+    expect(s.state.visits[0].ended).toBe(true);
+    expect(s.message).toEqual({ tone: "error", text: "Could not print the receipt" });
+    expect(s.fatal).toBeNull();
   });
 });
 
