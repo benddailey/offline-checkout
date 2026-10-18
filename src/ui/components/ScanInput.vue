@@ -73,10 +73,12 @@ onMounted(() => {
   input.value?.focus();
   document.addEventListener("click", onDocumentClick);
   document.addEventListener("keydown", onDocumentKeydown, true);
+  window.addEventListener("afterprint", refocusSoon);
 });
 onBeforeUnmount(() => {
   document.removeEventListener("click", onDocumentClick);
   document.removeEventListener("keydown", onDocumentKeydown, true);
+  window.removeEventListener("afterprint", refocusSoon);
   if (timer !== null) clearTimeout(timer);
 });
 </script>

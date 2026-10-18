@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { appUrl } from "./helpers/app";
+import { stubPrint } from "./helpers/print";
 
 test("scan, void, end patron and resume after reload", async ({ page }) => {
+  await stubPrint(page);
   await page.goto(appUrl());
   await page.getByLabel("Session name").fill("Scan Test");
   await page.getByLabel("Clerk name").fill("Rae");

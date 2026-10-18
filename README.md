@@ -11,6 +11,8 @@ and item, ready to be re-scanned into the library system.
 - Chrome or Edge on Windows (any Chromium browser), opened from `file://`. No admin rights, no installs.
 - A USB barcode scanner that types like a keyboard (Code 39) and sends Enter after each scan.
 - A webcam on each workstation if you want to pair by QR (copy and paste works without one).
+- Optional: a receipt printer (Star TSP143 / TSP100 series, 72 mm paper) installed in Windows, for
+  patron receipts.
 - To build: Node.js and npm.
 
 ## Build
@@ -34,6 +36,10 @@ open it in the browser.
 3. **Scan.** Scan the patron card, then each item. The scanner input always has focus; just scan.
    The status bar shows live totals and a green or red dot for each workstation.
    - Scan **OC-END** (or click End patron) to finish the patron and start the next one.
+   - Ending a patron (End patron or OC-END) saves the visit, then opens the print dialog with a
+     receipt for that patron. The first time, pick the Star receipt printer (Chrome remembers the
+     last printer) and keep Scale at 100 % and Margins at Default. Cancel skips the receipt; the
+     visit stays ended. Void patron does not print.
    - Scan **OC-VOIDLAST** (or click Void on a row) to void the last item. Void patron voids the whole visit.
    - Print the scanner card (offered when a session starts, and on the Summary) to get the OC-END and
      OC-VOIDLAST barcodes on paper.
@@ -75,5 +81,6 @@ camera, WebRTC on the local network). Build it with `npm run build:probe`. See
 
 - The field probe must be run on real library PCs before rollout.
 - Chrome may ask for camera permission on every pairing when the page is opened from `file://`.
+- Chrome shows the print dialog for every receipt: a page opened from `file://` cannot print silently.
 - Data lives in the browser profile; clearing site data or using another profile loses the session.
 - Barcodes are verified by zxing at 300 dpi, but still confirm them with the library's real scanners.

@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref, shallowRef } from "vue";
+import { computed, nextTick, ref, shallowRef } from "vue";
 import { CONTROL, normalizeScan, validateBarcode } from "../log/barcode";
 import { clampName } from "../log/limits";
 import { checkItem } from "../log/duplicates";
@@ -9,6 +9,9 @@ import type { ItemState, LogRecord, RecordBody, RecordId, VisitState } from "../
 import { Mesh, type MeshOptions, type PeerInfo } from "../mesh/mesh";
 import { PairingError, decodePayload, type PairingPayload } from "../pairing/payload";
 import { downloadBlob, renderScannerCard, renderSessionPdf } from "../pdf/render";
+import { afterPaint, printElement } from "../print/print";
+import { visitReceipt, type VisitReceipt } from "../print/receipt";
+import { renderVisitReceipt } from "../print/visit-receipt";
 import * as db from "../store/db";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
 import { SyncEngine } from "../sync/sync";
@@ -30,8 +33,12 @@ export interface SessionDeps {
   createMesh: (o: MeshOptions) => Mesh;
   /** Answer a pairing offer (Mesh.join). */
   joinMesh: typeof Mesh.join;
-  /** Wall clock for default session names and PDF dates. */
+  /** Wall clock for default session names, PDF dates and receipts. */
   now: () => Date;
+  /** Resolves once the browser has painted the current DOM. */
+  afterPaint: () => Promise<void>;
+  /** Open the print dialog with a visit receipt. */
+  printVisitReceipt: (r: VisitReceipt) => void;
 }
 
 /** Real dependencies, with any of them replaced (tests pass an in-memory store and a fixed clock). */
@@ -49,6 +56,8 @@ export function createSessionStoreDeps(overrides: Partial<SessionDeps> = {}): Se
     createMesh: (o) => new Mesh(o),
     joinMesh: (text, o) => Mesh.join(text, o),
     now: () => new Date(),
+    afterPaint,
+    printVisitReceipt: (r) => printElement(renderVisitReceipt(r)),
     ...overrides,
   };
 }
@@ -433,6 +442,25 @@ export const useSession = defineStore("session", () => {
     return run;
   }
 
+  /**
+   * Only after the patron-ended record is saved and the cleared screen has painted:
+   * window.print() blocks scripts and rendering while the dialog is open.
+   */
+  async function printReceipt(visitId: RecordId): Promise<void> {
+    const owner = store;
+    try {
+      const r = visitReceipt(state.value, visitId, deps.now());
+      if (!r) return;
+      await nextTick();
+      await deps.afterPaint();
+      if (store !== owner) return;
+      deps.printVisitReceipt(r);
+    } catch (err) {
+      console.error("session: receipt failed", err);
+      message.value = { tone: "error", text: "Could not print the receipt" };
+    }
+  }
+
   function scan(raw: string): Promise<void> {
     return enqueue(() => processScan(raw));
   }
@@ -453,6 +481,7 @@ export const useSession = defineStore("session", () => {
       if (await commit({ type: "patron-ended", visitId: visit.id }, "scan")) {
         currentVisitId.value = null;
         message.value = null;
+        await printReceipt(visit.id);
       }
       return;
     }
@@ -520,6 +549,7 @@ export const useSession = defineStore("session", () => {
       if (await commit({ type: "patron-ended", visitId: visit.id }, "change")) {
         currentVisitId.value = null;
         message.value = null;
+        await printReceipt(visit.id);
       }
     });
   }
