@@ -19,8 +19,8 @@ export interface Chunk {
 }
 
 /** Set ids are two of [A-Z0-9], never both digits, so a numeric item or patron barcode is never a chunk. */
-const SET_IDS = [...DIGITS]
-  .flatMap((a) => [...DIGITS].map((b) => a + b))
+const SET_IDS = DIGITS.split("")
+  .flatMap((a) => DIGITS.split("").map((b) => a + b))
   .filter((id) => /[A-Z]/.test(id));
 
 /** Derived from the code (FNV-1a), so a reprint of the same code mixes with the first print. */
