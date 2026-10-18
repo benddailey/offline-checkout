@@ -36,11 +36,12 @@ open it in the browser.
    hold the reply QR it shows up to the first workstation's camera. If a camera is not available,
    use the Join code / Reply code boxes and paste them instead. Codes expire after 5 minutes and work once.
    - **No camera?** Click **Print code** under the Join code to print it as a receipt (a QR code plus
-     numbered barcodes). Take the receipt to the other workstation, click **Scanner (printed code)**
-     and scan every barcode in any order (or the QR, if the scanner reads 2D codes). The progress
-     line shows which pieces are still missing; repeat scans are ignored, and Start over clears what
-     was scanned. The reply code prints and scans the same way. A typical code is 14–17 barcodes,
-     and the whole exchange takes about 2–3 minutes, inside the 5-minute limit.
+     numbered barcodes). Take the receipt to the other workstation and scan every barcode in any
+     order, or the QR if the scanner reads 2D codes. The scans go to the **Scanner (printed code)**
+     box without clicking it first. The progress line shows which pieces are still missing; repeat
+     scans are ignored, and Start over clears what was scanned. The reply code prints and scans the
+     same way. A typical code is 14–17 barcodes, and the whole exchange takes about 2–3 minutes,
+     inside the 5-minute limit.
 3. **Scan.** Scan the patron card, then each item. The scanner input always has focus; just scan.
    The status bar shows live totals and a green or red dot for each workstation.
    - Scan **OC-END** (or click End patron) to finish the patron and start the next one.
