@@ -9,7 +9,9 @@ and item, ready to be re-scanned into the library system.
 ## Requirements
 
 - Chrome or Edge on Windows (any Chromium browser), opened from `file://`. No admin rights, no installs.
-- A USB barcode scanner that types like a keyboard (Code 39) and sends Enter after each scan.
+- A USB barcode scanner that types like a keyboard (Code 39) and sends Enter after each scan. To pair
+  from printed codes it must also read Code 128, send Enter or Tab after each scan, and type
+  lower-case letters as they are (no forced upper case).
 - A webcam on each workstation if you want to pair by QR (copy and paste works without one).
 - Optional: a receipt printer (Star TSP143 / TSP100 series, 72 mm paper) installed in Windows, for
   patron receipts.
@@ -33,6 +35,12 @@ open it in the browser.
    On the new workstation click Join session, scan that code with its webcam, enter your name, then
    hold the reply QR it shows up to the first workstation's camera. If a camera is not available,
    use the Join code / Reply code boxes and paste them instead. Codes expire after 5 minutes and work once.
+   - **No camera?** Click **Print code** under the Join code to print it as a receipt (a QR code plus
+     numbered barcodes). Take the receipt to the other workstation, click **Scanner (printed code)**
+     and scan every barcode in any order (or the QR, if the scanner reads 2D codes). The progress
+     line shows which pieces are still missing; repeat scans are ignored, and Start over clears what
+     was scanned. The reply code prints and scans the same way. A typical code is 14–17 barcodes,
+     and the whole exchange takes about 2–3 minutes, inside the 5-minute limit.
 3. **Scan.** Scan the patron card, then each item. The scanner input always has focus; just scan.
    The status bar shows live totals and a green or red dot for each workstation.
    - Scan **OC-END** (or click End patron) to finish the patron and start the next one.
