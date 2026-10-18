@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import QRCode from "qrcode";
 import { ref, useTemplateRef, watchEffect } from "vue";
-import { printPairingCode } from "../print/pairing-receipt";
+import { printErrorText, printPairingCode } from "../print/pairing-receipt";
 
 const props = defineProps<{
   text: string;
@@ -48,10 +48,7 @@ function print() {
       expiresAt: props.expiresAt,
     });
   } catch (err) {
-    printError.value =
-      err instanceof Error && err.message === "too long"
-        ? "This code is too long to print. Use the camera or Copy instead."
-        : "Could not print the code. Use the camera or Copy instead.";
+    printError.value = printErrorText(err);
   }
 }
 </script>

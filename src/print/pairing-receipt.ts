@@ -81,6 +81,13 @@ export function renderPairingReceipt(r: PairingReceipt): HTMLElement {
   return box;
 }
 
+/** What QrDisplay shows when Print code fails. */
+export function printErrorText(err: unknown): string {
+  return err instanceof Error && err.message === "too long"
+    ? "This code is too long to print. Use the camera or Copy instead."
+    : "Could not print the code. Use the camera or Copy instead.";
+}
+
 export function printPairingCode(r: PairingReceipt): void {
   printElement(renderPairingReceipt(r), CSS);
 }
