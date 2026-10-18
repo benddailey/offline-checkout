@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { appUrl } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { decodePdfBarcodes, pdfText } from "./helpers/pdf";
+import { stubPrint } from "./helpers/print";
 
 /** Click `button` on `page`, wait for the download it starts and save it under test-results/. */
 async function download(page: Page, button: string, saveAs: string): Promise<string> {
@@ -26,7 +27,10 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
   const contexts = await Promise.all([1, 2].map(() => browser.newContext()));
   try {
     const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
-    for (const page of [a!, b!]) await page.goto(appUrl());
+    for (const page of [a!, b!]) {
+      await stubPrint(page);
+      await page.goto(appUrl());
+    }
     let downloadsOnA = 0;
     a!.on("download", () => downloadsOnA++);
 
