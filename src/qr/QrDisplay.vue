@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import QRCode from "qrcode";
 import { ref, useTemplateRef, watchEffect } from "vue";
+import { printErrorText, printPairingCode } from "../print/pairing-receipt";
 
-const props = defineProps<{ text: string; label: string }>();
+const props = defineProps<{
+  text: string;
+  label: "Join code" | "Reply code";
+  sessionName?: string;
+  expiresAt?: number;
+}>();
 
 const dataUrl = ref("");
 const copied = ref(false);
@@ -29,6 +35,22 @@ async function copy() {
   copied.value = true;
   setTimeout(() => (copied.value = false), 1500);
 }
+
+const printError = ref("");
+
+function print() {
+  printError.value = "";
+  try {
+    printPairingCode({
+      label: props.label,
+      code: props.text,
+      sessionName: props.sessionName,
+      expiresAt: props.expiresAt,
+    });
+  } catch (err) {
+    printError.value = printErrorText(err);
+  }
+}
 </script>
 
 <template>
@@ -50,12 +72,24 @@ async function copy() {
         @focus="area?.select()"
       />
     </label>
-    <button
-      type="button"
-      class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
-      @click="copy"
-    >
-      {{ copied ? "Copied" : "Copy" }}
-    </button>
+    <div class="flex gap-3">
+      <button
+        type="button"
+        class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
+        @click="copy"
+      >
+        {{ copied ? "Copied" : "Copy" }}
+      </button>
+      <button
+        type="button"
+        class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
+        @click="print"
+      >
+        Print code
+      </button>
+    </div>
+    <p v-if="printError" role="alert" class="rounded bg-amber-100 p-2 text-base text-amber-900">
+      {{ printError }}
+    </p>
   </div>
 </template>

@@ -30,7 +30,7 @@ export async function pdfText(path: string): Promise<string> {
 let wasmReady = false;
 
 /** Load the zxing reader from node_modules; it would otherwise fetch the wasm from a CDN. */
-async function useLocalWasm(): Promise<void> {
+export async function useLocalWasm(): Promise<void> {
   if (wasmReady) return;
   const wasm = await readFile(require.resolve("zxing-wasm/reader/zxing_reader.wasm"));
   setZXingModuleOverrides({

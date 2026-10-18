@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, useTemplateRef } from "vue";
 import { normalizeScan } from "../../log/barcode";
 import { MAX_NAME } from "../../log/limits";
 import type { Invite, Mesh } from "../../mesh/mesh";
+import { parseChunk } from "../../pairing/chunks";
 import { PairingError, type PairingPayload } from "../../pairing/payload";
 import QrDisplay from "../../qr/QrDisplay.vue";
 import QrScan from "../../qr/QrScan.vue";
@@ -15,8 +16,10 @@ const props = defineProps<{ mode: "invite" | "join" }>();
 
 const session = useSession();
 
-/** How long either side waits for the data channel once codes have been exchanged. */
+/** How long the inviter waits for the data channel once the reply code has been entered. */
 const CONNECT_TIMEOUT_MS = 45_000;
+/** The joiner's reply may be printed and scanned, so it waits as long as the join code lives. */
+const JOIN_WAIT_MS = 300_000;
 
 /** A join started while a session is open here is a re-pair of that session. */
 const repair = props.mode === "join" && session.meta !== null;
@@ -55,10 +58,10 @@ function fail(text: string): void {
   phase.value = "error";
 }
 
-function withTimeout<T>(p: Promise<T>): Promise<T> {
+function withTimeout<T>(p: Promise<T>, ms = CONNECT_TIMEOUT_MS): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("timeout")), CONNECT_TIMEOUT_MS);
+    timer = setTimeout(() => reject(new Error("timeout")), ms);
   });
   return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
 }
@@ -175,7 +178,7 @@ async function submitName(): Promise<void> {
   answer.value = joined.answer;
   phase.value = "answer";
   try {
-    await withTimeout(joined.connected);
+    await withTimeout(joined.connected, JOIN_WAIT_MS);
   } catch (err) {
     if (pending !== joined.mesh) return;
     dropPending();
@@ -216,11 +219,21 @@ function startJoin(): void {
 /** Outcome of the last scan made on this screen (recorded in the open session). */
 const scanNote = ref<Message | null>(null);
 
-/** A scanner used while this screen is up still records into the open session. */
-const capture = createScanCapture((code) => void recordScan(code));
+const scanner = useTemplateRef<InstanceType<typeof QrScan>>("scanner");
+
+const isPairingScan = (code: string) => code.startsWith("OC1:") || parseChunk(code) !== null;
+
+/**
+ * A scanner used while this screen is up still records into the open session, except printed
+ * pairing barcodes: those go to the code reader (raw, case kept), or nowhere if none is shown.
+ */
+const capture = createScanCapture((code) => {
+  if (isPairingScan(code)) scanner.value?.acceptScan(code);
+  else if (session.meta) void recordScan(code);
+});
 
 function onKeydown(e: KeyboardEvent): void {
-  if (session.meta) capture(e as KeyLike);
+  if (session.meta || scanner.value) capture(e as KeyLike);
 }
 
 async function recordScan(code: string): Promise<void> {
@@ -307,14 +320,19 @@ const step = "text-2xl font-bold text-slate-900";
     <div v-else-if="mode === 'invite' && invite" class="grid gap-6 md:grid-cols-2">
       <section class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5">
         <h2 :class="step">1. On the new workstation, click Join session and scan this code</h2>
-        <QrDisplay :text="invite.payload" label="Join code" />
+        <QrDisplay
+          :text="invite.payload"
+          label="Join code"
+          :session-name="session.meta?.name"
+          :expires-at="invite.expiresAt"
+        />
         <p class="text-lg text-slate-700" data-testid="countdown">
           Expires in <span class="font-mono font-bold">{{ countdown }}</span>
         </p>
       </section>
       <section class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5">
         <h2 :class="step">2. Scan the reply code shown on the new workstation</h2>
-        <QrScan :key="attempt" @decoded="onAnswer" />
+        <QrScan ref="scanner" :key="attempt" @decoded="onAnswer" />
       </section>
     </div>
 
@@ -326,7 +344,7 @@ const step = "text-2xl font-bold text-slate-900";
       <h2 :class="step">
         Scan the join code shown under Add workstation on a workstation already in the session
       </h2>
-      <QrScan :key="attempt" @decoded="onOffer" />
+      <QrScan ref="scanner" :key="attempt" @decoded="onOffer" />
     </section>
 
     <section
@@ -374,7 +392,7 @@ const step = "text-2xl font-bold text-slate-900";
       <h2 :class="step">
         On {{ offer?.employee || "the other" }}'s workstation, scan this reply code
       </h2>
-      <QrDisplay :text="answer" label="Reply code" />
+      <QrDisplay :text="answer" label="Reply code" :session-name="offer?.sessionName" />
       <p class="text-lg text-slate-700" role="status">Waiting for the other workstation…</p>
     </section>
   </main>

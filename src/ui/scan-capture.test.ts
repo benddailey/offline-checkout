@@ -68,6 +68,19 @@ describe("createScanCapture", () => {
     expect(onScan).toHaveBeenCalledWith("P9");
   });
 
+  it("leaves keys in an editable input to the field's own handler (the pairing scanner field)", () => {
+    const input = {
+      closest: (sel: string) =>
+        sel.split(",").some((s) => s.trim() === "input:not([readonly])") ? {} : null,
+    };
+    const onScan = vi.fn();
+    const h = createScanCapture(onScan);
+    const events = [key("A", input), key("Enter", input)];
+    for (const e of events) h(e);
+    expect(onScan).not.toHaveBeenCalled();
+    for (const e of events) expect(e.preventDefault).not.toHaveBeenCalled();
+  });
+
   it("drops a stray key when the next keystroke comes after a pause", () => {
     vi.useFakeTimers();
     try {
