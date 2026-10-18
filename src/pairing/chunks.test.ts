@@ -4,9 +4,9 @@ import {
   emptyCollector,
   MAX_CHUNKS,
   missing,
-  newSetId,
   parseChunk,
   progressText,
+  setIdFor,
   splitCode,
   type AddResult,
   type Collector,
@@ -39,9 +39,25 @@ function collect(chunks: string[]): { last: AddResult; c: Collector } {
   return { last, c };
 }
 
-describe("newSetId", () => {
+describe("setIdFor", () => {
+  const sample = Array.from({ length: 12 }, (_, i) => code(200 + i * 5) + "x".repeat(i));
+
   it("is two upper-case letters or digits, at least one a letter", () => {
-    for (let i = 0; i < 200; i++) expect(newSetId()).toMatch(/^(?=.*[A-Z])[A-Z0-9]{2}$/);
+    for (let i = 0; i < 500; i++) expect(setIdFor(code(i + 5))).toMatch(/^(?=.*[A-Z])[A-Z0-9]{2}$/);
+  });
+
+  it("gives a reprint of the same code the same set id", () => {
+    for (const c of sample) expect(setIdFor(c)).toBe(setIdFor(c.slice()));
+    expect(splitCode(sample[0]!)).toEqual(splitCode(sample[0]!));
+  });
+
+  it("gives a code and a one-character variant of it different set ids", () => {
+    for (const c of sample) expect(setIdFor(c.slice(0, -1) + "Q")).not.toBe(setIdFor(c));
+  });
+
+  it("spreads codes over the set ids", () => {
+    const ids = new Set(Array.from({ length: 1000 }, (_, i) => setIdFor(code(220) + i)));
+    expect(ids.size).toBeGreaterThan(500);
   });
 });
 
@@ -58,9 +74,10 @@ describe("splitCode", () => {
     expect(chunks.map((ch) => ch.slice(4)).join("")).toBe(c);
   });
 
-  it("uses one random set id for all chunks when none is given", () => {
-    const sets = new Set(splitCode(code(100)).map((ch) => ch.slice(0, 2)));
-    expect(sets.size).toBe(1);
+  it("uses the code's own set id for all chunks when none is given", () => {
+    const c = code(100);
+    const sets = new Set(splitCode(c).map((ch) => ch.slice(0, 2)));
+    expect([...sets]).toEqual([setIdFor(c)]);
   });
 
   it("fits 560 chars in 35 chunks and refuses 561", () => {

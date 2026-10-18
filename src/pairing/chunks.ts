@@ -1,4 +1,3 @@
-export const CHUNK_HEADER = 4;
 export const CHUNK_DATA = 16;
 export const MAX_CHUNKS = 35;
 
@@ -19,17 +18,19 @@ export interface Chunk {
   data: string;
 }
 
-/** Two of [A-Z0-9], never both digits, so a numeric item or patron barcode is never a chunk. */
-export function newSetId(): string {
-  const bytes = new Uint8Array(2);
-  for (;;) {
-    crypto.getRandomValues(bytes);
-    const id = Array.from(bytes, (b) => DIGITS[b % 36]).join("");
-    if (/[A-Z]/.test(id)) return id;
-  }
+/** Set ids are two of [A-Z0-9], never both digits, so a numeric item or patron barcode is never a chunk. */
+const SET_IDS = [...DIGITS]
+  .flatMap((a) => [...DIGITS].map((b) => a + b))
+  .filter((id) => /[A-Z]/.test(id));
+
+/** Derived from the code (FNV-1a), so a reprint of the same code mixes with the first print. */
+export function setIdFor(code: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < code.length; i++) h = Math.imul(h ^ code.charCodeAt(i), 0x01000193);
+  return SET_IDS[(h >>> 0) % SET_IDS.length]!;
 }
 
-export function splitCode(code: string, set: string = newSetId()): string[] {
+export function splitCode(code: string, set: string = setIdFor(code)): string[] {
   const total = Math.ceil(code.length / CHUNK_DATA);
   if (total > MAX_CHUNKS) throw new Error("too long");
   const out: string[] = [];
