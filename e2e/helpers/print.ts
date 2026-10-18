@@ -101,14 +101,18 @@ export async function printToPdf(html: string, saveAs: string): Promise<string> 
   }
 }
 
-/** Every Code 128 and QR code in the PDF, rasterised at the receipt printer's 203 dpi, top to bottom. */
+/**
+ * Every Code 128 and QR code in the PDF, rasterised at the receipt printer's 203 dpi, top to bottom.
+ * `mono` thresholds to black and white, as a thermal printer does.
+ */
 export async function decodePrintedBarcodes(
   pdfPath: string,
+  colour: "gray" | "mono" = "gray",
 ): Promise<{ code128: string[]; qr: string[] }> {
   await useLocalWasm();
   const dir = await mkdtemp(join(tmpdir(), "oc-print-"));
   try {
-    await run("pdftoppm", ["-r", "203", "-gray", "-png", pdfPath, join(dir, "page")]);
+    await run("pdftoppm", ["-r", "203", `-${colour}`, "-png", pdfPath, join(dir, "page")]);
     const pngs = (await readdir(dir)).filter((f) => f.endsWith(".png")).sort();
     const found = { code128: [] as string[], qr: [] as string[] };
     for (const png of pngs) {

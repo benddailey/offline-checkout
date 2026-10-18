@@ -1,7 +1,9 @@
 import JsBarcode from "jsbarcode";
 
-/** One narrow bar: 2 dots on a 203 dpi printer. */
-export const MODULE_MM = 0.25;
+/** One printer dot at 203 dpi. */
+export const DOT_MM = 25.4 / 203;
+/** One narrow bar: exactly 2 printer dots. */
+export const MODULE_MM = 2 * DOT_MM;
 export const QUIET_MODULES = 10;
 
 const BAR_UNITS = 100;

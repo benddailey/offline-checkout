@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import { splitCode } from "../pairing/chunks";
-import { code128Svg } from "./code128";
+import { code128Svg, DOT_MM } from "./code128";
 import { printElement, RECEIPT_WIDTH_MM } from "./print";
 
 export interface PairingReceipt {
@@ -15,11 +15,16 @@ const QR_MM = 50;
 const QR_QUIET = 4;
 const BAR_HEIGHT_MM = 10;
 
-/** Barcodes are wider than the padded receipt body, so their rows span the full paper width. */
+/** Left edge of every barcode, in whole printer dots from the paper's left edge, so bars land on dots. */
+const BAR_LEFT_DOTS = 8;
+
+/** Rows start at the paper's left edge (the root's 3 mm padding undone); barcodes are wider than the padded body. */
 const CSS = `
-#oc-print-root .oc-pair-row { margin: 3mm -3mm 0; width: ${RECEIPT_WIDTH_MM}mm; break-inside: avoid; }
-#oc-print-root .oc-pair-row svg { margin: 0 auto; }
-#oc-print-root .oc-pair-row div { text-align: center; font-size: 10pt; }
+#oc-print-root .oc-pair-row {
+  margin: 3mm -3mm 0; width: ${RECEIPT_WIDTH_MM}mm; padding-left: ${BAR_LEFT_DOTS * DOT_MM}mm;
+  box-sizing: border-box; break-inside: avoid;
+}
+#oc-print-root .oc-pair-bar { display: inline-block; text-align: center; font-size: 10pt; }
 `;
 
 function qrSvg(code: string): SVGSVGElement {
@@ -75,7 +80,10 @@ export function renderPairingReceipt(r: PairingReceipt): HTMLElement {
     const row = document.createElement("div");
     row.className = "oc-pair-row";
     row.dataset.chunk = chunk;
-    row.append(code128Svg(chunk, BAR_HEIGHT_MM), line(`${i + 1} of ${chunks.length}`));
+    const bar = document.createElement("div");
+    bar.className = "oc-pair-bar";
+    bar.append(code128Svg(chunk, BAR_HEIGHT_MM), line(`${i + 1} of ${chunks.length}`));
+    row.append(bar);
     box.append(row);
   });
   return box;
