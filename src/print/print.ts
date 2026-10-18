@@ -41,5 +41,25 @@ export function printElement(content: HTMLElement, extraCss = ""): void {
   style.textContent += `@page { size: ${RECEIPT_WIDTH_MM}mm ${heightMm}mm; margin: 0 }\n`;
 
   window.addEventListener("afterprint", removePrinted, { once: true });
-  window.print();
+  try {
+    window.print();
+  } catch (err) {
+    window.removeEventListener("afterprint", removePrinted);
+    removePrinted();
+    throw err;
+  }
+}
+
+/** Resolves once the current DOM has been painted (rAF, then a task); a timer covers hidden tabs, where rAF never fires. */
+export function afterPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      setTimeout(resolve, 0);
+    };
+    requestAnimationFrame(go);
+    setTimeout(go, 100);
+  });
 }

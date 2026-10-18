@@ -32,6 +32,7 @@ function fakeDb() {
   let persistCalls = 0;
   const prints: { receipt: VisitReceipt; endedInLog: boolean }[] = [];
   let failPrint = false;
+  let paint: Promise<void> = Promise.resolve();
   let nextId = 1;
   /** Wall-clock time stamped on the next append (seq → at). */
   let clock = (seq: number) => 1000 + seq;
@@ -129,10 +130,14 @@ function fakeDb() {
     renderScannerCard: () => new Blob(["card"]),
     downloadBlob: (_blob, filename) => downloads.push(filename),
     getDeviceId: async () => DEVICE,
+    afterPaint: () => paint,
     printVisitReceipt(receipt) {
-      const endedInLog = [...logs.values()].some((log) =>
-        log.some((r) => r.type === "patron-ended"),
-      );
+      const endedInLog = [...logs.values()].some((log) => {
+        const visits = log
+          .filter((r) => r.type === "patron-started" && r.patron === receipt.patron)
+          .map(recordId);
+        return log.some((r) => r.type === "patron-ended" && visits.includes(r.visitId));
+      });
       prints.push({ receipt, endedInLog });
       if (failPrint) throw new Error("print failed");
     },
@@ -175,6 +180,15 @@ function fakeDb() {
     },
     persistCalls: () => persistCalls,
     /** Hold every append until the returned function is called. */
+    /** Hold the "screen has painted" signal until the returned function is called. */
+    holdPaint() {
+      let release!: () => void;
+      paint = new Promise((r) => (release = r));
+      return () => {
+        release();
+        paint = Promise.resolve();
+      };
+    },
     holdAppends() {
       let release!: () => void;
       gate = new Promise((r) => (release = r));
@@ -503,14 +517,42 @@ describe("useSession receipts", () => {
     let committed: boolean | null = null;
     const visitId = s.currentVisitId;
     const print = db.deps.printVisitReceipt;
+    let cleared: boolean | null = null;
     db.deps.printVisitReceipt = (r) => {
       committed = s.records.some((x) => x.type === "patron-ended" && x.visitId === visitId);
+      cleared = s.currentVisitId === null && s.currentVisit === null;
       print(r);
     };
     await s.endPatron();
     expect(db.prints).toEqual([{ receipt: { ...receipt, items: ["I1"] }, endedInLog: true }]);
     expect(committed).toBe(true);
+    expect(cleared).toBe(true);
     expect(s.currentVisitId).toBeNull();
+  });
+
+  it("waits for the cleared screen to paint before printing", async () => {
+    const s = await withVisit();
+    const release = db.holdPaint();
+    const p = s.scan(CONTROL_END);
+    for (let i = 0; i < 30 && s.currentVisitId !== null; i++) await tick();
+    await tick();
+    expect(s.currentVisitId).toBeNull();
+    expect(db.prints).toHaveLength(0);
+    release();
+    await p;
+    expect(db.prints).toHaveLength(1);
+  });
+
+  it("skips the receipt if the session was left before the screen painted", async () => {
+    const s = await withVisit();
+    const release = db.holdPaint();
+    const p = s.endPatron();
+    for (let i = 0; i < 30 && s.currentVisitId !== null; i++) await tick();
+    expect(s.currentVisitId).toBeNull();
+    s.leaveSession();
+    release();
+    await p;
+    expect(db.prints).toHaveLength(0);
   });
 
   it("scanning OC-END prints the ended visit", async () => {
