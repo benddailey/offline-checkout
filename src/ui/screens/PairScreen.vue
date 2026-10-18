@@ -307,7 +307,12 @@ const step = "text-2xl font-bold text-slate-900";
     <div v-else-if="mode === 'invite' && invite" class="grid gap-6 md:grid-cols-2">
       <section class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5">
         <h2 :class="step">1. On the new workstation, click Join session and scan this code</h2>
-        <QrDisplay :text="invite.payload" label="Join code" />
+        <QrDisplay
+          :text="invite.payload"
+          label="Join code"
+          :session-name="session.meta?.name"
+          :expires-at="invite.expiresAt"
+        />
         <p class="text-lg text-slate-700" data-testid="countdown">
           Expires in <span class="font-mono font-bold">{{ countdown }}</span>
         </p>
@@ -374,7 +379,7 @@ const step = "text-2xl font-bold text-slate-900";
       <h2 :class="step">
         On {{ offer?.employee || "the other" }}'s workstation, scan this reply code
       </h2>
-      <QrDisplay :text="answer" label="Reply code" />
+      <QrDisplay :text="answer" label="Reply code" :session-name="offer?.sessionName" />
       <p class="text-lg text-slate-700" role="status">Waiting for the other workstation…</p>
     </section>
   </main>
