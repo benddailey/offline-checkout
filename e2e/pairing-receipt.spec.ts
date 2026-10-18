@@ -43,12 +43,20 @@ async function printCode(page: Page): Promise<{ text: string; html: string }> {
   return (await printed(page))[before]!;
 }
 
-/** Barcode texts as they would be scanned off the printed paper. */
+const sorted = (items: string[]) => [...items].sort();
+
+/** Barcode texts as they would be scanned off the printed paper; every one must decode in gray and in mono. */
 async function scanPaper(
   html: string,
   saveAs: string,
 ): Promise<{ code128: string[]; qr: string[] }> {
-  return decodePrintedBarcodes(await printToPdf(html, saveAs));
+  const pdf = await printToPdf(html, saveAs);
+  const gray = await decodePrintedBarcodes(pdf, "gray");
+  const mono = await decodePrintedBarcodes(pdf, "mono");
+  expect(sorted(gray.code128)).toEqual(sorted(chunksIn(html)));
+  expect(sorted(mono.code128)).toEqual(sorted(chunksIn(html)));
+  expect(mono.qr).toEqual(gray.qr);
+  return gray;
 }
 
 function chunksIn(html: string): string[] {
@@ -145,6 +153,49 @@ test("two workstations pair by scanning printed barcodes", async ({ browser }) =
     await expect(inviter.getByLabel("Scanner input")).toBeVisible({ timeout: 15_000 });
     await expect(joiner.getByLabel("Scanner input")).toBeVisible({ timeout: 15_000 });
     console.log(`print-then-scan pairing took ${((Date.now() - startedAt) / 1000).toFixed(1)} s`);
+  } finally {
+    await done();
+  }
+});
+
+test("barcodes scanned outside the scanner field still pair and are not recorded as scans", async ({
+  browser,
+}) => {
+  const { inviter, joiner, done } = await stations(browser);
+  try {
+    await inviter.getByRole("button", { name: "Add workstation" }).click();
+    await codeText(inviter, "Join code");
+    const joinChunks = chunksIn((await printCode(inviter)).html);
+
+    // No session is open on the joiner (Launch → Join session).
+    await joiner.getByRole("button", { name: "Join session" }).click();
+    await joiner.getByRole("heading", { name: "Join session" }).click();
+    await expect(joiner.getByLabel("Scanner (printed code)")).not.toBeFocused();
+    for (const chunk of joinChunks.slice(0, 2)) await joiner.keyboard.type(`${chunk}\n`);
+    await expect(joiner.getByTestId("chunk-progress")).toContainText(
+      `Received 2 of ${joinChunks.length}`,
+    );
+    for (const chunk of joinChunks.slice(2)) await joiner.keyboard.type(`${chunk}\n`);
+    await joiner.getByRole("button", { name: "Join", exact: true }).click();
+    await joiner.getByLabel("Clerk name").fill("Ben");
+    await joiner.getByRole("button", { name: "Continue" }).click();
+    await codeText(joiner, "Reply code");
+    const replyChunks = chunksIn((await printCode(joiner)).html);
+
+    await inviter.getByRole("heading", { name: "Add workstation" }).click();
+    await expect(inviter.getByLabel("Scanner (printed code)")).not.toBeFocused();
+    for (const chunk of replyChunks.slice(0, 3)) await inviter.keyboard.type(`${chunk}\n`);
+    await expect(inviter.getByTestId("chunk-progress")).toContainText(
+      `Received 3 of ${replyChunks.length}`,
+    );
+    await expect(inviter.getByTestId("message")).toHaveCount(0);
+    for (const chunk of replyChunks.slice(3)) await inviter.keyboard.type(`${chunk}\n`);
+
+    await expect(inviter.getByLabel("Scanner input")).toBeVisible({ timeout: 15_000 });
+    await expect(joiner.getByLabel("Scanner input")).toBeVisible({ timeout: 15_000 });
+    for (const page of [inviter, joiner]) {
+      await expect(page.getByTestId("totals")).toHaveText("Patrons 0 · Items 0");
+    }
   } finally {
     await done();
   }

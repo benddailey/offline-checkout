@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, useTemplateRef } from "vue";
 import { normalizeScan } from "../../log/barcode";
 import { MAX_NAME } from "../../log/limits";
 import type { Invite, Mesh } from "../../mesh/mesh";
+import { parseChunk } from "../../pairing/chunks";
 import { PairingError, type PairingPayload } from "../../pairing/payload";
 import QrDisplay from "../../qr/QrDisplay.vue";
 import QrScan from "../../qr/QrScan.vue";
@@ -218,11 +219,21 @@ function startJoin(): void {
 /** Outcome of the last scan made on this screen (recorded in the open session). */
 const scanNote = ref<Message | null>(null);
 
-/** A scanner used while this screen is up still records into the open session. */
-const capture = createScanCapture((code) => void recordScan(code));
+const scanner = useTemplateRef<InstanceType<typeof QrScan>>("scanner");
+
+const isPairingScan = (code: string) => code.startsWith("OC1:") || parseChunk(code) !== null;
+
+/**
+ * A scanner used while this screen is up still records into the open session, except printed
+ * pairing barcodes: those go to the code reader (raw, case kept), or nowhere if none is shown.
+ */
+const capture = createScanCapture((code) => {
+  if (isPairingScan(code)) scanner.value?.acceptScan(code);
+  else if (session.meta) void recordScan(code);
+});
 
 function onKeydown(e: KeyboardEvent): void {
-  if (session.meta) capture(e as KeyLike);
+  if (session.meta || scanner.value) capture(e as KeyLike);
 }
 
 async function recordScan(code: string): Promise<void> {
@@ -321,7 +332,7 @@ const step = "text-2xl font-bold text-slate-900";
       </section>
       <section class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5">
         <h2 :class="step">2. Scan the reply code shown on the new workstation</h2>
-        <QrScan :key="attempt" @decoded="onAnswer" />
+        <QrScan ref="scanner" :key="attempt" @decoded="onAnswer" />
       </section>
     </div>
 
@@ -333,7 +344,7 @@ const step = "text-2xl font-bold text-slate-900";
       <h2 :class="step">
         Scan the join code shown under Add workstation on a workstation already in the session
       </h2>
-      <QrScan :key="attempt" @decoded="onOffer" />
+      <QrScan ref="scanner" :key="attempt" @decoded="onOffer" />
     </section>
 
     <section

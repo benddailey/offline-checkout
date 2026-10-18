@@ -31,7 +31,7 @@ function reset() {
   paused.value = false;
   startOver();
 }
-defineExpose({ reset });
+defineExpose({ reset, acceptScan });
 
 function emitText(raw: string) {
   const text = raw.trim();
@@ -47,13 +47,8 @@ function onDetect(codes: DetectedBarcode[]) {
   }
 }
 
-/** Enter or Tab ends each printed barcode; both stay in the field so the next scan lands here too. */
-function onScannerKey(e: KeyboardEvent) {
-  if ((e.key !== "Enter" && e.key !== "Tab") || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey)
-    return;
-  e.preventDefault();
-  const text = scanned.value;
-  scanned.value = "";
+/** One scanned barcode: a printed piece, or a whole OC1: code. */
+function acceptScan(text: string) {
   if (!text.trim()) return;
   const r = addScan(collector.value, text);
   switch (r.kind) {
@@ -73,6 +68,16 @@ function onScannerKey(e: KeyboardEvent) {
     case "invalid":
       chunkError.value = INVALID_MESSAGE;
   }
+}
+
+/** Enter or Tab ends each printed barcode; both stay in the field so the next scan lands here too. */
+function onScannerKey(e: KeyboardEvent) {
+  if ((e.key !== "Enter" && e.key !== "Tab") || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey)
+    return;
+  e.preventDefault();
+  const text = scanned.value;
+  scanned.value = "";
+  acceptScan(text);
 }
 
 function usePasted() {
