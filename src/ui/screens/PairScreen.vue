@@ -15,8 +15,10 @@ const props = defineProps<{ mode: "invite" | "join" }>();
 
 const session = useSession();
 
-/** How long either side waits for the data channel once codes have been exchanged. */
+/** How long the inviter waits for the data channel once the reply code has been entered. */
 const CONNECT_TIMEOUT_MS = 45_000;
+/** The joiner's reply may be printed and scanned, so it waits as long as the join code lives. */
+const JOIN_WAIT_MS = 300_000;
 
 /** A join started while a session is open here is a re-pair of that session. */
 const repair = props.mode === "join" && session.meta !== null;
@@ -55,10 +57,10 @@ function fail(text: string): void {
   phase.value = "error";
 }
 
-function withTimeout<T>(p: Promise<T>): Promise<T> {
+function withTimeout<T>(p: Promise<T>, ms = CONNECT_TIMEOUT_MS): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("timeout")), CONNECT_TIMEOUT_MS);
+    timer = setTimeout(() => reject(new Error("timeout")), ms);
   });
   return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
 }
@@ -175,7 +177,7 @@ async function submitName(): Promise<void> {
   answer.value = joined.answer;
   phase.value = "answer";
   try {
-    await withTimeout(joined.connected);
+    await withTimeout(joined.connected, JOIN_WAIT_MS);
   } catch (err) {
     if (pending !== joined.mesh) return;
     dropPending();
