@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   addScan,
+  CHUNK_DIGITS,
+  DATA_DIGITS,
   emptyCollector,
+  isPairingText,
   MAX_CHUNKS,
   missing,
   parseChunk,
@@ -11,13 +14,13 @@ import {
   type AddResult,
   type Collector,
 } from "./chunks";
+import { codeFromBytes } from "./payload";
 
-const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
-function code(length: number): string {
-  let s = "OC1:";
-  for (let i = 0; s.length < length; i++) s += B64[(i * 7 + 3) % B64.length];
-  return s;
+/** A code of `n` bytes; like a real one, its first byte is never 0. */
+function code(n: number, seed = 0): string {
+  const bytes = Uint8Array.from({ length: n }, (_, i) => (i * 37 + seed * 11 + 5) % 256);
+  bytes[0] = 0x20;
+  return codeFromBytes(bytes);
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -40,89 +43,92 @@ function collect(chunks: string[]): { last: AddResult; c: Collector } {
 }
 
 describe("setIdFor", () => {
-  const sample = Array.from({ length: 12 }, (_, i) => code(200 + i * 5) + "x".repeat(i));
-
-  it("is two upper-case letters or digits, at least one a letter", () => {
-    for (let i = 0; i < 500; i++) expect(setIdFor(code(i + 5))).toMatch(/^(?=.*[A-Z])[A-Z0-9]{2}$/);
+  it("is two digits", () => {
+    for (let i = 0; i < 500; i++) expect(setIdFor(String(i * 7919))).toMatch(/^\d{2}$/);
   });
 
-  it("gives a reprint of the same code the same set id", () => {
-    for (const c of sample) expect(setIdFor(c)).toBe(setIdFor(c.slice()));
-    expect(splitCode(sample[0]!)).toEqual(splitCode(sample[0]!));
-  });
-
-  it("gives a code and a one-character variant of it different set ids", () => {
-    for (const c of sample) expect(setIdFor(c.slice(0, -1) + "Q")).not.toBe(setIdFor(c));
+  it("gives a reprint of the same code the same barcodes", () => {
+    expect(splitCode(code(110))).toEqual(splitCode(code(110)));
   });
 
   it("spreads codes over the set ids", () => {
-    const ids = new Set(Array.from({ length: 1000 }, (_, i) => setIdFor(code(220) + i)));
-    expect(ids.size).toBeGreaterThan(500);
+    const ids = new Set(Array.from({ length: 1000 }, (_, i) => setIdFor(`${i}123456789`)));
+    expect(ids.size).toBeGreaterThan(90);
   });
 });
 
 describe("splitCode", () => {
-  it("splits a 260-char code into 17 numbered chunks of at most 20 chars", () => {
-    const c = code(260);
-    const chunks = splitCode(c, "K7");
-    expect(chunks).toHaveLength(17);
-    const digits = "123456789ABCDEFGH";
+  it("prints a real-sized 111-byte code as 8 all-digit barcodes of 40 digits", () => {
+    const chunks = splitCode(code(111));
+    expect(chunks).toHaveLength(8);
+    for (const chunk of chunks) expect(chunk).toMatch(/^\d{40}$/);
+    const sets = new Set(chunks.map((ch) => ch.slice(0, 2)));
+    expect(sets.size).toBe(1);
+  });
+
+  it("numbers each barcode n of N", () => {
+    const chunks = splitCode(code(111));
     chunks.forEach((chunk, i) => {
-      expect(chunk.length).toBeLessThanOrEqual(20);
-      expect(chunk.slice(0, 4)).toBe(`K7${digits[i]}H`);
+      expect(parseChunk(chunk)).toMatchObject({ index: i + 1, total: chunks.length });
     });
-    expect(chunks.map((ch) => ch.slice(4)).join("")).toBe(c);
   });
 
-  it("uses the code's own set id for all chunks when none is given", () => {
-    const c = code(100);
-    const sets = new Set(splitCode(c).map((ch) => ch.slice(0, 2)));
-    expect([...sets]).toEqual([setIdFor(c)]);
+  it(`fits ${MAX_CHUNKS} barcodes and refuses more`, () => {
+    const bytesThatFit = Math.floor((MAX_CHUNKS * DATA_DIGITS) / Math.log10(256));
+    expect(splitCode(code(bytesThatFit))).toHaveLength(MAX_CHUNKS);
+    expect(() => splitCode(code(bytesThatFit + 2))).toThrow("too long");
   });
 
-  it("fits 560 chars in 35 chunks and refuses 561", () => {
-    expect(splitCode(code(560))).toHaveLength(MAX_CHUNKS);
-    expect(() => splitCode(code(561))).toThrow("too long");
-  });
-
-  it("keeps case and - _ in the data", () => {
-    const c = "OC1:aB-_zZ09xy";
-    expect(parseChunk(splitCode(c, "Q1")[0]!)?.data).toBe(c);
+  it("refuses text that is not a current code", () => {
+    expect(() => splitCode("OC1:abc")).toThrow();
+    expect(() => splitCode("hello")).toThrow();
   });
 });
 
 describe("parseChunk", () => {
   it("reads set, index, total and data", () => {
-    expect(parseChunk("AB2Cabcdefghijklmnop")).toEqual({
-      set: "AB",
-      index: 2,
-      total: 12,
-      data: "abcdefghijklmnop",
+    // Position 12 is index 3 of 5: 5*4/2 + 3 - 1.
+    expect(parseChunk(`4212${"7".repeat(DATA_DIGITS)}`)).toEqual({
+      set: "42",
+      index: 3,
+      total: 5,
+      data: "7".repeat(DATA_DIGITS),
     });
   });
 
   it("rejects text that is not a chunk", () => {
     for (const text of [
       "",
-      "AB21abcdefghijklmnop", // index above total
-      "ab2Cabcdefghijklmnop", // lower-case set
-      "AB0Cabcdefghijklmnop", // index 0
-      "AB2Cabcdefghijklmnopq", // 17 data chars
-      "AB2Cabc", // short chunk that is not the last
-      "AB1Cabcdefghijklmnop", // first chunk must start the code
       "31234567890123", // item barcode
-      "31994567890123", // all-digit set id
+      "1".repeat(CHUNK_DIGITS - 1),
+      "1".repeat(CHUNK_DIGITS + 1),
+      `4299${"0".repeat(DATA_DIGITS)}`, // position past 13 of 13
+      `42AB${"0".repeat(DATA_DIGITS)}`,
     ]) {
       expect(parseChunk(text), text).toBeNull();
     }
   });
 });
 
-describe("addScan", () => {
-  const c260 = code(260);
-  const chunks = splitCode(c260, "K7");
+describe("isPairingText", () => {
+  it("knows whole codes of any version and printed barcodes", () => {
+    expect(isPairingText(code(20))).toBe(true);
+    expect(isPairingText(" OC1:abc ")).toBe(true);
+    expect(isPairingText(splitCode(code(111))[0]!)).toBe(true);
+  });
 
-  it("rebuilds the code from chunks in any order, ignoring repeats", () => {
+  it("leaves patron and item barcodes alone", () => {
+    for (const text of ["31234567890123", "P1", "OC-END", "OC2", ""]) {
+      expect(isPairingText(text), text).toBe(false);
+    }
+  });
+});
+
+describe("addScan", () => {
+  const c111 = code(111);
+  const chunks = splitCode(c111);
+
+  it("rebuilds the code from barcodes in any order, ignoring repeats", () => {
     const order = shuffle(chunks);
     let c = emptyCollector();
     for (const [n, chunk] of order.entries()) {
@@ -136,8 +142,15 @@ describe("addScan", () => {
         expect(r.kind).toBe("added");
         if (r.kind === "added") c = r.collector;
       } else {
-        expect(r).toEqual({ kind: "complete", code: c260 });
+        expect(r).toEqual({ kind: "complete", code: c111 });
       }
+    }
+  });
+
+  it("round-trips codes of every length", () => {
+    for (let n = 1; n <= 190; n++) {
+      const c = code(n, n);
+      expect(collect(splitCode(c)).last, String(n)).toEqual({ kind: "complete", code: c });
     }
   });
 
@@ -147,21 +160,32 @@ describe("addScan", () => {
     expect(c).toEqual(emptyCollector());
   });
 
-  it("rejects a chunk from another printed code and keeps the progress", () => {
+  it("rejects a barcode from another printed code and keeps the progress", () => {
     const { c } = collect([chunks[0]!]);
-    const other = splitCode(c260, "Z9")[1]!;
-    expect(addScan(c, other)).toEqual({ kind: "other-set" });
+    let seed = 1;
+    let other = splitCode(code(111, seed));
+    while (other[0]!.slice(0, 2) === chunks[0]!.slice(0, 2)) other = splitCode(code(111, ++seed));
+    expect(addScan(c, other[1]!)).toEqual({ kind: "other-set" });
     expect(c.parts.size).toBe(1);
-    expect(c.set).toBe("K7");
   });
 
-  it("rejects a chunk of the same set with a different total", () => {
+  it("catches two receipts whose set ids collide once all pieces are in", () => {
+    const set = chunks[0]!.slice(0, 2);
+    let seed = 1;
+    let other = splitCode(code(111, seed));
+    while (other[0]!.slice(0, 2) !== set) other = splitCode(code(111, ++seed));
+    expect(collect([other[0]!, ...chunks.slice(1)]).last).toEqual({ kind: "other-set" });
+  });
+
+  it("rejects a barcode of the same set with a different total", () => {
     const { c } = collect([chunks[0]!]);
-    expect(addScan(c, "K72Aabcdefghijklmnop").kind).toBe("invalid");
+    const odd = chunks[0]!.slice(0, 2) + "00" + "0".repeat(DATA_DIGITS);
+    expect(addScan(c, odd).kind).toBe("invalid");
   });
 
-  it("passes a whole OC1 code through", () => {
-    expect(addScan(emptyCollector(), "  OC1:abc ")).toEqual({ kind: "full", code: "OC1:abc" });
+  it("passes a whole code of any version through", () => {
+    expect(addScan(emptyCollector(), "  OC2:abc ")).toEqual({ kind: "full", code: "OC2:abc" });
+    expect(addScan(emptyCollector(), "OC1:abc")).toEqual({ kind: "full", code: "OC1:abc" });
   });
 
   it("rejects item barcodes and blank text", () => {
@@ -169,18 +193,13 @@ describe("addScan", () => {
       expect(addScan(emptyCollector(), text).kind).toBe("invalid");
     }
   });
-
-  it("completes a single-chunk code on its only chunk", () => {
-    const [only] = splitCode("OC1:abc", "X1");
-    expect(only).toBe("X111OC1:abc");
-    expect(addScan(emptyCollector(), only!)).toEqual({ kind: "complete", code: "OC1:abc" });
-  });
 });
 
 describe("progress", () => {
-  const twelve = splitCode(code(12 * 16), "K7");
+  const twelve = splitCode(code(170));
 
   it("lists the missing pieces", () => {
+    expect(twelve).toHaveLength(12);
     const { c } = collect(twelve.filter((_, i) => i !== 2 && i !== 8));
     expect(missing(c)).toEqual([3, 9]);
     expect(progressText(c)).toBe("Received 10 of 12 — missing 3, 9");
@@ -188,7 +207,7 @@ describe("progress", () => {
 
   it("says only the count once all are in", () => {
     const c: Collector = {
-      set: "K7",
+      set: "42",
       total: 12,
       parts: new Map(twelve.map((ch, i) => [i + 1, ch.slice(4)])),
     };

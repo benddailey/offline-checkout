@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { splitCode } from "../pairing/chunks";
+import { codeFromBytes } from "../pairing/payload";
 import {
   BARCODE_MAX_MM,
   code128Modules,
@@ -32,10 +33,13 @@ describe("code128", () => {
     for (let i = 0; i < 1000; i++) fits(random(20, "0123456789a"));
   });
 
-  it("fits every chunk of random codes up to 560 chars", () => {
+  it("fits every pairing barcode of random codes up to the 13-barcode limit", () => {
     for (let i = 0; i < 100; i++) {
-      const code = "OC1:" + random(1 + Math.floor(Math.random() * 556), ALPHABET.slice(0, 64));
-      for (const chunk of splitCode(code)) fits(chunk);
+      const bytes = Uint8Array.from({ length: 1 + Math.floor(Math.random() * 190) }, () =>
+        Math.floor(Math.random() * 256),
+      );
+      bytes[0] = 0x20;
+      for (const chunk of splitCode(codeFromBytes(bytes))) fits(chunk);
     }
   });
 

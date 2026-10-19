@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, useTemplateRef } from "vue";
 import { normalizeScan } from "../../log/barcode";
 import { MAX_NAME } from "../../log/limits";
 import type { Invite, Mesh } from "../../mesh/mesh";
-import { parseChunk } from "../../pairing/chunks";
+import { isPairingText } from "../../pairing/chunks";
 import { PairingError, type PairingPayload } from "../../pairing/payload";
 import QrDisplay from "../../qr/QrDisplay.vue";
 import QrScan from "../../qr/QrScan.vue";
@@ -42,6 +42,8 @@ function errorText(err: unknown, box: "offer" | "answer"): string {
           : "That is a reply code. Scan the code shown under Add workstation on a workstation already in the session.";
       case "malformed":
         return "That code could not be read. Try scanning again or paste the text.";
+      case "old-version":
+        return "That code is from a different version of Offline Checkout. Put the same version on both workstations.";
       case "expired":
         return "This invitation has expired. Click Try again for a new code.";
       case "wrong-session":
@@ -221,14 +223,12 @@ const scanNote = ref<Message | null>(null);
 
 const scanner = useTemplateRef<InstanceType<typeof QrScan>>("scanner");
 
-const isPairingScan = (code: string) => code.startsWith("OC1:") || parseChunk(code) !== null;
-
 /**
  * A scanner used while this screen is up still records into the open session, except printed
  * pairing barcodes: those go to the code reader (raw, case kept), or nowhere if none is shown.
  */
 const capture = createScanCapture((code) => {
-  if (isPairingScan(code)) scanner.value?.acceptScan(code);
+  if (isPairingText(code)) scanner.value?.acceptScan(code);
   else if (session.meta) void recordScan(code);
 });
 
