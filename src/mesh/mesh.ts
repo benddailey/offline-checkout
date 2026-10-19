@@ -29,7 +29,7 @@ export interface MeshOptions {
   now?: () => number;
 }
 export interface Invite {
-  /** "OC1:…" text for the QR code / copy box. */
+  /** "OC2:…" text for the QR code / copy box. */
   payload: string;
   expiresAt: number;
   /** Resolves when the joiner's hello arrives. PairingError: expired (TTL, cancelled or second use), wrong-session, malformed, wrong-kind. */

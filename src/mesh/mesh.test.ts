@@ -435,7 +435,7 @@ describe("robustness", () => {
     await vi.advanceTimersByTimeAsync(4_999);
     expect(invite).toBeUndefined();
     await vi.advanceTimersByTimeAsync(1);
-    expect(invite?.payload).toMatch(/^OC1:/);
+    expect(invite?.payload).toMatch(/^OC2:/);
   });
 
   test("ICE gathering finds no address: createInvite and join fail clearly", async () => {

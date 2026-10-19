@@ -19,14 +19,14 @@ test("probe: IndexedDB passes and two pages connect over pasted codes", async ()
 
     await host.getByRole("button", { name: "I am PC A (Host)" }).click();
     const offer = await host.getByTestId("rtc-offer").locator("textarea").inputValue();
-    expect(offer).toMatch(/^OC1:/);
+    expect(offer).toMatch(/^OC2:/);
 
     await guest.getByRole("button", { name: "I am PC B (Guest)" }).click();
     const offerIn = guest.getByTestId("rtc-offer-in");
     await offerIn.getByLabel("Pasted code").fill(offer);
     await offerIn.getByRole("button", { name: "Use pasted code" }).click();
     const answer = await guest.getByTestId("rtc-answer").locator("textarea").inputValue();
-    expect(answer).toMatch(/^OC1:/);
+    expect(answer).toMatch(/^OC2:/);
 
     const answerIn = host.getByTestId("rtc-answer-in");
     await answerIn.getByLabel("Pasted code").fill(answer);
