@@ -8,15 +8,16 @@ import { printed, printToPdf, stubPrint } from "./helpers/print";
 const SESSION = "Desk <b>1</b>";
 const MM_72_IN_PT = (72 / 25.4) * 72;
 
-async function pdfPageWidths(path: string): Promise<number[]> {
+async function pdfPageSizes(path: string): Promise<{ width: number; height: number }[]> {
   const task = getDocument({ data: new Uint8Array(await readFile(path)) });
   try {
     const doc = await task.promise;
-    const widths: number[] = [];
+    const sizes: { width: number; height: number }[] = [];
     for (let n = 1; n <= doc.numPages; n++) {
-      widths.push((await doc.getPage(n)).getViewport({ scale: 1 }).width);
+      const { width, height } = (await doc.getPage(n)).getViewport({ scale: 1 });
+      sizes.push({ width, height });
     }
-    return widths;
+    return sizes;
   } finally {
     await task.destroy();
   }
@@ -84,9 +85,10 @@ test("ending a patron prints a 72 mm receipt and gives focus back to the scanner
   await expect(page.getByTestId("totals")).toHaveText("Patrons 2 · Items 2");
 
   const pdf = await printToPdf(first.html, "receipt-print/receipt-p1.pdf");
-  const widths = await pdfPageWidths(pdf);
-  expect(widths).toHaveLength(1);
-  expect(Math.abs(widths[0] - MM_72_IN_PT)).toBeLessThan(0.5);
+  const sizes = await pdfPageSizes(pdf);
+  expect(sizes).toHaveLength(1);
+  expect(Math.abs(sizes[0].width - MM_72_IN_PT)).toBeLessThan(0.5);
+  expect(sizes[0].height).toBeGreaterThan(sizes[0].width);
   expect(await pdfText(pdf)).toContain("Patron: P1");
 });
 

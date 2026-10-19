@@ -6,6 +6,11 @@ const PX_TO_MM = 25.4 / 96;
 /** Extra paper below the content so the cutter does not clip the last line. */
 const FEED_MM = 4;
 
+/** Taller than wide: Chrome prints a page wider than tall landscape, and roll drivers then feed blank paper. */
+export function pageHeightMm(contentPx: number): number {
+  return Math.max(Math.ceil(contentPx * PX_TO_MM) + FEED_MM, RECEIPT_WIDTH_MM + 1);
+}
+
 const BASE_CSS = `
 #${PRINT_ROOT_ID} {
   position: fixed; left: -10000px; top: 0; width: ${RECEIPT_WIDTH_MM}mm; visibility: hidden;
@@ -37,7 +42,7 @@ export function printElement(content: HTMLElement, extraCss = ""): void {
   document.body.append(root);
 
   // Chrome ignores `size: 72mm auto`, so the page is sized to the measured receipt.
-  const heightMm = Math.ceil(root.getBoundingClientRect().height * PX_TO_MM) + FEED_MM;
+  const heightMm = pageHeightMm(root.getBoundingClientRect().height);
   style.textContent += `@page { size: ${RECEIPT_WIDTH_MM}mm ${heightMm}mm; margin: 0 }\n`;
 
   window.addEventListener("afterprint", removePrinted, { once: true });
