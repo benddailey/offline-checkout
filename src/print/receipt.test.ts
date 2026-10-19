@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { mk } from "../log/helpers.test-util";
 import { reduce } from "../log/reduce";
 import type { LogRecord } from "../log/types";
-import { receiptLines, visitReceipt } from "./receipt";
+import { visitReceipt } from "./receipt";
 
 const AT = new Date(2026, 9, 18, 9, 5);
 const created = mk("a", 1, { type: "session-created", name: "Desk 1" });
@@ -30,7 +30,7 @@ describe("visitReceipt", () => {
     });
   });
 
-  it("prints a visit whose items are all voided with no items and Items: 0", () => {
+  it("lists no items for a visit whose items are all voided", () => {
     const state = reduce(
       visitWith(
         mk("a", 6, { type: "voided", target: "a:3" }),
@@ -40,7 +40,6 @@ describe("visitReceipt", () => {
     );
     const r = visitReceipt(state, "a:2", AT)!;
     expect(r.items).toEqual([]);
-    expect(receiptLines(r).at(-1)).toBe("Items: 0");
   });
 
   it("returns null for an unknown or voided visit", () => {
@@ -53,28 +52,5 @@ describe("visitReceipt", () => {
     const state = reduce(visitWith().slice(1));
     expect(state.name).toBeNull();
     expect(visitReceipt(state, "a:2", AT)?.session).toBe("Session");
-  });
-});
-
-describe("receiptLines", () => {
-  it("is the exact printed text in order", () => {
-    expect(
-      receiptLines({
-        session: "Desk 1",
-        when: "2026-10-18 09:05",
-        clerk: "Ann",
-        patron: "P1",
-        items: ["I1", "I3"],
-      }),
-    ).toEqual([
-      "Offline Checkout",
-      "Desk 1",
-      "2026-10-18 09:05",
-      "Clerk: Ann",
-      "Patron: P1",
-      "I1",
-      "I3",
-      "Items: 2",
-    ]);
   });
 });

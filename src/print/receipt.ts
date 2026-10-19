@@ -31,16 +31,3 @@ export function visitReceipt(
     items: visit.items.filter((i) => !i.voided).map((i) => i.barcode),
   };
 }
-
-/** The printed text, one entry per line. */
-export function receiptLines(r: VisitReceipt): string[] {
-  return [
-    "Offline Checkout",
-    r.session,
-    r.when,
-    `Clerk: ${r.clerk}`,
-    `Patron: ${r.patron}`,
-    ...r.items,
-    `Items: ${r.items.length}`,
-  ];
-}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { splitCode } from "../pairing/chunks";
-import { code128Modules, code128WidthMm, QUIET_MODULES } from "./code128";
+import { code128Modules, code128WidthMm, fitsReceipt, QUIET_MODULES } from "./code128";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_:";
 const PRINTABLE_MM = 70;
@@ -43,5 +43,15 @@ describe("code128", () => {
 
   it("is case-sensitive", () => {
     expect(code128Modules("ab")).not.toBe(code128Modules("AB"));
+  });
+});
+
+describe("fitsReceipt", () => {
+  it("accepts a 14-digit library barcode", () => {
+    expect(fitsReceipt("31234000123456")).toBe(true);
+  });
+
+  it("rejects a 40-character alphanumeric code", () => {
+    expect(fitsReceipt("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCD")).toBe(false);
   });
 });

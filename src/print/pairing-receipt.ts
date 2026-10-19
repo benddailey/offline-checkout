@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import { splitCode } from "../pairing/chunks";
-import { code128Svg, DOT_MM } from "./code128";
+import { BAR_LEFT_DOTS, code128Svg, DOT_MM } from "./code128";
 import { printElement, RECEIPT_WIDTH_MM } from "./print";
 
 export interface PairingReceipt {
@@ -14,9 +14,6 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const QR_MM = 50;
 const QR_QUIET = 4;
 const BAR_HEIGHT_MM = 10;
-
-/** Left edge of every barcode, in whole printer dots from the paper's left edge, so bars land on dots. */
-const BAR_LEFT_DOTS = 8;
 
 /** Rows start at the paper's left edge (the root's 3 mm padding undone); barcodes are wider than the padded body. */
 const CSS = `

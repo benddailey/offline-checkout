@@ -9,9 +9,9 @@ import type { ItemState, LogRecord, RecordBody, RecordId, VisitState } from "../
 import { Mesh, type MeshOptions, type PeerInfo } from "../mesh/mesh";
 import { PairingError, decodePayload, type PairingPayload } from "../pairing/payload";
 import { downloadBlob, renderScannerCard, renderSessionPdf } from "../pdf/render";
-import { afterPaint, printElement } from "../print/print";
+import { afterPaint } from "../print/print";
 import { visitReceipt, type VisitReceipt } from "../print/receipt";
-import { renderVisitReceipt } from "../print/visit-receipt";
+import { printVisitReceipt } from "../print/visit-receipt";
 import * as db from "../store/db";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
 import { SyncEngine } from "../sync/sync";
@@ -57,7 +57,7 @@ export function createSessionStoreDeps(overrides: Partial<SessionDeps> = {}): Se
     joinMesh: (text, o) => Mesh.join(text, o),
     now: () => new Date(),
     afterPaint,
-    printVisitReceipt: (r) => printElement(renderVisitReceipt(r)),
+    printVisitReceipt,
     ...overrides,
   };
 }
