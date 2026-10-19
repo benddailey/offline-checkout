@@ -48,7 +48,8 @@ open it in the browser.
    - Ending a patron (End patron or OC-END) saves the visit, then opens the print dialog with a
      receipt for that patron. The first time, pick the Star receipt printer (Chrome remembers the
      last printer) and keep Scale at 100 % and Margins at Default. Cancel skips the receipt; the
-     visit stays ended. Void patron does not print.
+     visit stays ended. Void patron does not print. The receipt shows the patron barcode, then one
+     barcode per item in order, so staff can scan them into the ILS when it's back online.
    - Scan **OC-VOIDLAST** (or click Void on a row) to void the last item. Void patron voids the whole visit.
    - Print the scanner card (offered when a session starts, and on the Summary) to get the OC-END and
      OC-VOIDLAST barcodes on paper.

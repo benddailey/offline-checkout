@@ -7,7 +7,7 @@ const BAR_HEIGHT_MM = 10;
 /** Rows start at the paper's left edge (the root's 3 mm padding undone); barcodes are wider than the padded body. */
 const CSS = `
 #oc-print-root .oc-visit-row {
-  margin: 3mm -3mm 0; width: ${RECEIPT_WIDTH_MM}mm; padding-left: ${BAR_LEFT_DOTS * DOT_MM}mm;
+  margin: 3mm -3mm 0; width: ${RECEIPT_WIDTH_MM}mm; padding-left: ${BAR_LEFT_DOTS * DOT_MM}mm; padding-right: 3mm;
   box-sizing: border-box; break-inside: avoid;
 }
 #oc-print-root .oc-visit-bar { display: inline-block; font-size: 10pt; }
@@ -42,7 +42,8 @@ export function renderVisitReceipt(r: VisitReceipt): HTMLElement {
   const title = line("Offline Checkout", "", true);
   title.style.fontSize = "14pt";
   box.append(title, line(r.session), line(r.when), line(`Clerk: ${r.clerk}`));
-  box.append(barcodeRow("Patron", r.patron), line("", "oc-visit-rule"));
+  box.append(barcodeRow("Patron", r.patron));
+  if (r.items.length > 0) box.append(line("", "oc-visit-rule"));
   r.items.forEach((item, i) => {
     box.append(barcodeRow(`Item ${i + 1} of ${r.items.length}`, item));
   });

@@ -127,6 +127,21 @@ test("a 12-item visit prints one barcode per code down a single tall page", asyn
   }
 });
 
+test("a visit with no items prints the patron and a single rule", async ({ page }) => {
+  const receipt = await endVisit(page, ["P1"]);
+  expect(receipt.text).toContain("Items: 0");
+  const rules = await page.evaluate((html) => {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    return d.querySelectorAll(".oc-visit-rule").length;
+  }, receipt.html);
+  expect(rules).toBe(1);
+  const pdf = await printToPdf(receipt.html, "receipt-print/receipt-empty.pdf");
+  for (const colour of ["gray", "mono"] as const) {
+    expect((await decodePrintedBarcodes(pdf, colour)).code128, colour).toEqual(["P1"]);
+  }
+});
+
 test("an item too long for the paper prints as text, not a barcode", async ({ page }) => {
   const long = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCD";
   const receipt = await endVisit(page, ["P1", "I1", long, "I2"]);

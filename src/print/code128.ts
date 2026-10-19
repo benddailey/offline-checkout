@@ -1,5 +1,4 @@
 import JsBarcode from "jsbarcode";
-import { RECEIPT_WIDTH_MM } from "./print";
 
 /** One printer dot at 203 dpi. */
 export const DOT_MM = 25.4 / 203;
@@ -9,6 +8,9 @@ export const QUIET_MODULES = 10;
 
 /** Left edge of every barcode, in whole printer dots from the paper's left edge, so bars land on dots. */
 export const BAR_LEFT_DOTS = 8;
+
+/** Widest barcode (quiet zones included) we print: the pairing receipt's tested budget. */
+export const BARCODE_MAX_MM = 70;
 
 const BAR_UNITS = 100;
 const cache = new Map<string, string>();
@@ -34,7 +36,7 @@ export function code128WidthMm(text: string): number {
 
 /** Whether the barcode fits the paper from its left edge. */
 export function fitsReceipt(text: string): boolean {
-  return code128WidthMm(text) <= RECEIPT_WIDTH_MM - BAR_LEFT_DOTS * DOT_MM;
+  return code128WidthMm(text) <= BARCODE_MAX_MM;
 }
 
 /** The barcode at exactly MODULE_MM per module, quiet zones included, `heightMm` tall. */
