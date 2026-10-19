@@ -10,8 +10,7 @@ and item, ready to be re-scanned into the library system.
 
 - Chrome or Edge on Windows (any Chromium browser), opened from `file://`. No admin rights, no installs.
 - A USB barcode scanner that types like a keyboard, reads Code 128 and sends Enter after each scan.
-  To pair from printed codes it must also send Enter or Tab after each scan, and type
-  lower-case letters as they are (no forced upper case).
+  To pair from printed codes it must also send Enter or Tab after each scan.
 - A webcam on each workstation if you want to pair by QR (copy and paste works without one).
 - Optional: a receipt printer (Star TSP143 / TSP100 series, 72 mm paper) installed in Windows, for
   patron receipts.
@@ -40,8 +39,9 @@ open it in the browser.
      order, or the QR if the scanner reads 2D codes. The scans go to the **Scanner (printed code)**
      box without clicking it first. The progress line shows which pieces are still missing; repeat
      scans are ignored, and Start over clears what was scanned. The reply code prints and scans the
-     same way. A typical code is 14–17 barcodes, and the whole exchange takes about 2–3 minutes,
-     inside the 5-minute limit.
+     same way. A typical code is 7–8 barcodes of digits only, so the exchange fits easily inside the
+     5-minute limit. Every workstation must run the same version: a code from an older version is
+     refused with a message saying so.
 3. **Scan.** Scan the patron card, then each item. The scanner input always has focus; just scan.
    The status bar shows live totals and a green or red dot for each workstation.
    - Scan **OC-END** (or click End patron) to finish the patron and start the next one.
