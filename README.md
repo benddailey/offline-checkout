@@ -3,14 +3,14 @@
 Offline Checkout is a single HTML file that library front-desk staff open in Chrome or Edge to record
 patron and item barcodes during a network outage. Several workstations can share one session by
 pairing directly with each other over QR codes (WebRTC, no server, no internet). When the outage is
-over, the session is closed and exported as a PDF with a scannable Code 39 barcode for every patron
+over, the session is closed and exported as a PDF with a scannable Code 128 barcode for every patron
 and item, ready to be re-scanned into the library system.
 
 ## Requirements
 
 - Chrome or Edge on Windows (any Chromium browser), opened from `file://`. No admin rights, no installs.
-- A USB barcode scanner that types like a keyboard (Code 39) and sends Enter after each scan. To pair
-  from printed codes it must also read Code 128, send Enter or Tab after each scan, and type
+- A USB barcode scanner that types like a keyboard, reads Code 128 and sends Enter after each scan.
+  To pair from printed codes it must also send Enter or Tab after each scan, and type
   lower-case letters as they are (no forced upper case).
 - A webcam on each workstation if you want to pair by QR (copy and paste works without one).
 - Optional: a receipt printer (Star TSP143 / TSP100 series, 72 mm paper) installed in Windows, for
@@ -52,7 +52,8 @@ open it in the browser.
      barcode per item in order, so staff can scan them into the ILS when it's back online.
    - Scan **OC-VOIDLAST** (or click Void on a row) to void the last item. Void patron voids the whole visit.
    - Print the scanner card (offered when a session starts, and on the Summary) to get the OC-END and
-     OC-VOIDLAST barcodes on paper.
+     OC-VOIDLAST barcodes on paper: **Receipt printer** prints it on the receipt roll, **Letter PDF**
+     downloads it for a regular printer.
    - Voided entries stay on screen struck through; nothing is ever deleted.
 4. **Summary.** Click Summary for totals, a per-clerk count and every patron with their items.
 5. **Close and export.** Click Close session (all workstations stop accepting scans), then Generate PDF.

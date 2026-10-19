@@ -1,5 +1,5 @@
 import type { Block } from "./blocks";
-import { code39Width } from "./code39";
+import { code128Modules, QUIET_MODULES } from "../print/code128";
 
 export const GEOMETRY = {
   pageW: 8.5,
@@ -16,12 +16,20 @@ export const GEOMETRY = {
   blockGap: 0.15,
 } as const;
 
+/** 10 mil: Code 128's 1–4 module bars land on whole dots at 300 and 600 dpi. */
+export const MODULE_IN = 0.01;
+
+/** Code 128 width in inches including a quiet zone on each side. */
+export function barcodeWidth(text: string, module = MODULE_IN): number {
+  return (code128Modules(text).length + 2 * QUIET_MODULES) * module;
+}
+
 /** Height of one summary line in inches. */
 export const SUMMARY_LINE_H = 0.2;
 
 /**
  * Coordinates are inches from the page's top-left. `page` is 1-based.
- * A barcode's (x, y) is the top-left of its bar area including quiet zones, width code39Width(text);
+ * A barcode's (x, y) is the top-left of its bar area including quiet zones, width barcodeWidth(text);
  * the human-readable text sits below the bars within the row height.
  */
 export type Placed =
@@ -48,8 +56,8 @@ export function layout(
   const usableW = g.pageW - 2 * g.margin;
   let maxW = 0;
   for (const b of blocks) {
-    maxW = Math.max(maxW, code39Width(b.patron));
-    for (const i of b.items) maxW = Math.max(maxW, code39Width(i));
+    maxW = Math.max(maxW, barcodeWidth(b.patron));
+    for (const i of b.items) maxW = Math.max(maxW, barcodeWidth(i));
   }
   const columns =
     maxW === 0 ? 1 : Math.max(1, Math.floor((usableW + g.gutter) / (maxW + g.gutter)));

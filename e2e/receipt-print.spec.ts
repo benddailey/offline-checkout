@@ -208,3 +208,30 @@ test("on the receipt printer's roll paper the receipt starts at the top, so noth
     expect((await decodePrintedBarcodes(pdf, colour)).code128, colour).toEqual(["P1", "I1", "I2"]);
   }
 });
+
+test("the scanner card prints on the receipt printer at the top of the roll", async ({ page }) => {
+  await stubPrint(page);
+  await page.goto(appUrl());
+  await page.getByLabel("Session name").fill("Card");
+  await page.getByLabel("Clerk name").fill("Ann");
+  await page.getByRole("button", { name: "Start session" }).click();
+  await page.getByRole("button", { name: "Receipt printer" }).click();
+  await expect.poll(async () => (await printed(page)).length).toBe(1);
+  const [card] = await printed(page);
+  for (const line of ["Scanner card", "End patron", "Void last item"]) {
+    expect(card.text).toContain(line);
+  }
+  expect(card.screen).not.toContain("Print the scanner card");
+  await expect(page.getByLabel("Scanner input")).toBeFocused();
+
+  const pdf = await printToPdf(card.html, "receipt-print/scanner-card.pdf");
+  const ink = await inkExtentMm(pdf);
+  expect(ink!.top).toBeLessThan(10);
+  expect(ink!.bottom).toBeLessThan(150);
+  for (const colour of ["gray", "mono"] as const) {
+    expect((await decodePrintedBarcodes(pdf, colour)).code128, colour).toEqual([
+      "OC-END",
+      "OC-VOIDLAST",
+    ]);
+  }
+});

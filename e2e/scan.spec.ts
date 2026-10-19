@@ -12,7 +12,8 @@ test("scan, void, end patron and resume after reload", async ({ page }) => {
   const input = page.getByLabel("Scanner input");
   await expect(page.getByText("Scan patron card")).toBeVisible();
   await expect(input).toBeFocused();
-  await expect(page.getByRole("button", { name: "Print scanner card" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Receipt printer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Letter PDF" })).toBeVisible();
 
   await page.keyboard.type("p1\n");
   await expect(page.getByTestId("patron")).toHaveText("P1");

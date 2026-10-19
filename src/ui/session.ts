@@ -11,6 +11,7 @@ import { PairingError, decodePayload, type PairingPayload } from "../pairing/pay
 import { downloadBlob, renderScannerCard, renderSessionPdf } from "../pdf/render";
 import { afterPaint } from "../print/print";
 import { visitReceipt, type VisitReceipt } from "../print/receipt";
+import { printScannerCardReceipt } from "../print/scanner-card";
 import { printVisitReceipt } from "../print/visit-receipt";
 import * as db from "../store/db";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
@@ -39,6 +40,8 @@ export interface SessionDeps {
   afterPaint: () => Promise<void>;
   /** Open the print dialog with a visit receipt. */
   printVisitReceipt: (r: VisitReceipt) => void;
+  /** Open the print dialog with the scanner card as a receipt. */
+  printScannerCardReceipt: () => void;
 }
 
 /** Real dependencies, with any of them replaced (tests pass an in-memory store and a fixed clock). */
@@ -58,6 +61,7 @@ export function createSessionStoreDeps(overrides: Partial<SessionDeps> = {}): Se
     now: () => new Date(),
     afterPaint,
     printVisitReceipt,
+    printScannerCardReceipt,
     ...overrides,
   };
 }
@@ -604,9 +608,16 @@ export const useSession = defineStore("session", () => {
     }
   }
 
-  function printScannerCard(): void {
+  /** Letter downloads a PDF; a receipt waits for the screen to paint, as window.print() blocks it. */
+  async function printScannerCard(format: "receipt" | "letter"): Promise<void> {
     try {
-      deps.downloadBlob(deps.renderScannerCard(), "offline-checkout-scanner-card.pdf");
+      if (format === "letter") {
+        deps.downloadBlob(deps.renderScannerCard(), "offline-checkout-scanner-card.pdf");
+        return;
+      }
+      await nextTick();
+      await deps.afterPaint();
+      deps.printScannerCardReceipt();
     } catch (err) {
       console.error("session: scanner card failed", err);
       message.value = { tone: "error", text: "Could not create the scanner card" };

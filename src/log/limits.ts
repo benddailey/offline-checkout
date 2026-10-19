@@ -1,4 +1,4 @@
-/** Longest barcode (Code 39 text) the app accepts, locally and from peers. */
+/** Longest barcode the app accepts, locally and from peers. */
 export const MAX_BARCODE = 64;
 /** Longest session name or clerk name, in UTF-16 units (what `String.length` counts). */
 export const MAX_NAME = 100;

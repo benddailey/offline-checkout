@@ -1,7 +1,7 @@
 import { test, expect, describe } from "vite-plus/test";
 import type { SessionState } from "../log/types";
 import { buildScannerCard, buildSessionPdf, renderScannerCard, renderSessionPdf } from "./render";
-import { code39Modules } from "./code39";
+import { code128Modules } from "../print/code128";
 
 const visit = (patron: string, items: string[], employee = "Zed") => ({
   patron,
@@ -49,7 +49,7 @@ describe("render", () => {
 
   test("barcode A is one rect per bar run", () => {
     const s = raw(buildSessionPdf(state([visit("A", [])]), { date }, false));
-    const runs = code39Modules("A").match(/1+/g)!.length;
+    const runs = code128Modules("A").match(/1+/g)!.length;
     // plus one stroked box for the (empty) item box
     expect(rects(s) - 1).toBe(runs);
   });
