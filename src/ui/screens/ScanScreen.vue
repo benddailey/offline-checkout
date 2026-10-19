@@ -9,9 +9,9 @@ const session = useSession();
 const button =
   "min-h-11 rounded-lg border-2 px-5 text-xl font-semibold disabled:cursor-not-allowed disabled:opacity-40";
 
-function printCard() {
-  session.printScannerCard();
+function printCard(format: "receipt" | "letter") {
   session.offerScannerCard = false;
+  void session.printScannerCard(format);
 }
 </script>
 
@@ -30,9 +30,16 @@ function printCard() {
         <button
           type="button"
           :class="[button, 'border-blue-700 bg-blue-700 text-white']"
-          @click="printCard"
+          @click="printCard('receipt')"
         >
-          Print scanner card
+          Receipt printer
+        </button>
+        <button
+          type="button"
+          :class="[button, 'border-blue-700 bg-white text-blue-800']"
+          @click="printCard('letter')"
+        >
+          Letter PDF
         </button>
         <button
           type="button"

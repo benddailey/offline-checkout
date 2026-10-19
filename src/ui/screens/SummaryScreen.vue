@@ -147,9 +147,15 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
         <p v-if="!canGenerate" id="generate-hint" class="text-lg text-slate-600">
           Scan at least one patron first
         </p>
-        <button type="button" :class="secondary" @click="session.printScannerCard()">
-          Print scanner card
-        </button>
+        <h2 class="mt-2 text-2xl font-bold">Scanner card</h2>
+        <div class="flex flex-wrap gap-3">
+          <button type="button" :class="secondary" @click="session.printScannerCard('receipt')">
+            Receipt printer
+          </button>
+          <button type="button" :class="secondary" @click="session.printScannerCard('letter')">
+            Letter PDF
+          </button>
+        </div>
         <template v-if="!session.closed">
           <h2 class="mt-2 text-2xl font-bold">End the session</h2>
           <button type="button" :class="danger" @click="ask('close')">Close session</button>

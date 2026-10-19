@@ -1,4 +1,4 @@
-import { CODE39_TEXT, CONTROL } from "./barcode";
+import { BARCODE_TEXT, CONTROL } from "./barcode";
 import { MAX_BARCODE, MAX_NAME } from "./limits";
 import type { LogRecord } from "./types";
 
@@ -10,11 +10,11 @@ const RECORD_ID = /^[0-9a-z]{10}:[1-9][0-9]*$/;
 const isStr = (v: unknown): v is string => typeof v === "string";
 const isName = (v: unknown): v is string => isStr(v) && v.length <= MAX_NAME;
 const isRecordId = (v: unknown): v is string => isStr(v) && RECORD_ID.test(v);
-/** A barcode the PDF can print: Code 39 text, not a control code, not absurdly long. */
+/** A barcode the PDF can print: BARCODE_TEXT, not a control code, not absurdly long. */
 const isBarcode = (v: unknown): v is string =>
   isStr(v) &&
   v.length <= MAX_BARCODE &&
-  CODE39_TEXT.test(v) &&
+  BARCODE_TEXT.test(v) &&
   v !== CONTROL.END &&
   v !== CONTROL.VOIDLAST;
 

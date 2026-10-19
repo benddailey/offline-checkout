@@ -128,6 +128,7 @@ function fakeDb() {
     },
     renderSessionPdf: () => new Blob(["pdf"]),
     renderScannerCard: () => new Blob(["card"]),
+    printScannerCardReceipt: () => downloads.push("print:scanner-card"),
     downloadBlob: (_blob, filename) => downloads.push(filename),
     getDeviceId: async () => DEVICE,
     afterPaint: () => paint,
@@ -277,7 +278,7 @@ describe("useSession scanning", () => {
     expect(s.message).toBeNull();
   });
 
-  it("rejects non-Code 39 barcodes with a reason", async () => {
+  it("rejects barcodes with unprintable characters, with a reason", async () => {
     const s = await started();
     await s.scan("P1#");
     expect(s.records).toHaveLength(1);
@@ -615,10 +616,12 @@ describe("useSession files", () => {
     expect(db.downloads).toEqual([]);
     await s.scan("P1");
     s.generatePdf();
-    s.printScannerCard();
+    await s.printScannerCard("letter");
+    await s.printScannerCard("receipt");
     expect(db.downloads).toEqual([
       "offline-checkout-Main-Desk-Fri-2026-10-10.pdf",
       "offline-checkout-scanner-card.pdf",
+      "print:scanner-card",
     ]);
   });
 });

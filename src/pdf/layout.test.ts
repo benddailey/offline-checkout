@@ -1,7 +1,6 @@
 import { test, expect, describe } from "vite-plus/test";
 import type { Block } from "./blocks";
-import { GEOMETRY as g, layout, type Placed } from "./layout";
-import { code39Width } from "./code39";
+import { barcodeWidth, GEOMETRY as g, layout, type Placed } from "./layout";
 
 const num = (n: number, len = 14) => String(n).padStart(len, "0");
 const blk = (n: number, items: number, len = 14): Block => ({
@@ -16,9 +15,9 @@ const barcodes = (els: Placed[]) =>
 const EPS = 1e-9;
 
 describe("layout", () => {
-  test("14-digit barcodes give 3 columns; a 20-char one gives 2", () => {
+  test("14-digit barcodes give 4 columns; a 20-char one gives 2", () => {
     const blocks = Array.from({ length: 20 }, (_, i) => blk(i + 1, 3));
-    expect(layout(blocks, ["x"]).columns).toBe(3);
+    expect(layout(blocks, ["x"]).columns).toBe(4);
     blocks[4].items[1] = "A".repeat(20);
     expect(layout(blocks, ["x"]).columns).toBe(2);
   });
@@ -41,7 +40,7 @@ describe("layout", () => {
       expect(e.x).toBeGreaterThanOrEqual(L);
       expect(e.y).toBeGreaterThanOrEqual(T);
       if (e.kind === "barcode") {
-        const right = e.x + code39Width(e.text);
+        const right = e.x + barcodeWidth(e.text);
         expect(right).toBeLessThanOrEqual(R);
         expect(right).toBeLessThanOrEqual(colRight(e.x));
         expect(e.y + rowH[e.role]).toBeLessThanOrEqual(B);

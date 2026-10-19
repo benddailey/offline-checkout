@@ -68,7 +68,7 @@ describe("isLogRecord", () => {
     }
   });
 
-  it("rejects patron and item barcodes a Code 39 PDF could not print", () => {
+  it("rejects patron and item barcodes the PDF could not print", () => {
     for (const code of ["", "p1", "P#1", "OC-END", "OC-VOIDLAST", "X".repeat(65)]) {
       expect(isLogRecord(rec(1, { type: "patron-started", patron: code }))).toBe(false);
       expect(isLogRecord(rec(2, { type: "item-scanned", visitId: `${DEV}:1`, item: code }))).toBe(

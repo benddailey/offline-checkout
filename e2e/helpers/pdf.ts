@@ -39,7 +39,7 @@ export async function useLocalWasm(): Promise<void> {
   wasmReady = true;
 }
 
-/** Every Code 39 barcode on every page, rasterised at 300 dpi with pdftoppm. */
+/** Every Code 128 barcode on every page, rasterised at 300 dpi with pdftoppm. */
 export async function decodePdfBarcodes(path: string): Promise<string[]> {
   await useLocalWasm();
   const dir = await mkdtemp(join(tmpdir(), "oc-pdf-"));
@@ -50,7 +50,7 @@ export async function decodePdfBarcodes(path: string): Promise<string[]> {
     for (const png of pngs) {
       const blob = new Blob([await readFile(join(dir, png))], { type: "image/png" });
       const results = await readBarcodesFromImageFile(blob, {
-        formats: ["Code39"],
+        formats: ["Code128"],
         maxNumberOfSymbols: 255,
         tryHarder: true,
       });

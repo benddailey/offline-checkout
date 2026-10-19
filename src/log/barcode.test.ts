@@ -5,7 +5,7 @@ describe("barcode", () => {
   test("normalizeScan trims and uppercases", () => {
     expect(normalizeScan(" 31204abc \n")).toBe("31204ABC");
   });
-  test("accepts digits and the full Code 39 charset", () => {
+  test("accepts digits and the full barcode charset", () => {
     expect(validateBarcode("31204001234567")).toEqual({ ok: true });
     expect(validateBarcode("A-1 . $/+%")).toEqual({ ok: true });
   });

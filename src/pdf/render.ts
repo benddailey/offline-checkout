@@ -1,11 +1,12 @@
 import { jsPDF } from "jspdf";
 import type { SessionState } from "../log/types";
 import { blocksFromState } from "./blocks";
-import { code39Modules, NARROW_IN, QUIET_MODULES } from "./code39";
-import { GEOMETRY, layout, SUMMARY_LINE_H } from "./layout";
+import { CONTROL } from "../log/barcode";
+import { code128Modules, QUIET_MODULES } from "../print/code128";
+import { GEOMETRY, layout, MODULE_IN, SUMMARY_LINE_H } from "./layout";
 
 const BAR_FONT_PT = 8;
-const CARD_NARROW_IN = 0.015;
+const CARD_MODULE_IN = 0.015;
 const CARD_BAR_H = 0.7;
 
 function newDoc(compress: boolean): jsPDF {
@@ -18,16 +19,16 @@ function drawBars(
   text: string,
   x: number,
   y: number,
-  narrow: number,
+  module: number,
   barH: number,
 ): { left: number; width: number } {
-  const modules = code39Modules(text);
-  const left = x + QUIET_MODULES * narrow;
+  const modules = code128Modules(text);
+  const left = x + QUIET_MODULES * module;
   doc.setFillColor(0, 0, 0);
   for (const m of modules.matchAll(/1+/g)) {
-    doc.rect(left + m.index * narrow, y, m[0].length * narrow, barH, "F");
+    doc.rect(left + m.index * module, y, m[0].length * module, barH, "F");
   }
-  return { left, width: modules.length * narrow };
+  return { left, width: modules.length * module };
 }
 
 function drawText(doc: jsPDF, text: string, x: number, y: number, opts?: { align?: "center" }) {
@@ -66,7 +67,7 @@ export function buildSessionPdf(state: SessionState, opts: { date: Date }, compr
         drawText(doc, `${title} - Page ${el.page} of ${pages}`, g.margin, g.margin);
         break;
       case "barcode": {
-        const bars = drawBars(doc, el.text, el.x, el.y, NARROW_IN, g.barH);
+        const bars = drawBars(doc, el.text, el.x, el.y, MODULE_IN, g.barH);
         const cx = bars.left + bars.width / 2;
         const ty = el.y + g.barH + (g.textH - BAR_FONT_PT / 72) / 2;
         doc.setFont("courier", el.role === "patron" ? "bold" : "normal").setFontSize(BAR_FONT_PT);
@@ -105,14 +106,14 @@ export function buildScannerCard(compress = true): jsPDF {
   doc.setTextColor(0, 0, 0).setFont("helvetica", "bold").setFontSize(18);
   drawText(doc, "Offline Checkout - Scanner card", g.margin, g.margin);
   const cards = [
-    { code: "OC-END", label: "End patron" },
-    { code: "OC-VOIDLAST", label: "Void last item" },
+    { code: CONTROL.END, label: "End patron" },
+    { code: CONTROL.VOIDLAST, label: "Void last item" },
   ];
   let y = g.margin + 0.9;
   for (const c of cards) {
     doc.setFont("helvetica", "bold").setFontSize(14);
     drawText(doc, c.label, g.margin, y);
-    const bars = drawBars(doc, c.code, g.margin, y + 0.4, CARD_NARROW_IN, CARD_BAR_H);
+    const bars = drawBars(doc, c.code, g.margin, y + 0.4, CARD_MODULE_IN, CARD_BAR_H);
     doc.setFont("courier", "normal").setFontSize(12);
     drawText(doc, c.code, bars.left + bars.width / 2, y + 0.4 + CARD_BAR_H + 0.08, {
       align: "center",

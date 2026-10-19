@@ -40,7 +40,7 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     await expect(a!.getByLabel("Scanner input")).toBeVisible();
 
     // The scanner card offered at session start downloads and scans as the control codes.
-    const card = await download(a!, "Print scanner card", "scanner-card.pdf");
+    const card = await download(a!, "Letter PDF", "scanner-card.pdf");
     expect((await decodePdfBarcodes(card)).sort()).toEqual(["OC-END", "OC-VOIDLAST"]);
 
     await pairViaPaste(a!, b!, "Ben");
@@ -50,11 +50,11 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     await expect(a!.getByRole("button", { name: "Generate PDF" })).toBeDisabled();
     await expect(a!.getByText("Scan at least one patron first")).toBeVisible();
     // The summary's own scanner card button.
-    await download(a!, "Print scanner card", "scanner-card-from-summary.pdf");
+    await download(a!, "Letter PDF", "scanner-card-from-summary.pdf");
     expect(downloadsOnA).toBe(2);
 
     // A scan made on the summary is recorded on the scan screen; its Enter presses no button.
-    await a!.getByRole("button", { name: "Print scanner card" }).focus();
+    await a!.getByRole("button", { name: "Letter PDF" }).focus();
     await scan(a!, "P1");
     await expect(a!.getByRole("heading", { name: "Session summary" })).toBeHidden();
     await expect(a!.getByTestId("patron")).toHaveText("P1");
