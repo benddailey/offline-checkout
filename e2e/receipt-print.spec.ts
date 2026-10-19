@@ -5,6 +5,7 @@ import { appUrl } from "./helpers/app";
 import { pdfText } from "./helpers/pdf";
 import {
   decodePrintedBarcodes,
+  inkExtentMm,
   printed,
   type Printed,
   printToPdf,
@@ -12,7 +13,6 @@ import {
 } from "./helpers/print";
 
 const SESSION = "Desk <b>1</b>";
-const MM_72_IN_PT = (72 / 25.4) * 72;
 
 async function pdfPageSizes(path: string): Promise<{ width: number; height: number }[]> {
   const task = getDocument({ data: new Uint8Array(await readFile(path)) });
@@ -93,8 +93,7 @@ test("ending a patron prints a 72 mm receipt and gives focus back to the scanner
   const pdf = await printToPdf(first.html, "receipt-print/receipt-p1.pdf");
   const sizes = await pdfPageSizes(pdf);
   expect(sizes).toHaveLength(1);
-  expect(Math.abs(sizes[0].width - MM_72_IN_PT)).toBeLessThan(0.5);
-  expect(sizes[0].height).toBeGreaterThan(sizes[0].width);
+  expect((await inkExtentMm(pdf))!.top).toBeLessThan(10);
   const text = await pdfText(pdf);
   for (const line of ["Patron", "Item 1 of 1", "Items: 1"]) expect(text).toContain(line);
   for (const colour of ["gray", "mono"] as const) {
@@ -120,8 +119,7 @@ test("a 12-item visit prints one barcode per code down a single tall page", asyn
   const pdf = await printToPdf(receipt.html, "receipt-print/receipt-12.pdf");
   const sizes = await pdfPageSizes(pdf);
   expect(sizes).toHaveLength(1);
-  expect(Math.abs(sizes[0].width - MM_72_IN_PT)).toBeLessThan(0.5);
-  expect(sizes[0].height).toBeGreaterThan(sizes[0].width);
+  expect((await inkExtentMm(pdf))!.top).toBeLessThan(10);
   for (const colour of ["gray", "mono"] as const) {
     expect((await decodePrintedBarcodes(pdf, colour)).code128, colour).toEqual(["P1", ...items]);
   }
@@ -195,4 +193,18 @@ test("a failed print leaves no print container and tells the clerk", async ({ pa
   await expect(page.getByText("Scan patron card")).toBeVisible();
   await expect(page.locator("#oc-print-root")).toHaveCount(0);
   await expect(page.locator("#oc-print-style")).toHaveCount(0);
+});
+
+test("on the receipt printer's roll paper the receipt starts at the top, so nothing feeds before it", async ({
+  page,
+}) => {
+  const receipt = await endVisit(page, ["P1", "I1", "I2"]);
+  const pdf = await printToPdf(receipt.html, "receipt-print/receipt-roll.pdf");
+  const ink = await inkExtentMm(pdf);
+  expect(ink).not.toBeNull();
+  expect(ink!.top).toBeLessThan(10);
+  expect(ink!.bottom).toBeLessThan(150);
+  for (const colour of ["gray", "mono"] as const) {
+    expect((await decodePrintedBarcodes(pdf, colour)).code128, colour).toEqual(["P1", "I1", "I2"]);
+  }
 });
