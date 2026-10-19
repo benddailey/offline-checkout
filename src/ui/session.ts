@@ -7,6 +7,7 @@ import { recordId } from "../log/ids";
 import { reduce } from "../log/reduce";
 import type { ItemState, LogRecord, RecordBody, RecordId, VisitState } from "../log/types";
 import { Mesh, type MeshOptions, type PeerInfo } from "../mesh/mesh";
+import { isPairingText } from "../pairing/chunks";
 import { PairingError, decodePayload, type PairingPayload } from "../pairing/payload";
 import { downloadBlob, renderScannerCard, renderSessionPdf } from "../pdf/render";
 import { afterPaint } from "../print/print";
@@ -488,6 +489,13 @@ export const useSession = defineStore("session", () => {
   async function processScan(raw: string): Promise<void> {
     const code = normalizeScan(raw);
     if (code === "") return;
+    if (isPairingText(raw)) {
+      message.value = {
+        tone: "error",
+        text: "That is a pairing barcode. Scan it on the Add workstation or Join session screen.",
+      };
+      return;
+    }
     if (closed.value) {
       message.value = { tone: "error", text: "Session closed" };
       return;

@@ -47,7 +47,7 @@ function onDetect(codes: DetectedBarcode[]) {
   }
 }
 
-/** One scanned barcode: a printed piece, or a whole OC1: code. */
+/** One scanned barcode: a printed piece, or a whole code. */
 function acceptScan(text: string) {
   if (!text.trim()) return;
   const r = addScan(collector.value, text);

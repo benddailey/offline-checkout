@@ -107,6 +107,8 @@ test("two workstations pair by scanning printed barcodes", async ({ browser }) =
     const n = joinPaper.code128.length;
     expect(joinReceipt.text).toContain(`${n} of ${n}`);
     console.log(`join code: ${join.length} chars, ${n} barcodes`);
+    expect(n).toBeLessThanOrEqual(8);
+    for (const chunk of joinPaper.code128) expect(chunk).toMatch(/^\d{40}$/);
 
     await joiner.getByRole("button", { name: "Join session" }).click();
     await joiner.getByLabel("Scanner (printed code)").click();
@@ -141,13 +143,17 @@ test("two workstations pair by scanning printed barcodes", async ({ browser }) =
     expect(rebuild(replyPaper.code128)).toBe(reply);
     const m = replyPaper.code128.length;
     console.log(`reply code: ${reply.length} chars, ${m} barcodes`);
+    expect(m).toBeLessThanOrEqual(8);
 
     await inviter.getByLabel("Scanner (printed code)").click();
     const replyOrder = shuffled(replyPaper.code128);
     await scanChunks(inviter, replyOrder.slice(0, 1));
-    await scanChunks(inviter, [joinPaper.code128[0]!]);
-    await expect(inviter.getByTestId("chunk-error")).toHaveText(OTHER_SET);
-    await expect(inviter.getByTestId("chunk-progress")).toContainText(`Received 1 of ${m}`);
+    // Set ids are two digits: 1 run in 100 the join and reply codes share one.
+    if (joinPaper.code128[0]!.slice(0, 2) !== replyOrder[0]!.slice(0, 2)) {
+      await scanChunks(inviter, [joinPaper.code128[0]!]);
+      await expect(inviter.getByTestId("chunk-error")).toHaveText(OTHER_SET);
+      await expect(inviter.getByTestId("chunk-progress")).toContainText(`Received 1 of ${m}`);
+    }
     await scanChunks(inviter, replyOrder.slice(1));
 
     await expect(inviter.getByLabel("Scanner input")).toBeVisible({ timeout: 15_000 });
