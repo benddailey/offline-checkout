@@ -85,7 +85,7 @@ export async function printed(page: Page): Promise<Printed[]> {
   return page.evaluate(() => window.__printed ?? []);
 }
 
-/** Render captured print HTML in a headless Chromium as PDF (print media, CSS page size); returns the path. */
+/** Print captured print HTML as Chrome does to the receipt printer, onto its roll paper; returns the PDF path. */
 export async function printToPdf(html: string, saveAs: string): Promise<string> {
   const path = resolve("test-results", saveAs);
   await mkdir(dirname(path), { recursive: true });
@@ -94,10 +94,52 @@ export async function printToPdf(html: string, saveAs: string): Promise<string> 
   try {
     const page = await browser.newPage();
     await page.setContent(`<!doctype html><html><head></head><body>${html}</body></html>`);
-    await page.pdf({ path, preferCSSPageSize: true, printBackground: true });
+    await page.pdf({ path, ...ROLL_PAPER, printBackground: true });
     return path;
   } finally {
     await browser.close();
+  }
+}
+
+/** The Star TSP143 driver's only paper, "72mm x Receipt" (2.84 × 118.23 in): the page Chrome prints onto. */
+export const ROLL_PAPER = { width: "72mm", height: "3003mm" };
+
+/** Where ink lands on the first page, in mm from its top edge (null on a blank page). */
+export async function inkExtentMm(
+  pdfPath: string,
+): Promise<{ top: number; bottom: number } | null> {
+  const dpi = 50;
+  const dir = await mkdtemp(join(tmpdir(), "oc-ink-"));
+  try {
+    await run("pdftoppm", [
+      "-r",
+      String(dpi),
+      "-gray",
+      "-f",
+      "1",
+      "-l",
+      "1",
+      pdfPath,
+      join(dir, "p"),
+    ]);
+    const [file] = (await readdir(dir)).filter((f) => f.endsWith(".pgm"));
+    const buf = await readFile(join(dir, file!));
+    const header = buf.toString("latin1", 0, 64).match(/^P5\s+(\d+)\s+(\d+)\s+(\d+)\s/);
+    if (!header) throw new Error("unexpected pdftoppm output");
+    const [all, w, h] = [header[0], Number(header[1]), Number(header[2])];
+    let top = -1;
+    let bottom = -1;
+    for (let y = 0; y < h; y++) {
+      const row = buf.subarray(all.length + y * w, all.length + (y + 1) * w);
+      if (row.some((v) => v < 128)) {
+        if (top < 0) top = y;
+        bottom = y + 1;
+      }
+    }
+    const mm = (px: number) => (px / dpi) * 25.4;
+    return top < 0 ? null : { top: mm(top), bottom: mm(bottom) };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 }
 
