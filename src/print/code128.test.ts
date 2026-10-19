@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 import { splitCode } from "../pairing/chunks";
-import { code128Modules, code128WidthMm, QUIET_MODULES } from "./code128";
+import {
+  BARCODE_MAX_MM,
+  code128Modules,
+  code128WidthMm,
+  fitsReceipt,
+  QUIET_MODULES,
+} from "./code128";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_:";
-const PRINTABLE_MM = 70;
 const DOTS_PER_MODULE = 2;
 const PRINTER_DOTS = 576;
 
@@ -15,7 +20,7 @@ function random(length: number, alphabet = ALPHABET): string {
 
 function fits(text: string): void {
   const modules = code128Modules(text);
-  expect(code128WidthMm(text), text).toBeLessThanOrEqual(PRINTABLE_MM);
+  expect(code128WidthMm(text), text).toBeLessThanOrEqual(BARCODE_MAX_MM);
   expect((modules.length + 2 * QUIET_MODULES) * DOTS_PER_MODULE, text).toBeLessThanOrEqual(
     PRINTER_DOTS,
   );
@@ -43,5 +48,25 @@ describe("code128", () => {
 
   it("is case-sensitive", () => {
     expect(code128Modules("ab")).not.toBe(code128Modules("AB"));
+  });
+});
+
+describe("fitsReceipt", () => {
+  it("accepts a 14-digit library barcode", () => {
+    expect(fitsReceipt("31234000123456")).toBe(true);
+  });
+
+  it("rejects a 40-character alphanumeric code", () => {
+    expect(fitsReceipt("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCD")).toBe(false);
+  });
+
+  it("caps barcodes at the proven 70 mm budget", () => {
+    expect(BARCODE_MAX_MM).toBe(70);
+    const under = "A".repeat(20);
+    const over = "A".repeat(21);
+    expect(code128WidthMm(under)).toBeLessThanOrEqual(BARCODE_MAX_MM);
+    expect(code128WidthMm(over)).toBeGreaterThan(BARCODE_MAX_MM);
+    expect(fitsReceipt(under)).toBe(true);
+    expect(fitsReceipt(over)).toBe(false);
   });
 });

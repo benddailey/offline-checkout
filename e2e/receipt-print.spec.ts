@@ -1,22 +1,29 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { appUrl } from "./helpers/app";
 import { pdfText } from "./helpers/pdf";
-import { printed, printToPdf, stubPrint } from "./helpers/print";
+import {
+  decodePrintedBarcodes,
+  printed,
+  type Printed,
+  printToPdf,
+  stubPrint,
+} from "./helpers/print";
 
 const SESSION = "Desk <b>1</b>";
 const MM_72_IN_PT = (72 / 25.4) * 72;
 
-async function pdfPageWidths(path: string): Promise<number[]> {
+async function pdfPageSizes(path: string): Promise<{ width: number; height: number }[]> {
   const task = getDocument({ data: new Uint8Array(await readFile(path)) });
   try {
     const doc = await task.promise;
-    const widths: number[] = [];
+    const sizes: { width: number; height: number }[] = [];
     for (let n = 1; n <= doc.numPages; n++) {
-      widths.push((await doc.getPage(n)).getViewport({ scale: 1 }).width);
+      const { width, height } = (await doc.getPage(n)).getViewport({ scale: 1 });
+      sizes.push({ width, height });
     }
-    return widths;
+    return sizes;
   } finally {
     await task.destroy();
   }
@@ -50,7 +57,7 @@ test("ending a patron prints a 72 mm receipt and gives focus back to the scanner
   await expect.poll(async () => (await printed(page)).length).toBe(1);
   const dayAfter = today();
   const [first] = await printed(page);
-  for (const line of [SESSION, "Clerk: Ann", "Patron: P1", "I1", "Items: 1"]) {
+  for (const line of [SESSION, "Clerk: Ann", "Patron", "P1", "Item 1 of 1", "I1", "Items: 1"]) {
     expect(first.text).toContain(line);
   }
   expect(first.text).not.toContain("I2");
@@ -68,7 +75,7 @@ test("ending a patron prints a 72 mm receipt and gives focus back to the scanner
   await page.keyboard.type("I9\nOC-END\n");
   await expect.poll(async () => (await printed(page)).length).toBe(2);
   const second = (await printed(page))[1];
-  for (const line of ["Patron: P2", "I9", "Items: 1"]) expect(second.text).toContain(line);
+  for (const line of ["P2", "Item 1 of 1", "I9", "Items: 1"]) expect(second.text).toContain(line);
   expect(second.screen).toContain("Scan patron card");
   expect(second.painted).toBe(true);
 
@@ -84,10 +91,68 @@ test("ending a patron prints a 72 mm receipt and gives focus back to the scanner
   await expect(page.getByTestId("totals")).toHaveText("Patrons 2 · Items 2");
 
   const pdf = await printToPdf(first.html, "receipt-print/receipt-p1.pdf");
-  const widths = await pdfPageWidths(pdf);
-  expect(widths).toHaveLength(1);
-  expect(Math.abs(widths[0] - MM_72_IN_PT)).toBeLessThan(0.5);
-  expect(await pdfText(pdf)).toContain("Patron: P1");
+  const sizes = await pdfPageSizes(pdf);
+  expect(sizes).toHaveLength(1);
+  expect(Math.abs(sizes[0].width - MM_72_IN_PT)).toBeLessThan(0.5);
+  expect(sizes[0].height).toBeGreaterThan(sizes[0].width);
+  const text = await pdfText(pdf);
+  for (const line of ["Patron", "Item 1 of 1", "Items: 1"]) expect(text).toContain(line);
+  for (const colour of ["gray", "mono"] as const) {
+    expect((await decodePrintedBarcodes(pdf, colour)).code128, colour).toEqual(["P1", "I1"]);
+  }
+});
+
+async function endVisit(page: Page, scans: string[]): Promise<Printed> {
+  await stubPrint(page);
+  await page.goto(appUrl());
+  await page.getByLabel("Session name").fill("Long visit");
+  await page.getByLabel("Clerk name").fill("Ann");
+  await page.getByRole("button", { name: "Start session" }).click();
+  await expect(page.getByLabel("Scanner input")).toBeFocused();
+  await page.keyboard.type(`${scans.join("\n")}\nOC-END\n`);
+  await expect.poll(async () => (await printed(page)).length).toBe(1);
+  return (await printed(page))[0];
+}
+
+test("a 12-item visit prints one barcode per code down a single tall page", async ({ page }) => {
+  const items = Array.from({ length: 12 }, (_, i) => `ITEM${i + 1}`);
+  const receipt = await endVisit(page, ["P1", ...items]);
+  const pdf = await printToPdf(receipt.html, "receipt-print/receipt-12.pdf");
+  const sizes = await pdfPageSizes(pdf);
+  expect(sizes).toHaveLength(1);
+  expect(Math.abs(sizes[0].width - MM_72_IN_PT)).toBeLessThan(0.5);
+  expect(sizes[0].height).toBeGreaterThan(sizes[0].width);
+  for (const colour of ["gray", "mono"] as const) {
+    expect((await decodePrintedBarcodes(pdf, colour)).code128, colour).toEqual(["P1", ...items]);
+  }
+});
+
+test("a visit with no items prints the patron and a single rule", async ({ page }) => {
+  const receipt = await endVisit(page, ["P1"]);
+  expect(receipt.text).toContain("Items: 0");
+  const rules = await page.evaluate((html) => {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    return d.querySelectorAll(".oc-visit-rule").length;
+  }, receipt.html);
+  expect(rules).toBe(1);
+  const pdf = await printToPdf(receipt.html, "receipt-print/receipt-empty.pdf");
+  for (const colour of ["gray", "mono"] as const) {
+    expect((await decodePrintedBarcodes(pdf, colour)).code128, colour).toEqual(["P1"]);
+  }
+});
+
+test("an item too long for the paper prints as text, not a barcode", async ({ page }) => {
+  const long = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCD";
+  const receipt = await endVisit(page, ["P1", "I1", long, "I2"]);
+  expect(receipt.text).toContain("Too long for a barcode — type it in");
+  expect(receipt.text).toContain(long);
+  const pdf = await printToPdf(receipt.html, "receipt-print/receipt-long.pdf");
+  // The 40 characters wrap onto two lines.
+  expect((await pdfText(pdf)).replace(/\s/g, "")).toContain(long);
+  for (const colour of ["gray", "mono"] as const) {
+    expect((await decodePrintedBarcodes(pdf, colour)).code128, colour).toEqual(["P1", "I1", "I2"]);
+  }
 });
 
 test("the scanner input takes focus back when the print dialog closes", async ({ page }) => {
