@@ -43,6 +43,8 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     const card = await download(a!, "Print scanner card", "scanner-card.pdf");
     expect((await decodePdfBarcodes(card)).sort()).toEqual(["OC-END", "OC-VOIDLAST"]);
 
+    await pairViaPaste(a!, b!, "Ben");
+
     // Nothing scanned yet: no PDF to generate.
     await a!.getByRole("button", { name: "Summary" }).click();
     await expect(a!.getByRole("button", { name: "Generate PDF" })).toBeDisabled();
@@ -58,8 +60,8 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     await expect(a!.getByTestId("patron")).toHaveText("P1");
     await a!.waitForTimeout(500);
     expect(downloadsOnA).toBe(2);
-
-    await pairViaPaste(a!, b!, "Ben");
+    // With P1 open, A cannot leave the scan screen.
+    await expect(a!.getByRole("button", { name: "Summary" })).toBeDisabled();
 
     // A: P1 with I1 and I2, then I2 voided.
     await scan(a!, "I1", "I2");

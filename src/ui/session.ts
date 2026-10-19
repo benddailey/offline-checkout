@@ -152,6 +152,22 @@ export const useSession = defineStore("session", () => {
     return v && !v.ended && !v.voided ? v : null;
   });
 
+  /**
+   * This workstation's open patron: leaving the scan screen is blocked until it is ended or
+   * voided, so a later scan is never filed under it by mistake. Lifted once the session closes,
+   * since the patron can no longer be ended then.
+   */
+  const lockedPatron = computed(() =>
+    currentVisit.value && !closed.value ? currentVisit.value.patron : null,
+  );
+  /** Patrons still open on other workstations, named by the clerk who started each. */
+  const othersInProgress = computed<{ employee: string; patron: string }[]>(() => {
+    const own = meta.value?.deviceId;
+    return state.value.visits
+      .filter((v) => v.deviceId !== own && !v.ended && !v.voided)
+      .map((v) => ({ employee: v.employee, patron: v.patron }));
+  });
+
   let store: SessionStore | null = null;
   let releaseLock: (() => void) | null = null;
   let sync: SyncEngine | null = null;
@@ -616,6 +632,8 @@ export const useSession = defineStore("session", () => {
     offerScannerCard,
     state,
     currentVisit,
+    lockedPatron,
+    othersInProgress,
     closed,
     notConnected,
     startSession,

@@ -240,6 +240,11 @@ async function recordScan(code: string): Promise<void> {
   session.message = null;
   await session.scan(code);
   if (!alive) return;
+  // A patron is checked out on the scan screen, never behind a pairing code.
+  if (session.lockedPatron) {
+    session.screen = "scan";
+    return;
+  }
   scanNote.value = session.message ?? {
     tone: "info",
     text: `Scan recorded: ${normalizeScan(code)}`,

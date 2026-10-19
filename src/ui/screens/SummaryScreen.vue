@@ -24,6 +24,10 @@ const cancelButton = useTemplateRef<HTMLButtonElement>("cancel");
 
 const missingNames = computed(() => session.notConnected.map((d) => d.employee || "Unnamed"));
 
+const inProgress = computed(() =>
+  session.othersInProgress.map((v) => `${v.patron} (${v.employee || "Unnamed"})`),
+);
+
 async function ask(what: "close" | "pdf"): Promise<void> {
   confirming.value = what;
   await nextTick();
@@ -210,6 +214,9 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
         <div id="confirm-text" class="flex flex-col gap-3 text-2xl">
           <p v-if="confirming === 'close'">
             Close this session for all workstations? Scanning will stop everywhere.
+          </p>
+          <p v-if="confirming === 'close' && inProgress.length" data-testid="in-progress">
+            Patron in progress: {{ inProgress.join(", ") }}. Their visits will stay open.
           </p>
           <p v-if="missingNames.length">
             Not connected: {{ missingNames.join(", ") }}. Their latest scans may be missing{{

@@ -10,28 +10,29 @@ async function start(page: Page, name: string, clerk: string): Promise<void> {
   await expect(page.getByLabel("Scanner input")).toBeVisible();
 }
 
-test("scans made on Add workstation are recorded without leaving it; the paste box still types", async ({
+test("a patron scanned on Add workstation opens on the scan screen; the paste box still types", async ({
   page,
 }) => {
   await start(page, "Pair Scan", "Rae");
-  await page.keyboard.type("P1\n");
-  await expect(page.getByTestId("patron")).toHaveText("P1");
 
   await page.getByRole("button", { name: "Add workstation" }).click();
   await expect(page.getByLabel("Join code", { exact: true })).not.toHaveValue("", {
     timeout: 15_000,
   });
-  await page.getByRole("heading", { name: "Add workstation" }).click();
-  await page.keyboard.type("I1\n");
-  await expect(page.getByTestId("message")).toHaveText("Scan recorded: I1");
-  await expect(page.getByRole("heading", { name: "Add workstation" })).toBeVisible();
-
   const box = page.getByLabel("Pasted code");
   await box.fill("");
   await box.pressSequentially("OC1:abc");
   await expect(box).toHaveValue("OC1:abc");
 
-  await page.getByRole("button", { name: "Back" }).click();
+  // A control code is answered here; a patron card leaves for the scan screen.
+  await page.getByRole("heading", { name: "Add workstation" }).click();
+  await page.keyboard.type("OC-END\n");
+  await expect(page.getByTestId("message")).toHaveText("No patron in progress");
+  await expect(page.getByRole("heading", { name: "Add workstation" })).toBeVisible();
+  await page.keyboard.type("P1\n");
+  await expect(page.getByTestId("patron")).toHaveText("P1");
+  await expect(page.getByRole("button", { name: "Add workstation" })).toBeDisabled();
+  await page.keyboard.type("I1\n");
   await expect(page.getByTestId("item")).toContainText("I1");
 });
 
@@ -56,6 +57,8 @@ test("the summary names unconnected workstations, confirms before PDF and close,
       a!.getByRole("button", { name: "Generate PDF" }).click(),
     ]);
     await expect(a!.getByRole("alertdialog")).toBeHidden();
+    // Only Close session warns about open patrons.
+    await expect(a!.getByTestId("in-progress")).toBeHidden();
 
     await contexts[1]!.close();
     await expect(a!.getByTestId("not-connected")).toHaveText(
@@ -82,6 +85,9 @@ test("the summary names unconnected workstations, confirms before PDF and close,
       "Close this session for all workstations? Scanning will stop everywhere.",
     );
     await expect(dialog).toContainText("Not connected: Ben");
+    await expect(dialog.getByTestId("in-progress")).toHaveText(
+      "Patron in progress: P2 (Ben). Their visits will stay open.",
+    );
     await a!.getByRole("button", { name: "Yes, close session" }).click();
     await expect(a!.getByText("Session closed", { exact: true })).toBeVisible();
 
