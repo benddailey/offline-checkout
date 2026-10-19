@@ -55,3 +55,48 @@ test("scan, void, end patron and resume after reload", async ({ page }) => {
   // Only this workstation has ever been in the session: nothing to re-pair with.
   await expect(page.getByText("Disconnected — re-pair with any workstation")).toBeHidden();
 });
+
+test("a patron in progress locks leaving the scan screen and asks before the tab closes", async ({
+  page,
+}) => {
+  await stubPrint(page);
+  await page.goto(appUrl());
+  await page.getByLabel("Session name").fill("Lock Test");
+  await page.getByLabel("Clerk name").fill("Rae");
+  await page.getByRole("button", { name: "Start session" }).click();
+  await page.getByRole("button", { name: "Not now" }).click();
+
+  const summary = page.getByRole("button", { name: "Summary" });
+  const add = page.getByRole("button", { name: "Add workstation" });
+  await expect(summary).toBeEnabled();
+  await page.keyboard.type("P1\nI1\n");
+  await expect(page.getByTestId("item")).toHaveCount(1);
+  await expect(summary).toBeDisabled();
+  await expect(add).toBeDisabled();
+  await expect(page.getByTestId("finish-patron")).toHaveText(
+    "Finish patron P1 first: End patron or Void patron",
+  );
+  await expect(summary).toHaveAccessibleDescription(
+    "Finish patron P1 first: End patron or Void patron",
+  );
+
+  const dialogs: string[] = [];
+  page.on("dialog", (d) => {
+    dialogs.push(d.type());
+    void d.dismiss();
+  });
+  await page.close({ runBeforeUnload: true });
+  await expect.poll(() => dialogs).toEqual(["beforeunload"]);
+  expect(page.isClosed()).toBe(false);
+
+  await page.keyboard.type("OC-END\n");
+  await expect(page.getByText("Scan patron card")).toBeVisible();
+  await expect(page.getByTestId("finish-patron")).toBeHidden();
+  await expect(add).toBeEnabled();
+  await summary.click();
+  await expect(page.getByRole("heading", { name: "Session summary" })).toBeVisible();
+
+  await page.close({ runBeforeUnload: true });
+  await expect.poll(() => page.isClosed()).toBe(true);
+  expect(dialogs).toEqual(["beforeunload"]);
+});

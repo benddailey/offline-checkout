@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { appUrl } from "./helpers/app";
+import { stubPrint } from "./helpers/print";
 
 const VIEWPORT = { width: 1366, height: 768 };
 
@@ -13,7 +14,10 @@ test("the main screens render at 1366x768 (screenshots for review)", async ({ br
   const contexts = await Promise.all([1, 2].map(() => browser.newContext({ viewport: VIEWPORT })));
   try {
     const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
-    for (const page of [a!, b!]) await page.goto(appUrl());
+    for (const page of [a!, b!]) {
+      await stubPrint(page);
+      await page.goto(appUrl());
+    }
 
     await expect(a!.getByRole("button", { name: "Start session" })).toBeVisible();
     await shot(a!, "1-launch");
@@ -46,6 +50,10 @@ test("the main screens render at 1366x768 (screenshots for review)", async ({ br
     expect(await a!.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(
       VIEWPORT.height,
     );
+
+    await expect(a!.getByTestId("finish-patron")).toBeVisible();
+    await a!.keyboard.type("OC-END\n");
+    await expect(a!.getByText("Scan patron card")).toBeVisible();
 
     await a!.getByRole("button", { name: "Add workstation" }).click();
     const offer = a!.getByLabel("Join code", { exact: true });

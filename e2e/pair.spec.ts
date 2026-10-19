@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { appUrl } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
+import { stubPrint } from "./helpers/print";
 
 /** The StatusBar entry for `name` shows a green (connected) dot. */
 async function expectConnected(page: Page, name: string): Promise<void> {
@@ -73,7 +74,10 @@ test("an isolated workstation re-pairs only with its own session", async ({ brow
   const contexts = await Promise.all([1, 2, 3].map(() => browser.newContext()));
   try {
     const [a, b, other] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
-    for (const page of [a!, b!, other!]) await page.goto(appUrl());
+    for (const page of [a!, b!, other!]) {
+      await stubPrint(page);
+      await page.goto(appUrl());
+    }
     for (const [page, session, clerk] of [
       [a!, "Outage", "Ann"],
       [other!, "Elsewhere", "Oz"],
@@ -94,6 +98,9 @@ test("an isolated workstation re-pairs only with its own session", async ({ brow
     await expect(b!.getByText("Disconnected — re-pair with any workstation")).toBeVisible();
     await b!.keyboard.type("P2\n");
     await expect(b!.getByTestId("patron")).toHaveText("P2");
+    await expect(b!.getByRole("button", { name: "Re-pair" })).toBeDisabled();
+    await b!.keyboard.type("OC-END\n");
+    await expect(b!.getByRole("button", { name: "Re-pair" })).toBeEnabled();
 
     // Another session's join code is refused.
     await other!.getByRole("button", { name: "Add workstation" }).click();

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted } from "vue";
 import FatalAlert from "./ui/components/FatalAlert.vue";
 import StatusBar from "./ui/components/StatusBar.vue";
 import LaunchScreen from "./ui/screens/LaunchScreen.vue";
@@ -8,6 +9,13 @@ import SummaryScreen from "./ui/screens/SummaryScreen.vue";
 import { useSession } from "./ui/session";
 
 const session = useSession();
+
+/** Closing or reloading the tab mid-patron asks first (Chrome shows its own generic prompt). */
+function onBeforeUnload(e: BeforeUnloadEvent): void {
+  if (session.lockedPatron) e.preventDefault();
+}
+onMounted(() => window.addEventListener("beforeunload", onBeforeUnload));
+onBeforeUnmount(() => window.removeEventListener("beforeunload", onBeforeUnload));
 </script>
 
 <template>

@@ -1127,3 +1127,72 @@ describe("useSession ensureMesh", () => {
     expect(await t.adoptJoinedSession(offerFor("joined-2"), "Lee", fakeMesh().mesh)).toBe(false);
   });
 });
+
+describe("useSession patron in progress", () => {
+  it("lockedPatron names this workstation's open patron until it is ended, voided or the session closes", async () => {
+    const s = await started();
+    expect(s.lockedPatron).toBeNull();
+    await s.scan("P1");
+    await s.scan("I1");
+    expect(s.lockedPatron).toBe("P1");
+    await s.scan(CONTROL_END);
+    expect(s.lockedPatron).toBeNull();
+    await s.scan("P2");
+    await s.voidPatron();
+    expect(s.lockedPatron).toBeNull();
+    await s.scan("P3");
+    expect(s.lockedPatron).toBe("P3");
+    await s.closeSession();
+    expect(s.lockedPatron).toBeNull();
+  });
+
+  it("othersInProgress lists open patrons on other workstations, not this one's", async () => {
+    const s = await started();
+    const m = fakeMesh([{ deviceId: PEER, employee: "Sam", connected: true }]);
+    s.attachMesh(m.mesh);
+    await s.scan("P1");
+    const base = { sessionId: s.meta!.sessionId, at: 5000 };
+    const third = "devicecccc";
+    const p9: LogRecord = {
+      ...base,
+      deviceId: PEER,
+      seq: 1,
+      employee: "Sam",
+      type: "patron-started",
+      patron: "P9",
+    };
+    const p7: LogRecord = {
+      ...base,
+      deviceId: third,
+      seq: 1,
+      employee: "Cy",
+      type: "patron-started",
+      patron: "P7",
+    };
+    const p7End: LogRecord = {
+      ...base,
+      deviceId: third,
+      seq: 2,
+      employee: "Cy",
+      type: "patron-ended",
+      visitId: recordId(p7),
+    };
+    m.deliver(PEER, { t: "recs", records: [p9, p7, p7End] });
+    await tick();
+    await tick();
+    expect(s.othersInProgress).toEqual([{ employee: "Sam", patron: "P9" }]);
+
+    const p9Void: LogRecord = {
+      ...base,
+      deviceId: PEER,
+      seq: 2,
+      employee: "Sam",
+      type: "voided",
+      target: recordId(p9),
+    };
+    m.deliver(PEER, { t: "recs", records: [p9Void] });
+    await tick();
+    await tick();
+    expect(s.othersInProgress).toEqual([]);
+  });
+});
