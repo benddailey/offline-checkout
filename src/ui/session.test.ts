@@ -278,6 +278,17 @@ describe("useSession scanning", () => {
     expect(s.message).toBeNull();
   });
 
+  it("does not record a pairing barcode scanned on the scan screen", async () => {
+    const s = await started();
+    await s.scan("1".repeat(40));
+    await s.scan("OC2:abc");
+    expect(s.records).toHaveLength(1);
+    expect(s.message).toEqual({
+      tone: "error",
+      text: "That is a pairing barcode. Scan it on the Add workstation or Join session screen.",
+    });
+  });
+
   it("rejects barcodes with unprintable characters, with a reason", async () => {
     const s = await started();
     await s.scan("P1#");
