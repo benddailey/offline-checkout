@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { QrcodeStream, type DetectedBarcode } from "vue-qrcode-reader";
 import {
   addScan,
   emptyCollector,
@@ -8,6 +7,7 @@ import {
   OTHER_SET_MESSAGE,
   progressText,
 } from "../pairing/chunks";
+import QrCamera from "./QrCamera.vue";
 
 const emit = defineEmits<{ decoded: [text: string] }>();
 
@@ -38,13 +38,9 @@ function emitText(raw: string) {
   if (text) emit("decoded", text);
 }
 
-function onDetect(codes: DetectedBarcode[]) {
-  for (const code of codes) {
-    if (code.rawValue.trim()) {
-      paused.value = true;
-      return emitText(code.rawValue);
-    }
-  }
+function onDetect(text: string) {
+  paused.value = true;
+  emitText(text);
 }
 
 /** One scanned barcode: a printed piece, or a whole code. */
@@ -88,12 +84,7 @@ function usePasted() {
 <template>
   <div class="flex flex-col gap-3">
     <div class="relative h-72 w-full overflow-hidden rounded bg-slate-900">
-      <QrcodeStream
-        :formats="['qr_code']"
-        :paused="paused"
-        @detect="onDetect"
-        @error="cameraError = true"
-      />
+      <QrCamera :paused="paused" @detect="onDetect" @error="cameraError = true" />
     </div>
     <p v-if="cameraError" role="alert" class="rounded bg-amber-100 p-2 text-base text-amber-900">
       Camera unavailable. Click Allow on the camera prompt in the address bar, or paste the code
