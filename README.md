@@ -2,8 +2,10 @@
 
 Offline Checkout lets front-desk staff keep checking items out when the library system is down. Scan
 each patron's card and their items as usual; the app records them on the PC. Several desk PCs can
-share one session. When the system is back, close the session and print a PDF with a barcode for
-every patron and item, ready to be scanned into the library system.
+share one session. At the end of every checkout a receipt prints on the receipt printer, with the
+patron's barcode and one barcode per item. Staff keep the receipts at the desk, and when the system
+is back they scan them into the library system. A PDF with a barcode for every patron and item in
+the session is also available as a complete copy.
 
 It runs in Chrome or Edge. It needs no internet, no server, no admin rights and no installs.
 
@@ -13,8 +15,8 @@ It runs in Chrome or Edge. It needs no internet, no server, no admin rights and 
 - A USB barcode scanner that reads Code 128 barcodes and sends Enter after each scan. To join PCs
   from a printed code, it must also send Enter or Tab after each scan.
 - Optional: a webcam on each PC, to join PCs by holding a QR code up to the camera.
-- Optional: a Star TSP143 / TSP100 receipt printer (72 mm paper) installed in Windows, for patron
-  receipts and printed join codes.
+- A Star TSP143 / TSP100 receipt printer (72 mm paper) installed in Windows, for the checkout
+  receipts that are scanned back in later, and for printed join codes.
 
 ## Setting up a desk PC
 
@@ -66,7 +68,8 @@ to the title on the start screen and on the Summary.
 3. **Scan.** Scan the patron's card, then each item. There is no need to click anything first. The
    bar at the top shows totals and a green or red dot for each desk PC.
    - **End the patron**: scan **OC-END** on the scanner card, or click **End patron**. Their receipt
-     prints, with the patron barcode and one barcode per item.
+     prints, with the patron barcode and one barcode per item. Keep the receipt at the desk (don't
+     give it to the patron): it is what gets scanned into the library system later.
    - **Undo the last item**: scan **OC-VOIDLAST**, or click **Void** on a row. **Void patron**
      cancels the whole visit and prints nothing.
    - Voided entries stay on screen crossed out. Nothing is ever deleted.
@@ -74,8 +77,9 @@ to the title on the start screen and on the Summary.
      roll, and **Letter PDF** saves it for a regular printer.
 4. **Summary.** Click **Summary** for totals, a count per clerk, and every patron with their items.
 5. **When the system is back.** On the Summary click **Close session**. Every desk PC stops taking
-   scans. Then click **Generate PDF**. The PDF is on US Letter paper and has a barcode for every
-   patron and item. Print it and scan it into the library system.
+   scans. Scan the kept receipts into the library system: the patron barcode, then each item.
+   **Generate PDF** makes a copy of the whole session on US Letter paper, with a barcode for every
+   patron and item. Use it for a receipt that is lost or won't scan, or to check nothing was missed.
 
 ## Good to know
 
