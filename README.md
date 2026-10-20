@@ -23,8 +23,25 @@ npm install
 npm run build
 ```
 
-The result is `dist/offline-checkout.html`, one self-contained file. Copy it to each workstation and
-open it in the browser.
+The result is `dist/offline-checkout.html`, one self-contained file. `npm run package:windows` then
+zips it with `windows/Create shortcuts.cmd` into `dist/offline-checkout-vX.Y.Z-windows.zip`.
+
+## Setting up a desk PC
+
+1. Download the release zip, right-click it, choose **Extract All**, and open the extracted folder.
+2. Double-click **Create shortcuts.cmd** (Windows may warn that it came from the internet; choose
+   **Run anyway** / **Run**). It copies `offline-checkout.html` to `%LOCALAPPDATA%\OfflineCheckout\`
+   and puts two shortcuts on the desktop. Both open Chrome as an app window with its own profile
+   (Edge if Chrome is not installed):
+   - **Offline Checkout**: everyday use. Receipts print straight to the printer with no dialog.
+   - **Offline Checkout - printer setup**: the same, with the print dialog, for choosing the printer.
+3. Choose the receipt printer once: close every Offline Checkout window, open the printer setup
+   shortcut, start a session, print the scanner card to the **Receipt printer**, pick the Star printer
+   and click **Print**. Close it and use **Offline Checkout** from then on. Chrome remembers the
+   printer in the app's profile; only an actual print saves it, not cancelling the dialog.
+
+The extracted folder can stay in Downloads or be deleted; the shortcuts use the copy. To update, run
+the new version's `Create shortcuts.cmd`. Sessions are kept, since they live in the browser profile.
 
 ## Using it at the desk
 
@@ -46,9 +63,10 @@ open it in the browser.
    The status bar shows live totals and a green or red dot for each workstation.
    - Scan **OC-END** (or click End patron) to finish the patron and start the next one.
    - Ending a patron (End patron or OC-END) saves the visit, then opens the print dialog with a
-     receipt for that patron. The first time, pick the Star receipt printer (Chrome remembers the
-     last printer) and keep Scale at 100 % and Margins at Default. Cancel skips the receipt; the
-     visit stays ended. Void patron does not print. The receipt shows the patron barcode, then one
+     receipt for that patron. From the **Offline Checkout** shortcut it prints without a dialog. Opened
+     any other way, the print dialog appears: the first time, pick the Star receipt printer (Chrome
+     remembers the last printer) and keep Scale at 100 % and Margins at Default. Cancel skips the
+     receipt; the visit stays ended. Void patron does not print. The receipt shows the patron barcode, then one
      barcode per item in order, so staff can scan them into the ILS when it's back online.
    - Scan **OC-VOIDLAST** (or click Void on a row) to void the last item. Void patron voids the whole visit.
    - Print the scanner card (offered when a session starts, and on the Summary) to get the OC-END and
@@ -81,10 +99,11 @@ camera, WebRTC on the local network). Build it with `npm run build:probe`. See
    library PCs first (see [docs/field-probe.md](docs/field-probe.md)).
 4. Bump the version with `npm version <major|minor|patch>`. This updates `package.json` and
    `package-lock.json`, commits, and creates a `vX.Y.Z` tag. Push both: `git push --follow-tags`.
-5. Build from the tagged commit with `npm run build` and take `dist/offline-checkout.html`.
+5. Build from the tagged commit with `npm run build && npm run package:windows`. Attach both
+   `dist/offline-checkout.html` and `dist/offline-checkout-vX.Y.Z-windows.zip` to the release.
 6. Open the built file once from `file://` and do a quick check: start a session, scan a patron and an
    item, close the session and generate the PDF.
-7. Copy the file to each workstation, replacing the old copy. Sessions are stored in the browser
+7. On each workstation run the new zip's `Create shortcuts.cmd`, which replaces the old copy. Sessions are stored in the browser
    profile, not the file, so replacing it keeps them, unless the release changes the IndexedDB
    schema (`src/store/db.ts`). That needs a migration. Don't swap the file during an outage.
 
@@ -92,6 +111,9 @@ camera, WebRTC on the local network). Build it with `npm run build:probe`. See
 
 - The field probe must be run on real library PCs before rollout.
 - Chrome may ask for camera permission on every pairing when the page is opened from `file://`.
-- Chrome shows the print dialog for every receipt: a page opened from `file://` cannot print silently.
+- Receipts print without a dialog only from the **Offline Checkout** shortcut (`--kiosk-printing`).
+  Chrome has no flag to name a printer; it uses the last one chosen in that profile.
+- The shortcut flags only apply when no other window of that profile is open, so close the printer
+  setup window before opening **Offline Checkout**.
 - Data lives in the browser profile; clearing site data or using another profile loses the session.
 - Barcodes are verified by zxing at 300 dpi, but still confirm them with the library's real scanners.
