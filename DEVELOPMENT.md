@@ -30,12 +30,13 @@ barcodes (jsPDF). Receipts are printed with the browser's print dialog, or silen
 - **Barcodes and QR:**
   - `jsbarcode` makes Code 128 for receipts and the PDF;
   - `qrcode` draws QR codes;
-  - `vue-qrcode-reader` with `zxing-wasm` reads QR codes from the webcam.
+  - `zxing-wasm` reads QR codes from the webcam. `src/qr/QrCamera.vue` opens the camera with
+    `getUserMedia`, draws about eight frames a second to a canvas and decodes them with
+    `readBarcodes` from `zxing-wasm/reader`.
 
-    `src/qr/zxing.ts` inlines the `.wasm` from the top-level `zxing-wasm` into the reader that
-    `vue-qrcode-reader` uses (through `barcode-detector`), so the two versions must match exactly:
-    a mismatch makes the camera decode nothing. `zxing-wasm` is pinned, and `.ncurc.json` keeps
-    `npx npm-check-updates` from bumping it. Move it only to the version `barcode-detector` uses.
+    `src/qr/zxing.ts` hands the inlined `.wasm` to that reader with `prepareZXingModule`, so nothing
+    is fetched from a CDN. Import it once at startup, before the first decode. There is only one
+    copy of `zxing-wasm`, so it can be updated like any other dependency.
 - **PDF:** `jspdf` (`src/pdf/`).
 - **Pairing and sync:** browser WebRTC data channels, no library (`src/mesh/`, `src/pairing/`,
   `src/sync/`).
