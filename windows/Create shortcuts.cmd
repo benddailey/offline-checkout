@@ -24,6 +24,8 @@ try {
   New-Item -ItemType Directory -Force -Path $installDir | Out-Null
   Copy-Item -LiteralPath $html -Destination $installed -Force
   Unblock-File -LiteralPath $installed
+  $match = Select-String -LiteralPath $installed -Pattern '<meta name="offline-checkout-version" content="([^"]+)"' | Select-Object -First 1
+  $version = if ($match) { $match.Matches[0].Groups[1].Value } else { 'unknown' }
 
   # Chrome first (App Paths, then the usual install folders), Edge if Chrome is not installed.
   $browser = $null
@@ -72,11 +74,13 @@ try {
   New-OcShortcut 'Offline Checkout - printer setup' $common 'Offline Checkout with the print dialog, to choose the receipt printer.'
 
   Write-Host ''
-  Write-Host 'Shortcuts created on the desktop:' -ForegroundColor Green
+  Write-Host "Installed Offline Checkout version $version" -ForegroundColor Green
+  Write-Host ''
+  Write-Host 'Shortcuts created on the desktop:'
   Write-Host '  Offline Checkout                   everyday use; receipts print without a dialog'
   Write-Host '  Offline Checkout - printer setup   use once to choose the receipt printer'
   Write-Host ''
-  Write-Host "Installed:  $installed"
+  Write-Host "App file:   $installed"
   Write-Host "Browser:    $browser"
   Write-Host ''
   Write-Host 'Choose the receipt printer once on this PC:'
