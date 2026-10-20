@@ -8,6 +8,28 @@ const ROOT = resolve(import.meta.dirname, "..");
 const { version } = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
 const OUT = resolve(ROOT, "dist", `offline-checkout-v${version}-windows.zip`);
 
+const now = new Date();
+const crlf = (text: string) => Buffer.from(text.replace(/\r?\n/g, "\r\n"));
+
+/** README.md as Notepad-friendly text: headings underlined, bold, code and link markup removed. */
+function readmeText(md: string): string {
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const lines = [`Offline Checkout version ${version} (${today})`, ""];
+  for (const line of md.split(/\r?\n/)) {
+    if (line.startsWith("Developers:")) continue;
+    const heading = /^(#{1,3}) (.*)$/.exec(line);
+    const text = (heading ? heading[2]! : line)
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label: string, url: string) =>
+        label === url ? url : `${label} (${url})`,
+      );
+    lines.push(text);
+    if (heading) lines.push((heading[1] === "#" ? "=" : "-").repeat(text.length));
+  }
+  return lines.join("\n").trimEnd() + "\n";
+}
+
 const files: { name: string; data: Buffer }[] = [
   {
     name: "offline-checkout.html",
@@ -16,16 +38,11 @@ const files: { name: string; data: Buffer }[] = [
   {
     name: "Create shortcuts.cmd",
     // cmd.exe needs CRLF whatever the checkout did.
-    data: Buffer.from(
-      readFileSync(resolve(ROOT, "windows", "Create shortcuts.cmd"), "utf8").replace(
-        /\r?\n/g,
-        "\r\n",
-      ),
-    ),
+    data: crlf(readFileSync(resolve(ROOT, "windows", "Create shortcuts.cmd"), "utf8")),
   },
+  { name: "README.txt", data: crlf(readmeText(readFileSync(resolve(ROOT, "README.md"), "utf8"))) },
 ];
 
-const now = new Date();
 const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
 const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
 
