@@ -48,7 +48,6 @@ barcodes (jsPDF). Receipts are printed with the browser's print dialog, or silen
 ## Requirements
 
 - Node.js 24 or newer and npm.
-- A display for the end-to-end tests (they run in a headed browser).
 
 ## Build
 
@@ -81,7 +80,8 @@ the camera, and WebRTC on the local network. Build it with `npm run build:probe`
 - `npm test` runs the unit tests.
 - `npm run check` runs formatting, lint and type checks.
 - `npm run e2e` builds everything and runs the Playwright end-to-end tests. Screenshots of the main
-  screens at 1366x768 are written to `test-results/screens/`.
+  screens at 1366x768 are written to `test-results/screens/`. The browsers run headless; set
+  `HEADED=1` to watch them (`HEADED=1 npm run e2e`, or with `npx playwright test <spec>`).
 
 ## Releasing
 

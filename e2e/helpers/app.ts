@@ -2,6 +2,9 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "@playwright/test";
 
+/** Set HEADED=1 to watch the browsers. */
+export const HEADLESS = !process.env.HEADED;
+
 export const CHROMIUM_ARGS = [
   "--use-fake-ui-for-media-stream",
   "--use-fake-device-for-media-stream",
@@ -13,5 +16,5 @@ export function appUrl(): string {
 }
 
 export function launchChromium(extraArgs: string[] = []): Promise<Browser> {
-  return chromium.launch({ headless: false, args: [...CHROMIUM_ARGS, ...extraArgs] });
+  return chromium.launch({ headless: HEADLESS, args: [...CHROMIUM_ARGS, ...extraArgs] });
 }
