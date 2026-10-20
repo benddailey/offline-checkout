@@ -15,8 +15,9 @@ It runs in Chrome or Edge. It needs no internet, no server, no admin rights and 
 - A USB barcode scanner that reads Code 128 barcodes and sends Enter after each scan. To join PCs
   from a printed code, it must also send Enter or Tab after each scan.
 - Optional: a webcam on each PC, to join PCs by holding a QR code up to the camera.
-- A Star TSP143 / TSP100 receipt printer (72 mm paper) installed in Windows, for the checkout
-  receipts that are scanned back in later, and for printed join codes.
+- A receipt printer for 80 mm paper rolls (72 mm print width) installed in Windows, for the checkout
+  receipts that are scanned back in later, and for printed join codes. Tested with a Star TSP143;
+  other receipt printers should work, but print a test receipt and scan it first.
 
 ## Setting up a desk PC
 
@@ -34,7 +35,7 @@ Do this before an outage, on every desk PC.
    1. Close every Offline Checkout window.
    2. Open **Offline Checkout - printer setup**, start a session, and click **Receipt printer**
       under Scanner card.
-   3. In the print dialog choose the Star printer and click **Print**. Keep the scanner card at the
+   3. In the print dialog choose the receipt printer and click **Print**. Keep the scanner card at the
       desk.
    4. Close the window. From now on, use **Offline Checkout**.
 
