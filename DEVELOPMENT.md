@@ -12,9 +12,37 @@ logs sync between paired workstations, and the closed session is exported as a P
 barcodes (jsPDF). Receipts are printed with the browser's print dialog, or silently with Chrome's
 `--kiosk-printing` flag, which the desk shortcuts set.
 
+## Stack
+
+- **Language and UI:** TypeScript, Vue 3 (`<script setup>` single-file components), Pinia for state,
+  Tailwind CSS 4.
+- **Toolchain:** Vite+ (`vp`, the `vite-plus` package):
+  - `vp build` and `vp dev` (Vite);
+  - `vp test` (Vitest, imported from `vite-plus/test`);
+  - `vp check` (formatting, oxlint and type checks).
+
+  Use `vite-plus` imports rather than `vite` / `vitest` directly; lint enforces it. If `vp` is not
+  on PATH, use `npx vp`.
+
+- **Single file:** `vite-plugin-singlefile` inlines everything, including the zxing WebAssembly,
+  into `dist/offline-checkout.html`.
+- **Storage:** IndexedDB through `idb` (`src/store/`).
+- **Barcodes and QR:**
+  - `jsbarcode` makes Code 128 for receipts and the PDF;
+  - `qrcode` draws QR codes;
+  - `vue-qrcode-reader` with `zxing-wasm` reads QR codes from the webcam.
+- **PDF:** `jspdf` (`src/pdf/`).
+- **Pairing and sync:** browser WebRTC data channels, no library (`src/mesh/`, `src/pairing/`,
+  `src/sync/`).
+- **Tests:**
+  - Vitest unit tests next to the code (`*.test.ts`), with `fake-indexeddb`;
+  - Playwright end-to-end tests in `e2e/`, which decode the printed and PDF barcodes with
+    `zxing-wasm` and `pdfjs-dist`.
+- **Scripts:** `scripts/*.ts` run directly with Node 24 (`node scripts/x.ts`, no build step).
+
 ## Requirements
 
-- Node.js and npm.
+- Node.js 24 or newer and npm.
 - A display for the end-to-end tests (they run in a headed browser).
 
 ## Build
