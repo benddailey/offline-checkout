@@ -1,97 +1,90 @@
 # Offline Checkout
 
-Offline Checkout is a single HTML file that library front-desk staff open in Chrome or Edge to record
-patron and item barcodes during a network outage. Several workstations can share one session by
-pairing directly with each other over QR codes (WebRTC, no server, no internet). When the outage is
-over, the session is closed and exported as a PDF with a scannable Code 128 barcode for every patron
-and item, ready to be re-scanned into the library system.
+Offline Checkout lets front-desk staff keep checking items out when the library system is down. Scan
+each patron's card and their items as usual; the app records them on the PC. Several desk PCs can
+share one session. When the system is back, close the session and print a PDF with a barcode for
+every patron and item, ready to be scanned into the library system.
 
-## Requirements
+It runs in Chrome or Edge. It needs no internet, no server, no admin rights and no installs.
 
-- Chrome or Edge on Windows (any Chromium browser), opened from `file://`. No admin rights, no installs.
-- A USB barcode scanner that types like a keyboard, reads Code 128 and sends Enter after each scan.
-  To pair from printed codes it must also send Enter or Tab after each scan.
-- A webcam on each workstation if you want to pair by QR (copy and paste works without one).
-- Optional: a receipt printer (Star TSP143 / TSP100 series, 72 mm paper) installed in Windows, for
-  patron receipts.
-- To build: Node.js and npm.
+## What you need
 
-## Build
+- A Windows PC with Chrome (or Edge) at each desk.
+- A USB barcode scanner that reads Code 128 barcodes and sends Enter after each scan. To join PCs
+  from a printed code, it must also send Enter or Tab after each scan.
+- Optional: a webcam on each PC, to join PCs by holding a QR code up to the camera.
+- Optional: a Star TSP143 / TSP100 receipt printer (72 mm paper) installed in Windows, for patron
+  receipts and printed join codes.
 
-```
-npm install
-npm run build
-```
+## Setting up a desk PC
 
-The result is `dist/offline-checkout.html`, one self-contained file. Copy it to each workstation and
-open it in the browser.
+Do this before an outage, on every desk PC.
+
+1. Download the latest Windows zip from the releases page:
+   https://github.com/benddailey/offline-checkout/releases
+2. Right-click the zip, choose **Extract All**, and open the extracted folder.
+3. Double-click **Create shortcuts.cmd**. If Windows warns that the file came from the internet,
+   choose **More info** and **Run anyway** (or **Run**). It installs the app for this Windows user
+   and puts two shortcuts on the desktop:
+   - **Offline Checkout**: use this every day. Receipts print straight to the printer.
+   - **Offline Checkout - printer setup**: use this once, to choose the receipt printer.
+4. Choose the receipt printer:
+   1. Close every Offline Checkout window.
+   2. Open **Offline Checkout - printer setup**, start a session, and click **Receipt printer**
+      under Scanner card.
+   3. In the print dialog choose the Star printer and click **Print**. Keep the scanner card at the
+      desk.
+   4. Close the window. From now on, use **Offline Checkout**.
+
+The extracted folder is no longer needed after setup; you can delete it.
+
+## Updating
+
+Every desk PC must run the same version, or they cannot join each other. The version is shown next
+to the title on the start screen and on the Summary.
+
+1. Finish any running session first. Don't update during an outage.
+2. Download and extract the new zip and run its **Create shortcuts.cmd**, as in setup. Stored
+   sessions and the chosen printer are kept.
 
 ## Using it at the desk
 
-1. **Start.** Open the file, enter a session name (it defaults to today's date) and your name, and
-   click Start session. Resume a stored session from the Resume list after a reload or crash.
-2. **Add a workstation / join.** On the running workstation click Add workstation; it shows a QR code.
-   On the new workstation click Join session, scan that code with its webcam, enter your name, then
-   hold the reply QR it shows up to the first workstation's camera. If a camera is not available,
-   use the Join code / Reply code boxes and paste them instead. Codes expire after 5 minutes and work once.
-   - **No camera?** Click **Print code** under the Join code to print it as a receipt (a QR code plus
-     numbered barcodes). Take the receipt to the other workstation and scan every barcode in any
-     order, or the QR if the scanner reads 2D codes. The scans go to the **Scanner (printed code)**
-     box without clicking it first. The progress line shows which pieces are still missing; repeat
-     scans are ignored, and Start over clears what was scanned. The reply code prints and scans the
-     same way. A typical code is 7–8 barcodes of digits only, so the exchange fits easily inside the
-     5-minute limit. Every workstation must run the same version: a code from an older version is
-     refused with a message saying so.
-3. **Scan.** Scan the patron card, then each item. The scanner input always has focus; just scan.
-   The status bar shows live totals and a green or red dot for each workstation.
-   - Scan **OC-END** (or click End patron) to finish the patron and start the next one.
-   - Ending a patron (End patron or OC-END) saves the visit, then opens the print dialog with a
-     receipt for that patron. The first time, pick the Star receipt printer (Chrome remembers the
-     last printer) and keep Scale at 100 % and Margins at Default. Cancel skips the receipt; the
-     visit stays ended. Void patron does not print. The receipt shows the patron barcode, then one
-     barcode per item in order, so staff can scan them into the ILS when it's back online.
-   - Scan **OC-VOIDLAST** (or click Void on a row) to void the last item. Void patron voids the whole visit.
-   - Print the scanner card (offered when a session starts, and on the Summary) to get the OC-END and
-     OC-VOIDLAST barcodes on paper: **Receipt printer** prints it on the receipt roll, **Letter PDF**
-     downloads it for a regular printer.
-   - Voided entries stay on screen struck through; nothing is ever deleted.
-4. **Summary.** Click Summary for totals, a per-clerk count and every patron with their items.
-5. **Close and export.** Click Close session (all workstations stop accepting scans), then Generate PDF.
-   The PDF is US Letter with the session name, date and Page X of Y on every page.
+1. **Start.** Open **Offline Checkout**. Enter a session name (it defaults to today's date) and your
+   name, and click **Start session**. After a crash or restart, pick the session from the
+   **Resume** list instead.
+2. **Add another desk PC.**
+   1. On the PC already running the session, click **Add workstation**. It shows a join code.
+   2. On the new PC, click **Join session** and enter your name.
+   3. Give the new PC the join code. Either hold the first PC's screen up to the new PC's webcam,
+      or click **Print code** on the first PC and scan every barcode on the receipt with the new
+      PC's scanner, in any order. The progress line shows which
+      barcodes are still missing. Scanning one twice does no harm, and **Start over** clears them.
+   4. The new PC then shows a reply code. Give it to the first PC the same way, the other way round.
 
-## Field probe
+   Codes expire after 5 minutes and work once. If one expires, click **Try again** for a new one.
 
-A small separate page checks a workstation for the things this app depends on (scanner behaviour,
-camera, WebRTC on the local network). Build it with `npm run build:probe`. See
-[docs/field-probe.md](docs/field-probe.md) for how to run it and read the results.
+3. **Scan.** Scan the patron's card, then each item. There is no need to click anything first. The
+   bar at the top shows totals and a green or red dot for each desk PC.
+   - **End the patron**: scan **OC-END** on the scanner card, or click **End patron**. Their receipt
+     prints, with the patron barcode and one barcode per item.
+   - **Undo the last item**: scan **OC-VOIDLAST**, or click **Void** on a row. **Void patron**
+     cancels the whole visit and prints nothing.
+   - Voided entries stay on screen crossed out. Nothing is ever deleted.
+   - Need a scanner card? It is offered when a session starts, and is on the Summary: **Receipt printer** prints it on the receipt
+     roll, and **Letter PDF** saves it for a regular printer.
+4. **Summary.** Click **Summary** for totals, a count per clerk, and every patron with their items.
+5. **When the system is back.** On the Summary click **Close session**. Every desk PC stops taking
+   scans. Then click **Generate PDF**. The PDF is on US Letter paper and has a barcode for every
+   patron and item. Print it and scan it into the library system.
 
-## Testing
+## Good to know
 
-- `npm test` runs the unit tests.
-- `npm run check` runs formatting, lint and type checks.
-- `npm run e2e` builds everything and runs the Playwright end-to-end tests. They run in a headed
-  browser, so a display is required. Screenshots of the main screens at 1366x768 are written to
-  `test-results/screens/`.
+- Sessions are stored in the browser on that PC. Don't clear the browsing data of the Offline
+  Checkout window, or the sessions are lost.
+- Chrome may ask for camera permission each time you join PCs by webcam.
+- Receipts print without a dialog only from the **Offline Checkout** shortcut. If the print dialog
+  appears, close every Offline Checkout window and open the app from that shortcut.
+- To change the receipt printer, repeat step 4 of the setup.
+- Test the printed barcodes with your own scanners before you rely on them.
 
-## Releasing
-
-1. Start from an up-to-date, clean `main`.
-2. Run the checks: `npm run check`, `npm test` and `npm run e2e` (needs a display). All must pass.
-3. If anything that touches the scanner, camera or WebRTC has changed, re-run the field probe on real
-   library PCs first (see [docs/field-probe.md](docs/field-probe.md)).
-4. Bump the version with `npm version <major|minor|patch>`. This updates `package.json` and
-   `package-lock.json`, commits, and creates a `vX.Y.Z` tag. Push both: `git push --follow-tags`.
-5. Build from the tagged commit with `npm run build` and take `dist/offline-checkout.html`.
-6. Open the built file once from `file://` and do a quick check: start a session, scan a patron and an
-   item, close the session and generate the PDF.
-7. Copy the file to each workstation, replacing the old copy. Sessions are stored in the browser
-   profile, not the file, so replacing it keeps them, unless the release changes the IndexedDB
-   schema (`src/store/db.ts`). That needs a migration. Don't swap the file during an outage.
-
-## Known limitations
-
-- The field probe must be run on real library PCs before rollout.
-- Chrome may ask for camera permission on every pairing when the page is opened from `file://`.
-- Chrome shows the print dialog for every receipt: a page opened from `file://` cannot print silently.
-- Data lives in the browser profile; clearing site data or using another profile loses the session.
-- Barcodes are verified by zxing at 300 dpi, but still confirm them with the library's real scanners.
+Developers: see DEVELOPMENT.md.

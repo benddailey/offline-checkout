@@ -7,6 +7,7 @@ import { useSession } from "../session";
 import { summaryPatrons } from "../summary";
 
 const session = useSession();
+const version = __APP_VERSION__;
 
 const patrons = computed(() => summaryPatrons(session.state));
 
@@ -84,6 +85,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
 
     <div class="flex flex-wrap items-center gap-4">
       <h1 class="text-3xl font-extrabold text-slate-900">Session summary</h1>
+      <span class="text-lg text-slate-600" data-testid="app-version">Version {{ version }}</span>
       <div class="ml-auto flex flex-wrap gap-3">
         <button
           v-if="session.closed"

@@ -11,7 +11,8 @@
     "check": "vp check",
     "build:harness": "vp build -c vite.harness.config.ts",
     "build:probe": "vp build -c vite.probe.config.ts",
-    "e2e": "vp build && npm run build:harness && npm run build:probe && playwright test"
+    "e2e": "vp build && npm run build:harness && npm run build:probe && playwright test",
+    "package:windows": "node scripts/package-windows.ts"
   },
   "dependencies": {
     "idb": "^8.0.4",

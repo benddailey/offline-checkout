@@ -43,7 +43,7 @@ function errorText(err: unknown, box: "offer" | "answer"): string {
       case "malformed":
         return "That code could not be read. Try scanning again or paste the text.";
       case "old-version":
-        return "That code is from a different version of Offline Checkout. Put the same version on both workstations.";
+        return `That code is from a different version of Offline Checkout. This workstation has version ${__APP_VERSION__}; put the same version on both workstations.`;
       case "expired":
         return "This invitation has expired. Click Try again for a new code.";
       case "wrong-session":
