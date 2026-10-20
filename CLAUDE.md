@@ -9,8 +9,8 @@
 - The repo is benddailey/offline-checkout.
   - PRs, merges and releases use `gh`.
   - Attach test builds as a zip.
-- Before a PR: `npx vp check`, `npx vp test run` and `npm run e2e` must pass. The e2e run needs a
-  display, and it rebuilds and clears `dist/`.
+- Before a PR: `npx vp check`, `npx vp test run` and `npm run e2e` must pass. The e2e run is
+  headless (`HEADED=1` shows the browsers), and it rebuilds and clears `dist/`.
 - `windows/Create shortcuts.cmd` must stay ASCII. It is checked out with CRLF line endings
   (.gitattributes).
 - All workstations must run the same version, because pairing codes carry a format version (`OC2:`).

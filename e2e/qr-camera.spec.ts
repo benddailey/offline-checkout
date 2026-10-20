@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium, test, expect, type Page } from "@playwright/test";
-import { launchChromium } from "./helpers/app";
+import { HEADLESS, launchChromium } from "./helpers/app";
 import { writeQrY4m } from "./helpers/y4m";
 
 const harnessUrl = pathToFileURL(resolve(process.cwd(), "dist-harness", "qr-harness.html")).href;
@@ -48,7 +48,7 @@ test("pasted code is emitted trimmed without a camera", async () => {
 
 test("shows the camera-unavailable message when permission is denied, paste still works", async () => {
   const browser = await chromium.launch({
-    headless: false,
+    headless: HEADLESS,
     args: ["--deny-permission-prompts", "--use-fake-device-for-media-stream"],
   });
   try {

@@ -31,6 +31,11 @@ barcodes (jsPDF). Receipts are printed with the browser's print dialog, or silen
   - `jsbarcode` makes Code 128 for receipts and the PDF;
   - `qrcode` draws QR codes;
   - `vue-qrcode-reader` with `zxing-wasm` reads QR codes from the webcam.
+
+    `src/qr/zxing.ts` inlines the `.wasm` from the top-level `zxing-wasm` into the reader that
+    `vue-qrcode-reader` uses (through `barcode-detector`), so the two versions must match exactly:
+    a mismatch makes the camera decode nothing. `zxing-wasm` is pinned, and `.ncurc.json` keeps
+    `npx npm-check-updates` from bumping it. Move it only to the version `barcode-detector` uses.
 - **PDF:** `jspdf` (`src/pdf/`).
 - **Pairing and sync:** browser WebRTC data channels, no library (`src/mesh/`, `src/pairing/`,
   `src/sync/`).
@@ -43,7 +48,6 @@ barcodes (jsPDF). Receipts are printed with the browser's print dialog, or silen
 ## Requirements
 
 - Node.js 24 or newer and npm.
-- A display for the end-to-end tests (they run in a headed browser).
 
 ## Build
 
@@ -76,7 +80,8 @@ the camera, and WebRTC on the local network. Build it with `npm run build:probe`
 - `npm test` runs the unit tests.
 - `npm run check` runs formatting, lint and type checks.
 - `npm run e2e` builds everything and runs the Playwright end-to-end tests. Screenshots of the main
-  screens at 1366x768 are written to `test-results/screens/`.
+  screens at 1366x768 are written to `test-results/screens/`. The browsers run headless; set
+  `HEADED=1` to watch them (`HEADED=1 npm run e2e`, or with `npx playwright test <spec>`).
 
 ## Releasing
 
