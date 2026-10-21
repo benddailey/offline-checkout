@@ -95,6 +95,7 @@ to the title on the start screen and on the Summary.
 ## License
 
 Offline Checkout is free software under the GNU Affero General Public License, version 3 or later.
-The source code is at https://github.com/benddailey/offline-checkout.
+The source code is at https://github.com/benddailey/offline-checkout. In the zip, `LICENSE.txt` is
+the license and `THIRD-PARTY-NOTICES.txt` lists the open-source libraries the app includes.
 
 Developers: see DEVELOPMENT.md.

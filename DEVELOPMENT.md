@@ -58,11 +58,12 @@ npm run build
 npm run package:windows
 ```
 
-- `npm run build` writes `dist/offline-checkout.html`.
+- `npm run build` writes `dist/offline-checkout.html` and `dist/THIRD-PARTY-NOTICES.md`.
 - `npm run package:windows` zips it into `dist/offline-checkout-vX.Y.Z-windows.zip` with:
   - `windows/Create shortcuts.cmd` (CRLF line endings), which installs the app to
     `%LOCALAPPDATA%\OfflineCheckout\` and creates the desktop shortcuts;
-  - `README.txt`, a plain-text copy of `README.md` with the version and date at the top.
+  - `README.txt`, a plain-text copy of `README.md` with the version and date at the top;
+  - `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt`.
 
 The version comes from `package.json`. The build puts it in the page as `__APP_VERSION__` and as a
 `<meta name="offline-checkout-version">` tag, which the shortcut script reads.
@@ -121,3 +122,16 @@ License, version 3 or (at your option) any later version. See [LICENSE](LICENSE)
 Anyone who distributes a modified version, or lets people use one over a network, must offer them its
 source under the same license. Dependencies must stay compatible with the AGPL (MIT, ISC, BSD and
 Apache-2.0 are).
+
+The bundled libraries' licenses require their notices to travel with every copy, so the build
+collects them. Vite's `build.license` lists each bundled package, and
+`scripts/third-party-notices.ts` then:
+
+- fills in any package whose license file Vite missed, failing the build if it finds none;
+- adds `licenses/zxing-wasm-native.md` and `licenses/Apache-2.0.txt` for the C++ compiled into
+  zxing-wasm's `.wasm`, which npm metadata does not list;
+- embeds the result, under the app's own notice, as a comment right after the doctype in the HTML
+  (the app and the field probe).
+
+When updating zxing-wasm, check that its README's license list still matches
+`licenses/zxing-wasm-native.md`.

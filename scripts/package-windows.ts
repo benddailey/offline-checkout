@@ -41,6 +41,11 @@ const files: { name: string; data: Buffer }[] = [
     data: crlf(readFileSync(resolve(ROOT, "windows", "Create shortcuts.cmd"), "utf8")),
   },
   { name: "README.txt", data: crlf(readmeText(readFileSync(resolve(ROOT, "README.md"), "utf8"))) },
+  { name: "LICENSE.txt", data: crlf(readFileSync(resolve(ROOT, "LICENSE"), "utf8")) },
+  {
+    name: "THIRD-PARTY-NOTICES.txt",
+    data: crlf(readFileSync(resolve(ROOT, "dist", "THIRD-PARTY-NOTICES.md"), "utf8")),
+  },
 ];
 
 const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
