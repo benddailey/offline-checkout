@@ -92,4 +92,9 @@ to the title on the start screen and on the Summary.
 - To change the receipt printer, repeat step 4 of the setup.
 - Test the printed barcodes with your own scanners before you rely on them.
 
+## License
+
+Offline Checkout is free software under the GNU Affero General Public License, version 3 or later.
+The source code is at https://github.com/benddailey/offline-checkout.
+
 Developers: see DEVELOPMENT.md.

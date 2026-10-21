@@ -92,8 +92,9 @@ the camera, and WebRTC on the local network. Build it with `npm run build:probe`
    library PCs first.
 4. Bump the version with `npm version <major|minor|patch>`. This updates `package.json` and
    `package-lock.json`, commits, and creates a `vX.Y.Z` tag. Push both: `git push --follow-tags`.
-5. From the tagged commit, run `npm run build && npm run package:windows`. Attach
-   `dist/offline-checkout.html` and `dist/offline-checkout-vX.Y.Z-windows.zip` to the release.
+5. From the tagged commit, run `npm run build && npm run package:windows`, then publish the GitHub
+   release with both files:
+   `gh release create vX.Y.Z dist/offline-checkout.html dist/offline-checkout-vX.Y.Z-windows.zip`.
 6. Open the built file once from `file://` and do a quick check: start a session, scan a patron and
    an item, close the session and generate the PDF.
 
@@ -111,3 +112,12 @@ that changes the IndexedDB schema (`src/store/db.ts`) needs a migration.
 - Pairing codes carry a format version (`OC2:`). A workstation refuses codes in another format, so
   staff are told to keep every desk on the same release.
 - Barcodes are verified by zxing at 300 dpi, but still confirm them with the library's real scanners.
+
+## License
+
+Copyright (C) 2026 Ben Dailey. Offline Checkout is free software under the GNU Affero General Public
+License, version 3 or (at your option) any later version. See [LICENSE](LICENSE).
+
+Anyone who distributes a modified version, or lets people use one over a network, must offer them its
+source under the same license. Dependencies must stay compatible with the AGPL (MIT, ISC, BSD and
+Apache-2.0 are).
