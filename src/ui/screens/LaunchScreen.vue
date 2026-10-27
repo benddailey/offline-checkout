@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { MAX_NAME } from "../../log/limits";
 import type { SessionSummary } from "../../store/db";
+import logoUrl from "../../../icons/icon-round.svg";
 import { useSession, ymd } from "../session";
 
 const session = useSession();
@@ -52,7 +53,8 @@ const secondary =
 
 <template>
   <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
-    <div class="flex flex-wrap items-baseline gap-4">
+    <div class="flex flex-wrap items-center gap-4">
+      <img :src="logoUrl" alt="" class="size-16" data-testid="app-logo" />
       <h1 class="text-4xl font-extrabold text-slate-900">Offline Checkout</h1>
       <span class="text-lg text-slate-600" data-testid="app-version">Version {{ version }}</span>
     </div>

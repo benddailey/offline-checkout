@@ -40,6 +40,10 @@ const files: { name: string; data: Buffer }[] = [
     // cmd.exe needs CRLF whatever the checkout did.
     data: crlf(readFileSync(resolve(ROOT, "windows", "Create shortcuts.cmd"), "utf8")),
   },
+  ...["offline-checkout.ico", "offline-checkout-printer.ico"].map((name) => ({
+    name,
+    data: readFileSync(resolve(ROOT, "windows", name)),
+  })),
   { name: "README.txt", data: crlf(readmeText(readFileSync(resolve(ROOT, "README.md"), "utf8"))) },
   { name: "LICENSE.txt", data: crlf(readFileSync(resolve(ROOT, "LICENSE"), "utf8")) },
   {

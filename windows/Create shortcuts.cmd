@@ -1,6 +1,6 @@
 @echo off
-rem Copies offline-checkout.html from this folder to %LOCALAPPDATA%\OfflineCheckout and creates
-rem the desktop shortcuts for it. Run it again from a new version's folder to update.
+rem Copies offline-checkout.html and its icons from this folder to %LOCALAPPDATA%\OfflineCheckout
+rem and creates the desktop shortcuts for it. Run it again from a new version's folder to update.
 rem The PowerShell below the #POWERSHELL line does the work; cmd never reads past "exit /b".
 setlocal
 set "OC_SCRIPT=%~f0"
@@ -13,17 +13,22 @@ exit /b
 $ErrorActionPreference = 'Stop'
 try {
   $here = Split-Path -Parent $env:OC_SCRIPT
-  $html = Join-Path $here 'offline-checkout.html'
-  if (-not (Test-Path -LiteralPath $html -PathType Leaf)) {
-    throw "offline-checkout.html is not in $here. Keep this script in the same folder as offline-checkout.html and run it again."
+  $files = 'offline-checkout.html', 'offline-checkout.ico', 'offline-checkout-printer.ico'
+  foreach ($file in $files) {
+    if (-not (Test-Path -LiteralPath (Join-Path $here $file) -PathType Leaf)) {
+      throw "$file is not in $here. Keep this script in the folder it was extracted to and run it again."
+    }
   }
 
   # A fixed copy, so the shortcuts keep working when Downloads is cleaned out.
   $installDir = Join-Path $env:LOCALAPPDATA 'OfflineCheckout'
   $installed = Join-Path $installDir 'offline-checkout.html'
   New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-  Copy-Item -LiteralPath $html -Destination $installed -Force
-  Unblock-File -LiteralPath $installed
+  foreach ($file in $files) {
+    $target = Join-Path $installDir $file
+    Copy-Item -LiteralPath (Join-Path $here $file) -Destination $target -Force
+    Unblock-File -LiteralPath $target
+  }
   $match = Select-String -LiteralPath $installed -Pattern '<meta name="offline-checkout-version" content="([^"]+)"' | Select-Object -First 1
   $version = if ($match) { $match.Matches[0].Groups[1].Value } else { 'unknown' }
 
@@ -61,17 +66,17 @@ try {
   $common = "--app=`"$url`" --user-data-dir=`"$profileDir`" --start-maximized --no-first-run --no-default-browser-check"
 
   $shell = New-Object -ComObject WScript.Shell
-  function New-OcShortcut([string]$name, [string]$arguments, [string]$description) {
+  function New-OcShortcut([string]$name, [string]$arguments, [string]$icon, [string]$description) {
     $link = $shell.CreateShortcut((Join-Path $desktop "$name.lnk"))
     $link.TargetPath = $browser
     $link.Arguments = $arguments
     $link.WorkingDirectory = $installDir
-    $link.IconLocation = "$browser,0"
+    $link.IconLocation = "$(Join-Path $installDir $icon),0"
     $link.Description = $description
     $link.Save()
   }
-  New-OcShortcut 'Offline Checkout' "$common --kiosk-printing" 'Offline Checkout. Receipts print without a dialog.'
-  New-OcShortcut 'Offline Checkout - printer setup' $common 'Offline Checkout with the print dialog, to choose the receipt printer.'
+  New-OcShortcut 'Offline Checkout' "$common --kiosk-printing" 'offline-checkout.ico' 'Offline Checkout. Receipts print without a dialog.'
+  New-OcShortcut 'Offline Checkout - printer setup' $common 'offline-checkout-printer.ico' 'Offline Checkout with the print dialog, to choose the receipt printer.'
 
   Write-Host ''
   Write-Host "Installed Offline Checkout version $version" -ForegroundColor Green

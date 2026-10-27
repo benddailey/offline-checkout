@@ -44,3 +44,18 @@ test("shows the package.json version", async ({ page }) => {
     version,
   );
 });
+
+test("carries its icons inline and shows the logo", async ({ page }) => {
+  await page.goto(appUrl());
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+    "href",
+    /^data:image\/svg\+xml;base64,/,
+  );
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute(
+    "href",
+    /^data:image\/png;base64,/,
+  );
+  const logo = page.getByTestId("app-logo");
+  await expect(logo).toBeVisible();
+  expect(await logo.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+});
