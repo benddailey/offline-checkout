@@ -540,6 +540,7 @@ export const useSession = defineStore("session", () => {
       if (r) {
         currentVisitId.value = recordId(r);
         message.value = null;
+        offerScannerCard.value = false;
       }
       return;
     }

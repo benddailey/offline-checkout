@@ -76,8 +76,9 @@ to the title on the start screen and on the Summary.
    - **Undo the last item**: scan **OC-VOIDLAST**, or click **Void** on a row. **Void patron**
      cancels the whole visit and prints nothing.
    - Voided entries stay on screen crossed out. Nothing is ever deleted.
-   - Need a scanner card? It is offered when a session starts, and is on the Summary: **Receipt printer** prints it on the receipt
-     roll, and **Letter PDF** saves it for a regular printer.
+   - Need a scanner card? It is offered when a session starts, until the first patron is scanned,
+     and is always on the Summary: **Receipt printer** prints it on the receipt roll, and
+     **Letter PDF** saves it for a regular printer.
 4. **Summary.** Click **Summary** for totals, a count per clerk, and every patron with their items.
 5. **When the system is back.** On the Summary click **Close session**. Every desk PC stops taking
    scans. Scan the kept receipts into the library system: the patron barcode, then each item.

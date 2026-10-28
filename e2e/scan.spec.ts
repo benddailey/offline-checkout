@@ -101,3 +101,17 @@ test("a patron in progress locks leaving the scan screen and asks before the tab
   await expect.poll(() => page.isClosed()).toBe(true);
   expect(dialogs).toEqual(["beforeunload"]);
 });
+
+test("the scanner card offer closes once the first patron is scanned", async ({ page }) => {
+  await stubPrint(page);
+  await page.goto(appUrl());
+  await page.getByLabel("Session name").fill("Offer Test");
+  await page.getByLabel("Clerk name").fill("Rae");
+  await page.getByRole("button", { name: "Start session" }).click();
+
+  const offer = page.getByText("Print the scanner card with the");
+  await expect(offer).toBeVisible();
+  await page.keyboard.type("P1\n");
+  await expect(page.getByTestId("patron")).toHaveText("P1");
+  await expect(offer).toBeHidden();
+});

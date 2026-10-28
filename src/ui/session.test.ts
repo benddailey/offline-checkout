@@ -271,6 +271,16 @@ describe("useSession scanning", () => {
     expect(s.currentVisitId).toBe(recordId(s.records[1]));
   });
 
+  it("closes the scanner card offer once a patron is scanned, not on a rejected scan", async () => {
+    const s = await started();
+    expect(s.offerScannerCard).toBe(true);
+    await s.scan("P1#");
+    await s.scan("OC-END");
+    expect(s.offerScannerCard).toBe(true);
+    await s.scan("P1");
+    expect(s.offerScannerCard).toBe(false);
+  });
+
   it("ignores empty scans", async () => {
     const s = await started();
     await s.scan("   ");
