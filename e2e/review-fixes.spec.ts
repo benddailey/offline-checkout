@@ -93,7 +93,14 @@ test("the summary names unconnected workstations, confirms before PDF and close,
 
     await a!.getByRole("button", { name: "Back to start" }).click();
     await expect(a!.getByRole("heading", { name: "Offline Checkout" })).toBeVisible();
-    await expect(a!.getByTestId("resume-list")).toContainText("Warn");
+    const row = a!.getByTestId("resume-list").getByRole("listitem").filter({ hasText: "Warn" });
+    await expect(row.getByTestId("session-closed")).toHaveText("Closed");
+    await expect(row).toContainText(/Started .+Closed \d/);
+
+    await row.getByRole("button").click();
+    await expect(a!.getByRole("button", { name: "Back to start" })).toBeVisible();
+    await expect(a!.getByText("Session closed", { exact: true })).toBeVisible();
+    await expect(a!.getByRole("button", { name: "Back to scanning" })).toBeVisible();
   } finally {
     await Promise.all(contexts.map((ctx) => ctx.close().catch(() => {})));
   }

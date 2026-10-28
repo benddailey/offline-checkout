@@ -138,6 +138,26 @@ describe("index", () => {
     expect(list.map((x) => x.sessionId)).toEqual([b.sessionId, a.sessionId]);
     expect(list[0]).toMatchObject({ name: "B", employee: "Ann" });
   });
+
+  it("listSessions gives the close time of closed sessions, from this or another workstation", async () => {
+    const open = await createSession({ name: "Open", employee: "Ann", withCreatedRecord: true });
+    const mine = await createSession({ name: "Mine", employee: "Ann", withCreatedRecord: true });
+    const closed = await mine.append({ type: "session-closed" });
+    const peer = await createSession({ name: "Peer", employee: "Ann", withCreatedRecord: true });
+    await peer.put([
+      { ...remote(peer.sessionId, "x", 1), type: "session-closed", at: 5000 },
+      { ...remote(peer.sessionId, "y", 1), type: "session-closed", at: 4000 },
+    ]);
+    for (const s of [open, mine, peer]) s.close();
+
+    const byName = async () =>
+      Object.fromEntries((await listSessions()).map((s) => [s.name, s.closedAt]));
+    expect(await byName()).toEqual({ Open: undefined, Mine: closed.at, Peer: 4000 });
+
+    // Saved in the index: later lists do not need the session's log.
+    globalThis.indexedDB.deleteDatabase(`oc-session-${peer.sessionId}`);
+    expect((await byName()).Peer).toBe(4000);
+  });
 });
 
 describe("tab lock", () => {

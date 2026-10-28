@@ -271,6 +271,16 @@ describe("useSession scanning", () => {
     expect(s.currentVisitId).toBe(recordId(s.records[1]));
   });
 
+  it("closes the scanner card offer once a patron is scanned, not on a rejected scan", async () => {
+    const s = await started();
+    expect(s.offerScannerCard).toBe(true);
+    await s.scan("P1#");
+    await s.scan("OC-END");
+    expect(s.offerScannerCard).toBe(true);
+    await s.scan("P1");
+    expect(s.offerScannerCard).toBe(false);
+  });
+
   it("ignores empty scans", async () => {
     const s = await started();
     await s.scan("   ");
@@ -478,6 +488,17 @@ describe("useSession scanning", () => {
     const r = reload();
     await r.resumeSession(s.meta!.sessionId);
     expect(r.currentVisitId).toBeNull();
+  });
+
+  it("resume opens a closed session on the summary, an open one on the scan screen", async () => {
+    const s = await started();
+    const open = reload();
+    await open.resumeSession(s.meta!.sessionId);
+    expect(open.screen).toBe("scan");
+    await open.closeSession();
+    const closed = reload();
+    await closed.resumeSession(s.meta!.sessionId);
+    expect(closed.screen).toBe("summary");
   });
 
   it("a session open in another tab is a calm notice on Launch, not a fatal stop", async () => {

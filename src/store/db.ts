@@ -17,6 +17,8 @@ export interface SessionSummary {
   name: string;
   employee: string;
   createdAt: number;
+  /** When the session was first closed, on any workstation. */
+  closedAt?: number;
 }
 
 export interface SessionStore {
@@ -199,10 +201,36 @@ export async function openSessionStore(sessionId: string): Promise<SessionStore>
   return makeStore(sessionId, await openSessionDb(sessionId));
 }
 
+async function findClosedAt(sessionId: string): Promise<number | undefined> {
+  const db = await openSessionDb(sessionId);
+  try {
+    let closedAt: number | undefined;
+    for (const r of await db.getAll("records")) {
+      if (r.type === "session-closed" && (closedAt === undefined || r.at < closedAt)) {
+        closedAt = r.at;
+      }
+    }
+    return closedAt;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * A close time, once found, is saved in the index, so only sessions not yet seen closed are read.
+ * Reading the log covers closes made before the index had the field and closes from peers.
+ */
 export async function listSessions(): Promise<SessionSummary[]> {
   const index = await openIndex();
   try {
     const all = await index.getAll("sessions");
+    for (const s of all) {
+      if (s.closedAt !== undefined) continue;
+      const closedAt = await findClosedAt(s.sessionId);
+      if (closedAt === undefined) continue;
+      s.closedAt = closedAt;
+      await index.put("sessions", s);
+    }
     return all.sort((a, b) => b.createdAt - a.createdAt);
   } finally {
     index.close();

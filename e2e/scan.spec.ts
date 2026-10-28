@@ -47,10 +47,10 @@ test("scan, void, end patron and resume after reload", async ({ page }) => {
   await expect(page.getByText("Scan patron card")).toBeVisible();
 
   await page.reload();
-  await page
-    .getByTestId("resume-list")
-    .getByRole("button", { name: /Scan Test/ })
-    .click();
+  const open = page.getByTestId("resume-list").getByRole("button", { name: /Scan Test/ });
+  await expect(open).toContainText("Started");
+  await expect(open.getByTestId("session-closed")).toBeHidden();
+  await open.click();
   await expect(page.getByText("Scan patron card")).toBeVisible();
   await expect(page.getByTestId("totals")).toHaveText("Patrons 1 · Items 1");
   // Only this workstation has ever been in the session: nothing to re-pair with.
@@ -100,4 +100,18 @@ test("a patron in progress locks leaving the scan screen and asks before the tab
   await page.close({ runBeforeUnload: true });
   await expect.poll(() => page.isClosed()).toBe(true);
   expect(dialogs).toEqual(["beforeunload"]);
+});
+
+test("the scanner card offer closes once the first patron is scanned", async ({ page }) => {
+  await stubPrint(page);
+  await page.goto(appUrl());
+  await page.getByLabel("Session name").fill("Offer Test");
+  await page.getByLabel("Clerk name").fill("Rae");
+  await page.getByRole("button", { name: "Start session" }).click();
+
+  const offer = page.getByText("Print the scanner card with the");
+  await expect(offer).toBeVisible();
+  await page.keyboard.type("P1\n");
+  await expect(page.getByTestId("patron")).toHaveText("P1");
+  await expect(offer).toBeHidden();
 });
