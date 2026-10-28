@@ -490,6 +490,17 @@ describe("useSession scanning", () => {
     expect(r.currentVisitId).toBeNull();
   });
 
+  it("resume opens a closed session on the summary, an open one on the scan screen", async () => {
+    const s = await started();
+    const open = reload();
+    await open.resumeSession(s.meta!.sessionId);
+    expect(open.screen).toBe("scan");
+    await open.closeSession();
+    const closed = reload();
+    await closed.resumeSession(s.meta!.sessionId);
+    expect(closed.screen).toBe("summary");
+  });
+
   it("a session open in another tab is a calm notice on Launch, not a fatal stop", async () => {
     const s = await started();
     const sessionId = s.meta!.sessionId;

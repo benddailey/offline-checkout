@@ -57,7 +57,7 @@ to the title on the start screen and on the Summary.
 1. **Start.** Open **Offline Checkout**. Enter a session name (it defaults to today's date) and your
    name, and click **Start session**. After a crash or restart, pick the session from the
    **Resume** list instead. Each session there shows when it started, and closed sessions are marked
-   **Closed** with the time they were closed.
+   **Closed** with the time they were closed. A closed session opens on its Summary.
 2. **Add another desk PC.**
    1. On the PC already running the session, click **Add workstation**. It shows a join code.
    2. On the new PC, click **Join session** and enter your name.

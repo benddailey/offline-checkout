@@ -300,7 +300,7 @@ export const useSession = defineStore("session", () => {
       if (!latest || seqOf(v.id) > seqOf(latest.id)) latest = v;
     }
     currentVisitId.value = latest?.id ?? null;
-    screen.value = "scan";
+    screen.value = closed.value ? "summary" : "scan";
   }
 
   async function adoptJoinedSession(
