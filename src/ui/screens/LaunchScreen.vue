@@ -132,13 +132,28 @@ const secondary =
         <li v-for="s in sessions" :key="s.sessionId">
           <button
             type="button"
-            :class="[secondary, 'flex w-full items-center justify-between text-left']"
+            :class="[
+              secondary,
+              'flex w-full flex-wrap items-center justify-between gap-x-4 py-2 text-left',
+            ]"
             :disabled="busy"
             @click="resume(s.sessionId)"
           >
-            <span>{{ s.name }}</span>
-            <span class="text-lg font-normal text-slate-600">
-              {{ s.employee }} · {{ new Date(s.createdAt).toLocaleString() }}
+            <span class="flex items-center gap-3">
+              {{ s.name }}
+              <span
+                v-if="s.closedAt !== undefined"
+                class="rounded border-2 border-slate-500 bg-slate-100 px-2 text-base font-semibold text-slate-700"
+                data-testid="session-closed"
+              >
+                Closed
+              </span>
+            </span>
+            <span class="flex flex-col text-lg font-normal text-slate-600">
+              <span>{{ s.employee }} · Started {{ new Date(s.createdAt).toLocaleString() }}</span>
+              <span v-if="s.closedAt !== undefined">
+                Closed {{ new Date(s.closedAt).toLocaleString() }}
+              </span>
             </span>
           </button>
         </li>

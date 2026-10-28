@@ -47,10 +47,10 @@ test("scan, void, end patron and resume after reload", async ({ page }) => {
   await expect(page.getByText("Scan patron card")).toBeVisible();
 
   await page.reload();
-  await page
-    .getByTestId("resume-list")
-    .getByRole("button", { name: /Scan Test/ })
-    .click();
+  const open = page.getByTestId("resume-list").getByRole("button", { name: /Scan Test/ });
+  await expect(open).toContainText("Started");
+  await expect(open.getByTestId("session-closed")).toBeHidden();
+  await open.click();
   await expect(page.getByText("Scan patron card")).toBeVisible();
   await expect(page.getByTestId("totals")).toHaveText("Patrons 1 · Items 1");
   // Only this workstation has ever been in the session: nothing to re-pair with.
