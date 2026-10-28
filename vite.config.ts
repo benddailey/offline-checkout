@@ -6,6 +6,8 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 import { NOTICES_FILE, thirdPartyNotices } from "./scripts/third-party-notices";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+const dataUri = (file: string, type: string) =>
+  `data:${type};base64,${readFileSync(new URL(file, import.meta.url)).toString("base64")}`;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -22,7 +24,11 @@ export default defineConfig({
     viteSingleFile(),
     {
       name: "app-version",
-      transformIndexHtml: (html) => html.replace("{{APP_VERSION}}", version),
+      transformIndexHtml: (html) =>
+        html
+          .replace("{{APP_VERSION}}", version)
+          .replace("{{FAVICON}}", dataUri("./icons/icon-round.svg", "image/svg+xml"))
+          .replace("{{APPLE_TOUCH_ICON}}", dataUri("./icons/apple-touch-icon.png", "image/png")),
     },
     thirdPartyNotices(`Offline Checkout ${version}`),
   ]),

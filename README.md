@@ -29,8 +29,10 @@ Do this before an outage, on every desk PC.
 3. Double-click **Create shortcuts.cmd**. If Windows warns that the file came from the internet,
    choose **More info** and **Run anyway** (or **Run**). It installs the app for this Windows user
    and puts two shortcuts on the desktop:
-   - **Offline Checkout**: use this every day. Receipts print straight to the printer.
-   - **Offline Checkout - printer setup**: use this once, to choose the receipt printer.
+   - **Offline Checkout**: use this every day. Receipts print straight to the printer. Its icon is
+     a crossed-out evergreen tree.
+   - **Offline Checkout - printer setup**: use this once, to choose the receipt printer. Its icon
+     has a small printer in the corner.
 4. Choose the receipt printer:
    1. Close every Offline Checkout window.
    2. Open **Offline Checkout - printer setup**, start a session, and click **Receipt printer**

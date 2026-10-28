@@ -60,8 +60,9 @@ npm run package:windows
 
 - `npm run build` writes `dist/offline-checkout.html` and `dist/THIRD-PARTY-NOTICES.md`.
 - `npm run package:windows` zips it into `dist/offline-checkout-vX.Y.Z-windows.zip` with:
-  - `windows/Create shortcuts.cmd` (CRLF line endings), which installs the app to
-    `%LOCALAPPDATA%\OfflineCheckout\` and creates the desktop shortcuts;
+  - `windows/Create shortcuts.cmd` (CRLF line endings), which installs the app and the two shortcut
+    icons to `%LOCALAPPDATA%\OfflineCheckout\` and creates the desktop shortcuts;
+  - `windows/offline-checkout.ico` and `windows/offline-checkout-printer.ico`, the shortcut icons;
   - `README.txt`, a plain-text copy of `README.md` with the version and date at the top;
   - `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt`.
 
@@ -70,6 +71,22 @@ The version comes from `package.json`. The build puts it in the page as `__APP_V
 
 Keep `README.md` to headings, lists, bold, inline code and links. That is all the `README.txt`
 conversion handles.
+
+## Icons
+
+The icon sources are in `icons/`:
+
+- `evergreen-tree.svg`: the tree drawing the icons are built from.
+- `icon-round.svg`: the main icon with transparent corners. It is the favicon, the logo on the
+  launch screen and the main shortcut icon.
+- `icon-round-printer.svg`: the same with a printer badge, for the printer setup shortcut. The
+  badge is bottom right because Windows draws the shortcut arrow bottom left.
+- `icon.svg`: a square, opaque version for the Apple touch icon (iOS and macOS Safari).
+
+After changing one, run `npm run icons` and commit the results. It renders them with
+Playwright's Chromium to `windows/offline-checkout.ico`, `windows/offline-checkout-printer.ico` and
+`icons/apple-touch-icon.png`. The build inlines the favicon and the Apple touch icon into the page
+as data URIs, so the single HTML file stays self-contained.
 
 ## Field probe
 
