@@ -1,4 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { strFromU8, unzipSync } from "fflate";
 import { expect, test, type Page } from "@playwright/test";
 import { appUrl } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
@@ -138,6 +140,41 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     expect(text).toContain("Page 1 of 1");
     expect(text).toContain("Patrons: 2");
     expect(text).toContain("Items: 3");
+
+    // The CSV and Excel files hold the same rows as the PDF, one per item.
+    const csv = await download(b!, "Download CSV", "session.csv");
+    const lines = (await readFile(csv, "utf8")).split("\r\n");
+    expect(lines[0]).toBe("\uFEFFPatron,Item,Scanned at,Clerk,Session");
+    expect(lines.slice(1).map((l) => l.replace(/,[\d-]+ [\d:]+,/, ",T,"))).toEqual([
+      "P1,I1,T,Ann,Outage",
+      "P2,I3,T,Ben,Outage",
+      "P2,I1,T,Ben,Outage",
+      "",
+    ]);
+    await expect(b!.getByRole("button", { name: "Download Excel" })).toBeEnabled();
+    const xlsx = unzipSync(await readFile(await download(b!, "Download Excel", "session.xlsx")));
+    const sheet = strFromU8(xlsx["xl/worksheets/sheet1.xml"]!);
+    const cells = [...sheet.matchAll(/<t xml:space="preserve">([^<]*)<\/t>/g)].map((m) => m[1]);
+    expect(cells).toEqual([
+      "Patron",
+      "Item",
+      "Scanned at",
+      "Clerk",
+      "Session",
+      "P1",
+      "I1",
+      "Ann",
+      "Outage",
+      "P2",
+      "I3",
+      "Ben",
+      "Outage",
+      "P2",
+      "I1",
+      "Ben",
+      "Outage",
+    ]);
+    expect(strFromU8(xlsx["xl/worksheets/sheet2.xml"]!)).toContain('<c r="B4"><v>3</v></c>');
   } finally {
     await Promise.all(contexts.map((ctx) => ctx.close()));
   }

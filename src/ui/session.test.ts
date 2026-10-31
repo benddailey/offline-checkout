@@ -641,17 +641,23 @@ describe("useSession receipts", () => {
 });
 
 describe("useSession files", () => {
-  it("generatePdf is a no-op with zero patrons and names the file after the session", async () => {
+  it("exports are no-ops with zero patrons and name the file after the session", async () => {
     const s = useSession();
     await s.startSession("Main Desk / Fri", "Rae");
     s.generatePdf();
+    s.exportTable("csv");
+    s.exportTable("xlsx");
     expect(db.downloads).toEqual([]);
     await s.scan("P1");
     s.generatePdf();
+    s.exportTable("csv");
+    s.exportTable("xlsx");
     await s.printScannerCard("letter");
     await s.printScannerCard("receipt");
     expect(db.downloads).toEqual([
       "offline-checkout-Main-Desk-Fri-2026-10-10.pdf",
+      "offline-checkout-Main-Desk-Fri-2026-10-10.csv",
+      "offline-checkout-Main-Desk-Fri-2026-10-10.xlsx",
       "offline-checkout-scanner-card.pdf",
       "print:scanner-card",
     ]);

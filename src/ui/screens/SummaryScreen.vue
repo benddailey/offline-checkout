@@ -19,8 +19,19 @@ const clerks = computed(() =>
 
 const canGenerate = computed(() => session.state.totals.patrons > 0);
 
+type ExportKind = "pdf" | "csv" | "xlsx";
+
+const EXPORTS: Record<ExportKind, { action: string; verb: string; noun: string }> = {
+  pdf: { action: "Generate PDF", verb: "Generate", noun: "PDF" },
+  csv: { action: "Download CSV", verb: "Download", noun: "CSV file" },
+  xlsx: { action: "Download Excel", verb: "Download", noun: "Excel file" },
+};
+
 /** Which action the confirm dialog is asking about. */
-const confirming = ref<"close" | "pdf" | null>(null);
+const confirming = ref<"close" | ExportKind | null>(null);
+const confirmingExport = computed(() =>
+  confirming.value && confirming.value !== "close" ? EXPORTS[confirming.value] : null,
+);
 const cancelButton = useTemplateRef<HTMLButtonElement>("cancel");
 
 const missingNames = computed(() => session.notConnected.map((d) => d.employee || "Unnamed"));
@@ -29,23 +40,28 @@ const inProgress = computed(() =>
   session.othersInProgress.map((v) => `${v.patron} (${v.employee || "Unnamed"})`),
 );
 
-async function ask(what: "close" | "pdf"): Promise<void> {
+async function ask(what: "close" | ExportKind): Promise<void> {
   confirming.value = what;
   await nextTick();
   cancelButton.value?.focus();
 }
 
-/** Scans on an unconnected workstation would be missing from the PDF: confirm first. */
-function generate(): void {
-  if (session.notConnected.length > 0) void ask("pdf");
-  else session.generatePdf();
+function runExport(kind: ExportKind): void {
+  if (kind === "pdf") session.generatePdf();
+  else session.exportTable(kind);
+}
+
+/** Scans on an unconnected workstation would be missing from the export: confirm first. */
+function exportSession(kind: ExportKind): void {
+  if (session.notConnected.length > 0) void ask(kind);
+  else runExport(kind);
 }
 
 async function confirm(): Promise<void> {
   const what = confirming.value;
   confirming.value = null;
-  if (what === "pdf") session.generatePdf();
-  else if (what === "close") await session.closeSession();
+  if (what === "close") await session.closeSession();
+  else if (what) runExport(what);
 }
 
 const dialog = useTemplateRef<HTMLElement>("dialog");
@@ -75,7 +91,7 @@ function onScan(code: string): void {
 const button =
   "min-h-12 rounded-lg border-2 px-5 text-xl font-semibold disabled:cursor-not-allowed disabled:opacity-40";
 const primary = `${button} border-blue-800 bg-blue-700 text-white hover:bg-blue-800 disabled:hover:bg-blue-700`;
-const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-slate-100`;
+const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-slate-100 disabled:hover:bg-white`;
 const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`;
 </script>
 
@@ -142,10 +158,30 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
           :class="primary"
           :disabled="!canGenerate"
           :aria-describedby="canGenerate ? undefined : 'generate-hint'"
-          @click="generate"
+          @click="exportSession('pdf')"
         >
           Generate PDF
         </button>
+        <div class="flex flex-wrap gap-3">
+          <button
+            type="button"
+            :class="secondary"
+            :disabled="!canGenerate"
+            :aria-describedby="canGenerate ? undefined : 'generate-hint'"
+            @click="exportSession('csv')"
+          >
+            Download CSV
+          </button>
+          <button
+            type="button"
+            :class="secondary"
+            :disabled="!canGenerate"
+            :aria-describedby="canGenerate ? undefined : 'generate-hint'"
+            @click="exportSession('xlsx')"
+          >
+            Download Excel
+          </button>
+        </div>
         <p v-if="!canGenerate" id="generate-hint" class="text-lg text-slate-600">
           Scan at least one patron first
         </p>
@@ -217,7 +253,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
         :class="confirming === 'close' ? 'border-red-700' : 'border-amber-600'"
       >
         <h2 id="confirm-title" class="text-3xl font-extrabold">
-          {{ confirming === "close" ? "Close session" : "Generate PDF" }}
+          {{ confirmingExport?.action ?? "Close session" }}
         </h2>
         <div id="confirm-text" class="flex flex-col gap-3 text-2xl">
           <p v-if="confirming === 'close'">
@@ -228,14 +264,16 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
           </p>
           <p v-if="missingNames.length">
             Not connected: {{ missingNames.join(", ") }}. Their latest scans may be missing{{
-              confirming === "pdf" ? " from this PDF" : ""
+              confirmingExport ? ` from this ${confirmingExport.noun}` : ""
             }}.
           </p>
-          <p v-if="confirming === 'pdf'">Generate the PDF anyway?</p>
+          <p v-if="confirmingExport">
+            {{ confirmingExport.verb }} the {{ confirmingExport.noun }} anyway?
+          </p>
         </div>
         <div class="flex flex-wrap gap-3">
           <button type="button" :class="confirming === 'close' ? danger : primary" @click="confirm">
-            {{ confirming === "close" ? "Yes, close session" : "Generate anyway" }}
+            {{ confirmingExport ? `${confirmingExport.verb} anyway` : "Yes, close session" }}
           </button>
           <button ref="cancel" type="button" :class="secondary" @click="confirming = null">
             Cancel
