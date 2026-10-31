@@ -17,6 +17,7 @@
     "icons": "node scripts/build-icons.ts"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "idb": "^8.0.4",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
