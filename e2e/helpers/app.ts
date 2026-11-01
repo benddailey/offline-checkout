@@ -21,7 +21,9 @@ export function launchChromium(extraArgs: string[] = []): Promise<Browser> {
 
 /** On Launch, open a session that has not been closed as `clerk`. */
 export async function resumeAs(page: Page, session: string | RegExp, clerk: string): Promise<void> {
-  await page.getByTestId("resume-list").getByRole("button", { name: session }).click();
+  const row = page.getByTestId("resume-list").getByRole("button", { name: session });
+  // The most recent open session starts expanded; clicking it would collapse it.
+  if ((await row.getAttribute("aria-expanded")) !== "true") await row.click();
   const form = page.getByTestId("resume-form");
   await form.getByLabel("Clerk name").fill(clerk);
   await form.getByRole("button", { name: "Resume session" }).click();

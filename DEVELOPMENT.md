@@ -26,7 +26,12 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
 
 - **Single file:** `vite-plugin-singlefile` inlines everything, including the zxing WebAssembly,
   into `dist/offline-checkout.html`.
-- **Storage:** IndexedDB through `idb` (`src/store/`).
+- **Storage:** IndexedDB through `idb` (`src/store/`). The `offline-checkout` database indexes the
+  sessions, and each session's log is in its own `oc-session-<id>` database. `listSessions` reads
+  the log of every session not yet seen closed, to find closes from peers and the last activity.
+  The start page uses that last activity: if an open session has a record from the last 72 hours,
+  the page lists open sessions first with the latest one expanded, and the start form sits behind
+  a **Start new session** button.
 - **Barcodes and QR:**
   - `jsbarcode` makes Code 128 for receipts and the PDF;
   - `qrcode` draws QR codes;
