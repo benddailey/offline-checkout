@@ -5,7 +5,14 @@ import { clampName } from "../log/limits";
 import { checkItem } from "../log/duplicates";
 import { recordId } from "../log/ids";
 import { reduce } from "../log/reduce";
-import type { ItemState, LogRecord, RecordBody, RecordId, VisitState } from "../log/types";
+import type {
+  ExportKind,
+  ItemState,
+  LogRecord,
+  RecordBody,
+  RecordId,
+  VisitState,
+} from "../log/types";
 import { Mesh, type MeshOptions, type PeerInfo } from "../mesh/mesh";
 import { isPairingText } from "../pairing/chunks";
 import { PairingError, decodePayload, type PairingPayload } from "../pairing/payload";
@@ -648,12 +655,17 @@ export const useSession = defineStore("session", () => {
     });
   }
 
+  function recordExport(kind: ExportKind): void {
+    void enqueue(async () => void (await commit({ type: "exported", kind }, "change")));
+  }
+
   function generatePdf(): void {
     if (!meta.value || state.value.totals.patrons === 0) return;
     try {
       const date = deps.now();
       const blob = deps.renderSessionPdf(state.value, { date });
       deps.downloadBlob(blob, `offline-checkout-${fileSafe(meta.value.name)}-${ymd(date)}.pdf`);
+      recordExport("pdf");
     } catch (err) {
       console.error("session: PDF failed", err);
       message.value = { tone: "error", text: "Could not create the PDF" };
@@ -678,6 +690,7 @@ export const useSession = defineStore("session", () => {
         blob,
         `offline-checkout-${fileSafe(meta.value.name)}-${ymd(date)}.${format}`,
       );
+      recordExport(format);
     } catch (err) {
       console.error(`session: ${format} export failed`, err);
       const noun = { csv: "CSV", xlsx: "Excel", xacts: "Evergreen" }[format];

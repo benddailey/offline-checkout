@@ -706,6 +706,34 @@ describe("useSession files", () => {
   });
 });
 
+describe("useSession export records", () => {
+  it("records each successful export with the clerk's name", async () => {
+    const s = await started();
+    await s.scan("P1");
+    await s.scan("I1"); // xacts needs at least one item
+    await s.closeSession();
+    s.generatePdf();
+    s.exportTable("xacts");
+    await s.closeSession(); // already closed: just waits for the queue
+    expect(s.state.exports.map((e) => e.kind)).toEqual(["pdf", "xacts"]);
+    expect(s.state.exports.map((e) => e.employee)).toEqual(["Rae", "Rae"]);
+  });
+
+  it("records nothing when the download fails", async () => {
+    setSessionDeps({
+      ...db.deps,
+      downloadBlob: () => {
+        throw new Error("blocked");
+      },
+    });
+    const s = await started();
+    await s.scan("P1");
+    s.exportTable("csv");
+    await s.closeSession();
+    expect(s.state.exports).toEqual([]);
+  });
+});
+
 /** A MeshLike fake that lets the test drive peer changes and inbound messages. */
 function fakeMesh(initial: PeerInfo[] = []) {
   const msgCbs = new Set<(peer: string, msg: unknown) => void>();
