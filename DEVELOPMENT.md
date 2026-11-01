@@ -36,6 +36,10 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
   The start page uses that last activity: if an open session has a record from the last 72 hours,
   the page lists open sessions first with the latest one expanded, and the start form sits behind
   a **Start new session** button.
+  `listSessions` also gives each open session every other workstation's latest record, by `seq`,
+  when it has a name. The start page lists those from the last 72 hours under **Other workstations**
+  (`src/ui/workstations.ts`). It is only the last activity synced here: the start page has no mesh,
+  so it cannot show which are online.
 - **Barcodes and QR:**
   - `jsbarcode` makes Code 128 for receipts and the PDF;
   - `qrcode` draws QR codes;

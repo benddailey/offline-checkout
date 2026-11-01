@@ -23,6 +23,14 @@ export interface SessionSummary {
   closedAt?: number;
   /** Open sessions only: the latest record time from any workstation, or createdAt. Not stored. */
   lastActivityAt?: number;
+  /** Open sessions only: each other workstation's latest record, if it has a name. Not stored. */
+  workstations?: SeenWorkstation[];
+}
+
+export interface SeenWorkstation {
+  deviceId: string;
+  name: string;
+  lastAt: number;
 }
 
 export interface SessionStore {
@@ -254,18 +262,28 @@ export async function openSessionStore(sessionId: string): Promise<SessionStore>
   return makeStore(sessionId, db);
 }
 
-async function readLog(sessionId: string): Promise<{ closedAt?: number; lastAt?: number }> {
+async function readLog(
+  sessionId: string,
+): Promise<{ closedAt?: number; lastAt?: number; workstations: SeenWorkstation[] }> {
   const db = await openSessionDb(sessionId);
   try {
+    const own = (await db.get("meta", META_KEY))?.deviceId;
     let closedAt: number | undefined;
     let lastAt: number | undefined;
+    const latest = new Map<string, LogRecord>();
     for (const r of await db.getAll("records")) {
       if (r.type === "session-closed" && (closedAt === undefined || r.at < closedAt)) {
         closedAt = r.at;
       }
       if (lastAt === undefined || r.at > lastAt) lastAt = r.at;
+      // By seq, not by clock: a PC's clock can go back.
+      const prev = latest.get(r.deviceId);
+      if (r.deviceId !== own && (!prev || r.seq > prev.seq)) latest.set(r.deviceId, r);
     }
-    return { closedAt, lastAt };
+    const workstations = [...latest.values()].flatMap((r) =>
+      r.workstation ? [{ deviceId: r.deviceId, name: r.workstation, lastAt: r.at }] : [],
+    );
+    return { closedAt, lastAt, workstations };
   } finally {
     db.close();
   }
@@ -281,9 +299,10 @@ export async function listSessions(): Promise<SessionSummary[]> {
     const all = await index.getAll("sessions");
     for (const s of all) {
       if (s.closedAt !== undefined) continue;
-      const { closedAt, lastAt } = await readLog(s.sessionId);
+      const { closedAt, lastAt, workstations } = await readLog(s.sessionId);
       if (closedAt === undefined) {
         s.lastActivityAt = Math.max(s.createdAt, lastAt ?? 0);
+        s.workstations = workstations;
         continue;
       }
       s.closedAt = closedAt;

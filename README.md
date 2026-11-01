@@ -75,6 +75,10 @@ PC. Every scan is recorded with this name and the clerk's, so the Summary and th
 each scan was made. To change it later, click **Rename** next to the name on the start screen. Scans
 already made keep the old name.
 
+Once another desk's scans in an open session have synced to this PC, the start screen lists that
+desk under **Other workstations**, with its session and the time of its last activity this PC has
+received in the last 3 days. It shows when that desk last scanned, not whether it is on now.
+
 ### Choose the receipt printer
 
 Do this once on every desk computer, after the setup script:

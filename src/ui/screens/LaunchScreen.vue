@@ -6,8 +6,9 @@ import logoUrl from "../../../icons/icon-round.svg";
 import StartSessionForm from "../components/StartSessionForm.vue";
 import WorkstationNameForm from "../components/WorkstationNameForm.vue";
 import { useSession } from "../session";
+import { otherWorkstations, type OtherWorkstation } from "../workstations";
 
-/** An open session with no records for this long is not expanded on the start page. */
+/** An open session with no records for this long is not expanded, nor are its workstations listed. */
 const STALE_MS = 72 * 60 * 60 * 1000;
 
 const session = useSession();
@@ -15,6 +16,7 @@ const version = __APP_VERSION__;
 
 const busy = ref(false);
 const sessions = ref<SessionSummary[]>([]);
+const others = ref<OtherWorkstation[]>([]);
 /** Set once on load, so the layout doesn't change under the clerk. */
 const recentOpen = ref(false);
 const showStart = ref(false);
@@ -51,6 +53,7 @@ onMounted(async () => {
     console.error("launch: could not list sessions", err);
     return;
   }
+  others.value = otherWorkstations(sessions.value, Date.now() - STALE_MS);
   const latest = openSessions.value[0];
   if (latest && Date.now() - lastActivity(latest) <= STALE_MS) {
     recentOpen.value = true;
@@ -257,5 +260,26 @@ const secondary =
         <StartSessionForm v-if="showStart" autofocus />
       </template>
     </template>
+
+    <section
+      v-if="named && others.length > 0"
+      class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
+      aria-labelledby="others-title"
+    >
+      <h2 id="others-title" class="text-2xl font-bold">Other workstations</h2>
+      <p class="text-lg text-slate-600">Last activity synced to this workstation.</p>
+      <ul class="flex flex-col gap-2" data-testid="other-workstations">
+        <li
+          v-for="w in others"
+          :key="w.deviceId"
+          class="flex flex-wrap items-baseline justify-between gap-x-4 rounded-lg border-2 border-slate-200 px-4 py-2 text-xl"
+        >
+          <b class="text-slate-900">{{ w.name }}</b>
+          <span class="text-lg text-slate-600"
+            >{{ w.sessionName }} · {{ new Date(w.lastAt).toLocaleString() }}</span
+          >
+        </li>
+      </ul>
+    </section>
   </main>
 </template>
