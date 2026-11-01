@@ -5,6 +5,8 @@ export interface Envelope {
   deviceId: string;
   seq: number;
   employee: string;
+  /** The workstation's name when the record was written; absent on records from before names. */
+  workstation?: string;
   at: number;
 }
 
@@ -25,6 +27,8 @@ export interface ItemState {
   voided: boolean;
   at: number;
   employee: string;
+  /** "" when the record has no workstation name. */
+  workstation: string;
 }
 
 export interface VisitState {
@@ -32,6 +36,8 @@ export interface VisitState {
   patron: string;
   deviceId: string;
   employee: string;
+  /** "" when the record has no workstation name. */
+  workstation: string;
   at: number;
   ended: boolean;
   voided: boolean;
@@ -53,6 +59,8 @@ export interface SessionState {
   totals: { patrons: number; items: number };
   /** By employee: distinct patrons they started a non-voided visit for; non-voided items. */
   perClerk: Record<string, { patrons: number; items: number }>;
+  /** The same counts by workstation name, "" for records without one. */
+  perWorkstation: Record<string, { patrons: number; items: number }>;
 }
 
 export type VersionVector = Record<string, number>;

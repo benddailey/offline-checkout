@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Page } from "@playwright/test";
+import { chromium, expect, type Browser, type Page } from "@playwright/test";
 
 /** Set HEADED=1 to watch the browsers. */
 export const HEADLESS = !process.env.HEADED;
@@ -27,4 +27,16 @@ export async function resumeAs(page: Page, session: string | RegExp, clerk: stri
   const form = page.getByTestId("resume-form");
   await form.getByLabel("Clerk name").fill(clerk);
   await form.getByRole("button", { name: "Resume session" }).click();
+}
+
+/** Open the app; on a workstation with no name yet, name it `workstation` first. */
+export async function openApp(page: Page, workstation = "Desk 1"): Promise<void> {
+  await page.goto(appUrl());
+  const form = page.getByTestId("workstation-form");
+  const named = page.getByTestId("workstation");
+  await expect(form.or(named)).toBeVisible();
+  if (await named.isVisible()) return;
+  await form.getByLabel("Workstation name").fill(workstation);
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(named).toBeVisible();
 }

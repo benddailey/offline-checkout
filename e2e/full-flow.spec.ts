@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { strFromU8, unzipSync } from "fflate";
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl } from "./helpers/app";
+import { openApp } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { decodePdfBarcodes, pdfText } from "./helpers/pdf";
 import { stubPrint } from "./helpers/print";
@@ -29,9 +29,12 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
   const contexts = await Promise.all([1, 2].map(() => browser.newContext()));
   try {
     const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
-    for (const page of [a!, b!]) {
+    for (const [page, desk] of [
+      [a!, "Front desk"],
+      [b!, "Back desk"],
+    ] as const) {
       await stubPrint(page);
-      await page.goto(appUrl());
+      await openApp(page, desk);
     }
     let downloadsOnA = 0;
     a!.on("download", () => downloadsOnA++);
@@ -126,6 +129,8 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     await expect(summary.locator(".line-through", { hasText: "P3" })).toBeVisible();
     await expect(b!.getByTestId("per-clerk")).toContainText("Ann: 1 patron, 1 item");
     await expect(b!.getByTestId("per-clerk")).toContainText("Ben: 1 patron, 2 items");
+    await expect(b!.getByTestId("per-workstation")).toContainText("Back desk: 1 patron, 2 items");
+    await expect(b!.getByTestId("per-workstation")).toContainText("Front desk: 1 patron, 1 item");
 
     const [file] = await Promise.all([
       b!.waitForEvent("download"),
@@ -140,15 +145,16 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     expect(text).toContain("Page 1 of 1");
     expect(text).toContain("Patrons: 2");
     expect(text).toContain("Items: 3");
+    expect(text).toContain("Front desk: 1 patron, 1 item");
 
     // The CSV and Excel files hold the same rows as the PDF, one per item.
     const csv = await download(b!, "Download CSV", "session.csv");
     const lines = (await readFile(csv, "utf8")).split("\r\n");
-    expect(lines[0]).toBe("\uFEFFPatron,Item,Scanned at,Clerk,Session");
+    expect(lines[0]).toBe("\uFEFFPatron,Item,Scanned at,Clerk,Workstation,Session");
     expect(lines.slice(1).map((l) => l.replace(/,[\d-]+ [\d:]+,/, ",T,"))).toEqual([
-      "P1,I1,T,Ann,Outage",
-      "P2,I3,T,Ben,Outage",
-      "P2,I1,T,Ben,Outage",
+      "P1,I1,T,Ann,Front desk,Outage",
+      "P2,I3,T,Ben,Back desk,Outage",
+      "P2,I1,T,Ben,Back desk,Outage",
       "",
     ]);
     await expect(b!.getByRole("button", { name: "Download Excel" })).toBeEnabled();
@@ -160,18 +166,22 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
       "Item",
       "Scanned at",
       "Clerk",
+      "Workstation",
       "Session",
       "P1",
       "I1",
       "Ann",
+      "Front desk",
       "Outage",
       "P2",
       "I3",
       "Ben",
+      "Back desk",
       "Outage",
       "P2",
       "I1",
       "Ben",
+      "Back desk",
       "Outage",
     ]);
     expect(strFromU8(xlsx["xl/worksheets/sheet2.xml"]!)).toContain('<c r="B4"><v>3</v></c>');

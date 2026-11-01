@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { recordId } from "../log/ids";
 import { MAX_BARCODE, MAX_NAME } from "../log/limits";
 import { isLogRecord } from "../log/validate";
@@ -34,6 +34,8 @@ function fakeDb() {
   let failPrint = false;
   let paint: Promise<void> = Promise.resolve();
   let nextId = 1;
+  let workstation: string | undefined;
+  let failNameWorkstation = false;
   /** Wall-clock time stamped on the next append (seq → at). */
   let clock = (seq: number) => 1000 + seq;
 
@@ -131,6 +133,11 @@ function fakeDb() {
     printScannerCardReceipt: () => downloads.push("print:scanner-card"),
     downloadBlob: (_blob, filename) => downloads.push(filename),
     getDeviceId: async () => DEVICE,
+    getWorkstationName: async () => workstation,
+    async setWorkstationName(name) {
+      if (failNameWorkstation) throw new Error("QuotaExceededError");
+      workstation = name;
+    },
     afterPaint: () => paint,
     printVisitReceipt(receipt) {
       const endedInLog = [...logs.values()].some((log) => {
@@ -163,6 +170,10 @@ function fakeDb() {
     meshOptions,
     failSetEmployee(v: boolean) {
       failSetEmployee = v;
+    },
+    workstation: () => workstation,
+    failNameWorkstation(v: boolean) {
+      failNameWorkstation = v;
     },
     failMeta(v: boolean) {
       failMeta = v;
@@ -830,14 +841,19 @@ describe("useSession mesh", () => {
     await tick();
     await tick();
     expect(s.notConnected).toEqual([
-      { deviceId: third, employee: "Cy" },
-      { deviceId: PEER, employee: "Sue" },
+      { deviceId: third, employee: "Cy", workstation: "" },
+      { deviceId: PEER, employee: "Sue", workstation: "" },
     ]);
     m.setPeers([
       { deviceId: PEER, employee: "Sue", connected: true },
       { deviceId: third, employee: "Cy", connected: false },
     ]);
-    expect(s.notConnected).toEqual([{ deviceId: third, employee: "Cy" }]);
+    expect(s.notConnected).toEqual([{ deviceId: third, employee: "Cy", workstation: "" }]);
+    m.deliver(third, { t: "recs", records: [{ ...rec(third, 2, "Cy"), workstation: "Desk 3" }] });
+    m.setPeers([{ deviceId: PEER, employee: "Sue", connected: true }]);
+    await tick();
+    await tick();
+    expect(s.notConnected).toEqual([{ deviceId: third, employee: "Cy", workstation: "Desk 3" }]);
   });
 
   it("also lists disconnected mesh peers that have no records, once each", async () => {
@@ -848,7 +864,7 @@ describe("useSession mesh", () => {
       { deviceId: PEER, employee: "Sam", connected: false },
       { deviceId: "devicecccc", employee: "Cy", connected: true },
     ]);
-    expect(s.notConnected).toEqual([{ deviceId: PEER, employee: "Sam" }]);
+    expect(s.notConnected).toEqual([{ deviceId: PEER, employee: "Sam", workstation: "" }]);
     m.deliver("devicecccc", {
       t: "recs",
       records: [
@@ -865,7 +881,7 @@ describe("useSession mesh", () => {
     });
     await tick();
     await tick();
-    expect(s.notConnected).toEqual([{ deviceId: PEER, employee: "Samuel" }]);
+    expect(s.notConnected).toEqual([{ deviceId: PEER, employee: "Samuel", workstation: "" }]);
   });
 
   it("a remote session-closed stops local scanning", async () => {
@@ -1300,5 +1316,38 @@ describe("useSession patron in progress", () => {
     await tick();
     await tick();
     expect(s.othersInProgress).toEqual([]);
+  });
+});
+
+describe("useSession workstation name", () => {
+  it("loads the saved name: null until one is saved", async () => {
+    const s = useSession();
+    expect(s.workstationName).toBeUndefined();
+    await s.loadWorkstationName();
+    expect(s.workstationName).toBeNull();
+    expect(await s.nameWorkstation("  Front desk 1 ")).toBe(true);
+    expect(s.workstationName).toBe("Front desk 1");
+    expect(db.workstation()).toBe("Front desk 1");
+    const again = reload();
+    await again.loadWorkstationName();
+    expect(again.workstationName).toBe("Front desk 1");
+  });
+
+  it("refuses a blank name and clamps a long one", async () => {
+    const s = useSession();
+    expect(await s.nameWorkstation("   ")).toBe(false);
+    expect(db.workstation()).toBeUndefined();
+    expect(await s.nameWorkstation("D".repeat(MAX_NAME + 5))).toBe(true);
+    expect(db.workstation()).toHaveLength(MAX_NAME);
+  });
+
+  it("reports a name it could not save", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const s = useSession();
+    db.failNameWorkstation(true);
+    expect(await s.nameWorkstation("Desk")).toBe(false);
+    expect(s.workstationName).toBeUndefined();
+    expect(s.message?.tone).toBe("error");
+    err.mockRestore();
   });
 });

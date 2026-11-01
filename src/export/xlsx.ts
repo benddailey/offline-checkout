@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from "fflate";
 import type { SessionState } from "../log/types";
+import { hasWorkstations, workstationLabel } from "../log/reduce";
 import { COLUMNS, type ExportRow } from "./rows";
 
 const NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -118,6 +119,7 @@ export function buildXlsx(
         r.item,
         r.scannedAt === null ? null : { date: r.scannedAt },
         r.clerk,
+        r.workstation,
         r.session,
       ],
     })),
@@ -133,6 +135,15 @@ export function buildXlsx(
     ...clerks.map((c) => ({
       cells: [c, state.perClerk[c]!.patrons, state.perClerk[c]!.items],
     })),
+    ...(hasWorkstations(state)
+      ? [
+          { cells: [] },
+          { cells: ["Workstation", "Patrons", "Items"], style: S.bold },
+          ...Object.entries(state.perWorkstation).map(([w, n]) => ({
+            cells: [workstationLabel(w), n.patrons, n.items],
+          })),
+        ]
+      : []),
   ];
 
   const files: Record<string, string> = {

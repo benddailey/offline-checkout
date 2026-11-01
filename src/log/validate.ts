@@ -28,6 +28,7 @@ export function isLogRecord(x: unknown): x is LogRecord {
     !isStr(r.deviceId) ||
     !ID.test(r.deviceId) ||
     !isName(r.employee) ||
+    (r.workstation !== undefined && !isName(r.workstation)) ||
     typeof r.seq !== "number" ||
     !Number.isInteger(r.seq) ||
     r.seq <= 0 ||

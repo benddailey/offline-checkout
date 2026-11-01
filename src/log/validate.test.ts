@@ -84,6 +84,13 @@ describe("isLogRecord", () => {
     );
   });
 
+  it("accepts a record without a workstation, and rejects a mistyped or over-long one", () => {
+    const r = rec(1, { type: "session-closed" });
+    expect(isLogRecord({ ...r, workstation: "Front desk 1" })).toBe(true);
+    expect(isLogRecord({ ...r, workstation: 7 })).toBe(false);
+    expect(isLogRecord({ ...r, workstation: "W".repeat(101) })).toBe(false);
+  });
+
   it("rejects unknown types and missing or mistyped body fields", () => {
     const env = rec(1, { type: "session-closed" });
     const { type: _t, ...e } = env as unknown as Record<string, unknown>;

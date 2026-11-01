@@ -46,4 +46,23 @@ test("workbook has Items and Summary sheets with text barcodes, dates and totals
   expect(summary).toContain('<c r="B2" s="2"><v>46326.5</v></c>');
   expect(summary).toContain('<c r="B3"><v>1</v></c>');
   expect(summary).toContain('<c r="A7" s="3" t="inlineStr"><is><t xml:space="preserve">A</t>');
+  expect(summary).not.toContain("Workstation");
+});
+
+test("Items has a Workstation column; Summary lists workstations once any record has one", () => {
+  const s = reduce([
+    { ...mk("a", 1, { type: "patron-started", patron: "P1" }), workstation: "Desk 1" },
+    mk("b", 1, { type: "item-scanned", visitId: "a:1", item: "I1" }),
+  ]);
+  const files = unzipSync(buildXlsx(s, exportRows(s), new Date(2026, 9, 31, 12, 0, 0)));
+  const items = strFromU8(files["xl/worksheets/sheet1.xml"]!);
+  expect(items).toContain('<c r="E1" s="1" t="inlineStr"><is><t xml:space="preserve">Workstation');
+  const summary = strFromU8(files["xl/worksheets/sheet2.xml"]!);
+  const cell = (ref: string, text: string) =>
+    `<c r="${ref}" s="3" t="inlineStr"><is><t xml:space="preserve">${text}</t>`;
+  expect(summary).toContain(
+    '<c r="A10" s="1" t="inlineStr"><is><t xml:space="preserve">Workstation',
+  );
+  expect(summary).toContain(cell("A11", "Desk 1"));
+  expect(summary).toContain(cell("A12", "Not named"));
 });

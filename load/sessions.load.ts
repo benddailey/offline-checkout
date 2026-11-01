@@ -1,7 +1,7 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium, expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { appUrl, CHROMIUM_ARGS, HEADLESS, launchChromium } from "../e2e/helpers/app";
+import { appUrl, CHROMIUM_ARGS, HEADLESS, launchChromium, openApp } from "../e2e/helpers/app";
 import { pairViaPaste } from "../e2e/helpers/pair";
 
 const RUNS = Number(process.env.LOAD_RUNS ?? 5);
@@ -166,6 +166,7 @@ async function seed(page: Page, sessions: SeedSession[]): Promise<void> {
         });
         let tx = index.transaction(["device", "sessions"], "readwrite");
         tx.objectStore("device").put(own, "id");
+        tx.objectStore("device").put("Load desk", "name");
         const { records, ...summary } = s;
         if (summary.closedAt === undefined) delete summary.closedAt;
         tx.objectStore("sessions").put(summary);
@@ -314,7 +315,7 @@ async function runOnce(profile: string, rate: number, pairing: boolean): Promise
         const joiner = await joinerCtx.newPage();
         await joiner.addInitScript(MARKS);
         await throttle(joinerCtx, joiner, rate);
-        await joiner.goto(appUrl());
+        await openApp(joiner, "Joiner desk");
         const profiler = PROFILE ? await joinerCtx.newCDPSession(joiner) : null;
         const inviterProfiler = PROFILE ? await ctx.newCDPSession(page) : null;
         for (const p of [profiler, inviterProfiler]) {

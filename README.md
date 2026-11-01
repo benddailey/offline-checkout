@@ -67,13 +67,21 @@ Do this before an outage, on every desk PC.
 4. The app and its stored sessions are in the **OfflineCheckout** folder in your home folder. Keep
    that folder.
 
+### Name the desk PC
+
+The first time Offline Checkout opens on a PC (in the printer setup below, or the first time you use
+it) it asks for a **Workstation name**, such as **Front desk 1**. Use a different name on each desk
+PC. Every scan is recorded with this name and the clerk's, so the Summary and the exports show where
+each scan was made. To change it later, click **Rename** next to the name on the start screen. Scans
+already made keep the old name.
+
 ### Choose the receipt printer
 
 Do this once on every desk computer, after the setup script:
 
 1. Close every Offline Checkout window.
-2. Open **Offline Checkout - printer setup**, start a session, and click **Receipt printer** under
-   Scanner card.
+2. Open **Offline Checkout - printer setup**, name the PC if it asks, start a session, and click
+   **Receipt printer** under Scanner card.
 3. In the print dialog choose the receipt printer and click **Print**. Keep the scanner card at the
    desk.
 4. Close the window. From now on, use **Offline Checkout**.
@@ -88,6 +96,8 @@ to the title on the start screen and on the Summary.
 1. Finish any running session first. Don't update during an outage.
 2. Download and extract the new zip and run its setup script, as in setup. Stored sessions and the
    chosen printer are kept.
+3. If the PC has no workstation name yet, it asks for one the first time it opens, as in
+   **Name the desk PC**.
 
 ## Using it at the desk
 
@@ -123,7 +133,9 @@ to the title on the start screen and on the Summary.
    - Need a scanner card? It is offered when a session starts, until the first patron is scanned,
      and is always on the Summary: **Receipt printer** prints it on the receipt roll, and
      **Letter PDF** saves it for a regular printer.
-4. **Summary.** Click **Summary** for totals, a count per clerk, and every patron with their items.
+4. **Summary.** Click **Summary** for totals, a count per clerk and per desk PC, and every patron
+   with their items. A desk PC that is not connected is listed by its clerk and name, for example
+   **Not connected: Ann (Front desk 2)**.
    - **Change clerk**: when someone takes over the desk, click **Change clerk** and enter your name.
      Scans from then on are counted under your name; earlier scans keep theirs.
    - **Exit session** goes back to the start screen. If other desk PCs are connected, it asks first:
@@ -135,7 +147,7 @@ to the title on the start screen and on the Summary.
    **Generate PDF** makes a copy of the whole session on US Letter paper, with a barcode for every
    patron and item. Use it for a receipt that is lost or won't scan, or to check nothing was missed.
    **Download CSV** and **Download Excel** save the same list as a spreadsheet, one row per item,
-   with the patron, item, time scanned, clerk and session name. Open the Excel file in Excel: it
+   with the patron, item, time scanned, clerk, workstation and session name. Open the Excel file in Excel: it
    keeps barcodes exactly as scanned. Excel can change barcodes in the CSV, for example by dropping
    leading zeros, and a barcode that starts with `-` or `+` has a `'` added in front of it.
    **Download for Evergreen** saves every checkout as an Evergreen offline transaction file (the

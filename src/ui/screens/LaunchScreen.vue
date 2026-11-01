@@ -4,6 +4,7 @@ import { MAX_NAME } from "../../log/limits";
 import type { SessionSummary } from "../../store/db";
 import logoUrl from "../../../icons/icon-round.svg";
 import StartSessionForm from "../components/StartSessionForm.vue";
+import WorkstationNameForm from "../components/WorkstationNameForm.vue";
 import { useSession } from "../session";
 
 /** An open session with no records for this long is not expanded on the start page. */
@@ -17,6 +18,9 @@ const sessions = ref<SessionSummary[]>([]);
 /** Set once on load, so the layout doesn't change under the clerk. */
 const recentOpen = ref(false);
 const showStart = ref(false);
+const renaming = ref(false);
+/** Until this workstation has a name, naming it is all the page offers. */
+const named = computed(() => typeof session.workstationName === "string");
 
 const lastActivity = (s: SessionSummary) => s.lastActivityAt ?? s.createdAt;
 const openSessions = computed(() =>
@@ -26,15 +30,21 @@ const openSessions = computed(() =>
 );
 const closedSessions = computed(() => sessions.value.filter((s) => s.closedAt !== undefined));
 const groups = computed(() =>
-  recentOpen.value
-    ? [
-        { id: "open", title: "Open sessions", items: openSessions.value },
-        { id: "closed", title: "Closed sessions", items: closedSessions.value },
-      ].filter((g) => g.items.length > 0)
-    : [{ id: "resume", title: "Resume", items: sessions.value }],
+  !named.value
+    ? []
+    : recentOpen.value
+      ? [
+          { id: "open", title: "Open sessions", items: openSessions.value },
+          { id: "closed", title: "Closed sessions", items: closedSessions.value },
+        ].filter((g) => g.items.length > 0)
+      : [{ id: "resume", title: "Resume", items: sessions.value }],
 );
 
 onMounted(async () => {
+  session.loadWorkstationName().catch((err) => {
+    console.error("launch: could not read the workstation name", err);
+    session.workstationName = null;
+  });
   try {
     sessions.value = await session.listSessions();
   } catch (err) {
@@ -119,7 +129,27 @@ const secondary =
       </button>
     </div>
 
-    <div v-if="!recentOpen" class="grid gap-6 md:grid-cols-2">
+    <WorkstationNameForm v-if="session.workstationName === null" />
+    <WorkstationNameForm
+      v-else-if="renaming"
+      :initial="session.workstationName"
+      cancellable
+      @done="renaming = false"
+    />
+    <p
+      v-else-if="named"
+      class="flex flex-wrap items-center gap-3 text-lg text-slate-700"
+      data-testid="workstation"
+    >
+      <span
+        >Workstation: <b class="text-slate-900">{{ session.workstationName }}</b></span
+      >
+      <button type="button" :class="[secondary, 'min-h-10 px-4 text-lg']" @click="renaming = true">
+        Rename
+      </button>
+    </p>
+
+    <div v-if="named && !recentOpen" class="grid gap-6 md:grid-cols-2">
       <StartSessionForm />
 
       <section

@@ -7,19 +7,23 @@ export interface ExportRow {
   item: string;
   scannedAt: number | null;
   clerk: string;
+  /** "" for a record from before workstation names. */
+  workstation: string;
   session: string;
 }
 
-export const COLUMNS = ["Patron", "Item", "Scanned at", "Clerk", "Session"] as const;
+export const COLUMNS = ["Patron", "Item", "Scanned at", "Clerk", "Workstation", "Session"] as const;
 
 /** One row per item, matching the PDF: same patrons, items and order. Duplicates keep their first scan. */
 export function exportRows(s: SessionState): ExportRow[] {
   const session = s.name ?? "";
   const firstScan = new Map<string, ItemState>();
-  const firstClerk = new Map<string, string>();
+  const firstVisit = new Map<string, { clerk: string; workstation: string }>();
   for (const v of s.visits) {
     if (v.voided) continue;
-    if (!firstClerk.has(v.patron)) firstClerk.set(v.patron, v.employee);
+    if (!firstVisit.has(v.patron)) {
+      firstVisit.set(v.patron, { clerk: v.employee, workstation: v.workstation });
+    }
     for (const i of v.items) {
       if (i.voided) continue;
       const key = `${v.patron}\n${i.barcode}`;
@@ -29,12 +33,19 @@ export function exportRows(s: SessionState): ExportRow[] {
   }
   return blocksFromState(s).flatMap((b): ExportRow[] => {
     if (b.items.length === 0) {
-      const clerk = firstClerk.get(b.patron) ?? "";
-      return [{ patron: b.patron, item: "", scannedAt: null, clerk, session }];
+      const { clerk, workstation } = firstVisit.get(b.patron) ?? { clerk: "", workstation: "" };
+      return [{ patron: b.patron, item: "", scannedAt: null, clerk, workstation, session }];
     }
     return b.items.map((item) => {
       const i = firstScan.get(`${b.patron}\n${item}`)!;
-      return { patron: b.patron, item, scannedAt: i.at, clerk: i.employee, session };
+      return {
+        patron: b.patron,
+        item,
+        scannedAt: i.at,
+        clerk: i.employee,
+        workstation: i.workstation,
+        session,
+      };
     });
   });
 }

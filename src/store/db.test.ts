@@ -6,9 +6,11 @@ import {
   acquireSessionLock,
   createSession,
   getDeviceId,
+  getWorkstationName,
   listSessions,
   openSessionStore,
   requestPersistence,
+  setWorkstationName,
 } from "./db";
 
 beforeEach(() => {
@@ -43,6 +45,26 @@ describe("session store", () => {
     const again = await openSessionStore(s.sessionId);
     const d = await again.append({ type: "session-closed" });
     expect(d.seq).toBe(4);
+    again.close();
+  });
+
+  it("stores the workstation name for this browser profile", async () => {
+    expect(await getWorkstationName()).toBeUndefined();
+    await setWorkstationName("Front desk 1");
+    expect(await getWorkstationName()).toBe("Front desk 1");
+  });
+
+  it("append stamps the workstation name, taken when the session is created or opened", async () => {
+    const plain = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
+    expect(await plain.append({ type: "session-closed" })).not.toHaveProperty("workstation");
+    plain.close();
+    await setWorkstationName("Front desk 1");
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: true });
+    expect((await s.all())[0]!.workstation).toBe("Front desk 1");
+    s.close();
+    await setWorkstationName("Desk 2");
+    const again = await openSessionStore(s.sessionId);
+    expect((await again.append({ type: "session-closed" })).workstation).toBe("Desk 2");
     again.close();
   });
 

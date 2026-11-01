@@ -8,6 +8,8 @@ export interface SessionMeta {
   name: string;
   deviceId: string;
   employee: string;
+  /** This workstation's name, copied in when the session is created or opened. */
+  workstation?: string;
   nextSeq: number;
   createdAt: number;
 }
@@ -86,6 +88,40 @@ export async function getDeviceId(): Promise<string> {
   }
 }
 
+const WORKSTATION_KEY = "name";
+
+/** The name staff gave this workstation (this browser profile), if any. */
+export async function getWorkstationName(): Promise<string | undefined> {
+  const db = await openIndex();
+  try {
+    return await db.get("device", WORKSTATION_KEY);
+  } finally {
+    db.close();
+  }
+}
+
+export async function setWorkstationName(name: string): Promise<void> {
+  const db = await openIndex();
+  try {
+    await db.put("device", name, WORKSTATION_KEY);
+  } finally {
+    db.close();
+  }
+}
+
+/** Copy the workstation name into the session's meta, so append() stamps it without a lookup. */
+async function adoptWorkstation(
+  db: IDBPDatabase<SessionSchema>,
+  workstation: string | undefined,
+): Promise<void> {
+  const tx = db.transaction("meta", "readwrite");
+  const m = await tx.store.get(META_KEY);
+  if (m && workstation !== undefined && m.workstation !== workstation) {
+    await tx.store.put({ ...m, workstation }, META_KEY);
+  }
+  await tx.done;
+}
+
 function makeStore(sessionId: string, db: IDBPDatabase<SessionSchema>): SessionStore {
   const readMeta = async (): Promise<SessionMeta> => {
     const m = await db.get("meta", META_KEY);
@@ -119,6 +155,7 @@ function makeStore(sessionId: string, db: IDBPDatabase<SessionSchema>): SessionS
           deviceId: m.deviceId,
           seq: m.nextSeq,
           employee: m.employee,
+          ...(m.workstation === undefined ? {} : { workstation: m.workstation }),
           at: Date.now(),
           ...body,
         } as LogRecord;
@@ -184,6 +221,9 @@ export async function createSession(o: {
       { sessionId, name: o.name, deviceId, employee: o.employee, nextSeq: 1, createdAt },
       META_KEY,
     );
+  }
+  await adoptWorkstation(db, await getWorkstationName());
+  if (!existing) {
     if (o.withCreatedRecord) await store.append({ type: "session-created", name: o.name });
   }
   const index = await openIndex();
@@ -209,7 +249,9 @@ export async function openSessionStore(sessionId: string): Promise<SessionStore>
     index.close();
   }
   if (!known) throw new Error(`Unknown session ${sessionId}`);
-  return makeStore(sessionId, await openSessionDb(sessionId));
+  const db = await openSessionDb(sessionId);
+  await adoptWorkstation(db, await getWorkstationName());
+  return makeStore(sessionId, db);
 }
 
 async function readLog(sessionId: string): Promise<{ closedAt?: number; lastAt?: number }> {

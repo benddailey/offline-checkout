@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl, resumeAs } from "./helpers/app";
+import { openApp, resumeAs } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 
 async function start(page: Page, name: string, clerk: string): Promise<void> {
-  await page.goto(appUrl());
+  await openApp(page);
   await page.getByLabel("Session name").fill(name);
   await page.getByLabel("Clerk name").fill(clerk);
   await page.getByRole("button", { name: "Start session" }).click();
@@ -44,7 +44,7 @@ test("the summary names unconnected workstations, confirms before PDF and close,
   try {
     const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
     await start(a!, "Warn", "Ann");
-    await b!.goto(appUrl());
+    await openApp(b!, "Back desk");
     await pairViaPaste(a!, b!, "Ben");
     await b!.keyboard.type("P2\n");
     await expect(a!.getByTestId("totals")).toHaveText("Patrons 1 · Items 0", { timeout: 5_000 });
@@ -62,7 +62,7 @@ test("the summary names unconnected workstations, confirms before PDF and close,
 
     await contexts[1]!.close();
     await expect(a!.getByTestId("not-connected")).toHaveText(
-      "Not connected: Ben — their latest scans may be missing",
+      "Not connected: Ben (Back desk) — their latest scans may be missing",
       { timeout: 30_000 },
     );
 
@@ -70,7 +70,7 @@ test("the summary names unconnected workstations, confirms before PDF and close,
     a!.on("download", () => downloads++);
     await a!.getByRole("button", { name: "Generate PDF" }).click();
     const dialog = a!.getByRole("alertdialog");
-    await expect(dialog).toContainText("Not connected: Ben");
+    await expect(dialog).toContainText("Not connected: Ben (Back desk)");
     await a!.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();
     expect(downloads).toBe(0);
@@ -103,7 +103,7 @@ test("the summary names unconnected workstations, confirms before PDF and close,
     await expect(dialog).toContainText(
       "Close this session for all workstations? Scanning will stop everywhere.",
     );
-    await expect(dialog).toContainText("Not connected: Ben");
+    await expect(dialog).toContainText("Not connected: Ben (Back desk)");
     await expect(dialog.getByTestId("in-progress")).toHaveText(
       "Patron in progress: P2 (Ben). Their visits will stay open.",
     );
@@ -134,7 +134,7 @@ test("a session already open in another tab shows a dismissable notice on Launch
   const first = await context.newPage();
   await start(first, "Two Tabs", "Rae");
   const second = await context.newPage();
-  await second.goto(appUrl());
+  await openApp(second);
   await resumeAs(second, /Two Tabs/, "Sam");
   const notice = second.getByTestId("notice");
   await expect(notice).toContainText("This session is already open in another tab");
