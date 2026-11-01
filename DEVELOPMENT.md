@@ -33,6 +33,8 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
   launch. `createSession` and `openSessionStore` copy it into the session's meta, and `append()`
   stamps it on each record as an optional `workstation` field beside `employee`. Records from before
   names have none and show as "Not named". It is not part of the pairing payload.
+  Each PDF, CSV, Excel or Evergreen download appends an `exported` record (`kind`), which syncs like
+  any other record and lets the delete dialog show who exported what. The reducer lists them in order.
   The start page uses that last activity: if an open session has a record from the last 72 hours,
   the page lists open sessions first with the latest one expanded, and the start form sits behind
   a **Start new session** button.
@@ -69,6 +71,11 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
   `src/sync/`). A catch-up arrives as many 200-record batches at once. `SyncEngine` writes all the
   batches that arrive during a write in one `put()`, and `put()` queues its IndexedDB requests
   without awaiting each one, because every write is a disk flush and a full re-reduce of the log.
+  Deleting a closed session sends `{t:"delete-session", workstation}` to the connected peers and
+  waits up to 3 s (`DELETE_REPLY_MS`) for each `{t:"deleted"}`. A peer with that session closed
+  replies, waits for the sender to disconnect (or 1 s), then deletes it; a peer with it open ignores
+  the message. The sender then deletes its own copy and shows which peers did not confirm. Peers that
+  were not connected keep their copy. The pairing payload is unchanged, so `OC2:` stays.
 - **Tests:**
   - Vitest unit tests next to the code (`*.test.ts`), with `fake-indexeddb`;
   - Playwright end-to-end tests in `e2e/`, which decode the printed and PDF barcodes with
