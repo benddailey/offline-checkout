@@ -107,4 +107,14 @@ describe("isLogRecord", () => {
       expect(isLogRecord(bad)).toBe(false);
     }
   });
+
+  it("accepts exported records of the four kinds only", () => {
+    for (const kind of ["pdf", "csv", "xlsx", "xacts"] as const) {
+      expect(isLogRecord(rec(1, { type: "exported", kind }))).toBe(true);
+    }
+    expect(
+      isLogRecord({ ...rec(1, { type: "session-closed" }), type: "exported", kind: "docx" }),
+    ).toBe(false);
+    expect(isLogRecord({ ...rec(1, { type: "session-closed" }), type: "exported" })).toBe(false);
+  });
 });

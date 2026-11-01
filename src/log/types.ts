@@ -10,13 +10,16 @@ export interface Envelope {
   at: number;
 }
 
+export type ExportKind = "pdf" | "csv" | "xlsx" | "xacts";
+
 export type RecordBody =
   | { type: "session-created"; name: string }
   | { type: "patron-started"; patron: string }
   | { type: "item-scanned"; visitId: RecordId; item: string }
   | { type: "patron-ended"; visitId: RecordId }
   | { type: "voided"; target: RecordId }
-  | { type: "session-closed" };
+  | { type: "session-closed" }
+  | { type: "exported"; kind: ExportKind };
 
 export type LogRecord = Envelope & RecordBody;
 
@@ -44,6 +47,14 @@ export interface VisitState {
   items: ItemState[];
 }
 
+export interface ExportState {
+  kind: ExportKind;
+  at: number;
+  employee: string;
+  /** "" when the record has no workstation name. */
+  workstation: string;
+}
+
 export interface SessionState {
   sessionId: string | null;
   name: string | null;
@@ -61,6 +72,8 @@ export interface SessionState {
   perClerk: Record<string, { patrons: number; items: number }>;
   /** The same counts by workstation name, "" for records without one. */
   perWorkstation: Record<string, { patrons: number; items: number }>;
+  /** Downloads recorded in the log, in record order. */
+  exports: ExportState[];
 }
 
 export type VersionVector = Record<string, number>;

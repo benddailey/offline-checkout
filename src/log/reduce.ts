@@ -1,5 +1,12 @@
 import { recordId } from "./ids";
-import type { ItemState, LogRecord, RecordId, SessionState, VisitState } from "./types";
+import type {
+  ExportState,
+  ItemState,
+  LogRecord,
+  RecordId,
+  SessionState,
+  VisitState,
+} from "./types";
 
 /** How a workstation is named in summaries: records from before names have none. */
 export function workstationLabel(name: string): string {
@@ -29,6 +36,7 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
   let name: string | null = null;
   let closed = false;
   const visits = new Map<RecordId, VisitState>();
+  const exports: ExportState[] = [];
 
   for (const r of sorted) {
     sessionId ??= r.sessionId;
@@ -38,6 +46,14 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
         break;
       case "session-closed":
         closed = true;
+        break;
+      case "exported":
+        exports.push({
+          kind: r.kind,
+          at: r.at,
+          employee: r.employee,
+          workstation: r.workstation ?? "",
+        });
         break;
       case "voided":
         voidedTargets.add(r.target);
@@ -141,5 +157,6 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
     totals: { patrons: livePatrons.size, items: patronItems.size },
     perClerk: byName(perClerk),
     perWorkstation: byName(perWorkstation),
+    exports,
   };
 }
