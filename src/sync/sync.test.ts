@@ -12,9 +12,11 @@ const OWN = dev("o");
 
 function setup(initial: LogRecord[] = [], opts: { batch?: number; putGate?: Promise<void> } = {}) {
   const recs = new Map(initial.map((r) => [`${r.deviceId}:${r.seq}`, r]));
+  const puts: number[] = [];
   const store: StoreLike = {
     sessionId: SID,
     put: async (rs) => {
+      puts.push(rs.length);
       await opts.putGate;
       const fresh: LogRecord[] = [];
       for (const r of rs) {
@@ -42,7 +44,7 @@ function setup(initial: LogRecord[] = [], opts: { batch?: number; putGate?: Prom
   const onRecords = vi.fn();
   const engine = new SyncEngine({ mesh, store, onRecords, batch: opts.batch });
   engine.start();
-  return { engine, deliver: (m: unknown) => handler("p", m), sent, broadcasts, onRecords };
+  return { engine, deliver: (m: unknown) => handler("p", m), sent, broadcasts, onRecords, puts };
 }
 
 const body = { type: "patron-started", patron: "P" } as const;
@@ -88,6 +90,20 @@ describe("SyncEngine", () => {
     deliver(m);
     await flush();
     expect(onRecords).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes the batches that arrive during a write together, in one put", async () => {
+    let open!: () => void;
+    const putGate = new Promise<void>((r) => (open = r));
+    const { deliver, onRecords, puts } = setup([], { putGate });
+    deliver({ t: "recs", records: [mk(A, 1, body)] });
+    await flush();
+    for (const n of [2, 3, 4]) deliver({ t: "recs", records: [mk(A, n, body), mk(B, n, body)] });
+    open();
+    await flush();
+    expect(puts).toEqual([1, 6]);
+    expect(onRecords).toHaveBeenCalledTimes(2);
+    expect(onRecords.mock.calls[1]![0]).toHaveLength(6);
   });
 
   it("ignores malformed messages and records", async () => {
@@ -173,6 +189,7 @@ describe("SyncEngine", () => {
       throw new Error("boom");
     });
     deliver({ t: "recs", records: [mk(A, 1, body)] });
+    await flush();
     deliver({ t: "recs", records: [mk(A, 2, body)] });
     await flush();
     expect(onRecords).toHaveBeenCalledTimes(2);

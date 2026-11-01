@@ -7,6 +7,8 @@ import { pairViaPaste } from "../e2e/helpers/pair";
 const RUNS = Number(process.env.LOAD_RUNS ?? 5);
 const RECORDS = Number(process.env.LOAD_RECORDS ?? 10_000);
 const THROTTLES = (process.env.LOAD_THROTTLE ?? "1,4").split(",").map(Number);
+/** Save a CPU profile of the joining workstation's sync (open it in Chrome DevTools). */
+const PROFILE = !!process.env.LOAD_PROFILE;
 const OUT = resolve("test-results", "load");
 const HOUR = 3_600_000;
 
@@ -313,6 +315,12 @@ async function runOnce(profile: string, rate: number, pairing: boolean): Promise
         await joiner.addInitScript(MARKS);
         await throttle(joinerCtx, joiner, rate);
         await joiner.goto(appUrl());
+        const profiler = PROFILE ? await joinerCtx.newCDPSession(joiner) : null;
+        const inviterProfiler = PROFILE ? await ctx.newCDPSession(page) : null;
+        for (const p of [profiler, inviterProfiler]) {
+          await p?.send("Profiler.enable");
+          await p?.send("Profiler.start");
+        }
         await pairViaPaste(page, joiner, "Joiner");
         const done = await joiner.waitForFunction(
           (want) =>
@@ -324,6 +332,16 @@ async function runOnce(profile: string, rate: number, pairing: boolean): Promise
         );
         out["pairing: joiner scan screen to full log"] =
           ((await done.jsonValue()) as number) - (await marks(joiner)).scan!;
+        if (profiler) {
+          const { profile } = await profiler.send("Profiler.stop");
+          await mkdir(OUT, { recursive: true });
+          await writeFile(resolve(OUT, `joiner-${rate}x.cpuprofile`), JSON.stringify(profile));
+          const inviter = await inviterProfiler!.send("Profiler.stop");
+          await writeFile(
+            resolve(OUT, `inviter-${rate}x.cpuprofile`),
+            JSON.stringify(inviter.profile),
+          );
+        }
       } finally {
         await browser.close();
       }

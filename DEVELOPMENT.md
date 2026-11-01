@@ -55,7 +55,9 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
   Evergreen then applies its loan rules from `checkout_time`, and needs no `CIRC_OVERRIDE_DUE_DATE`
   permission.
 - **Pairing and sync:** browser WebRTC data channels, no library (`src/mesh/`, `src/pairing/`,
-  `src/sync/`).
+  `src/sync/`). A catch-up arrives as many 200-record batches at once. `SyncEngine` writes all the
+  batches that arrive during a write in one `put()`, and `put()` queues its IndexedDB requests
+  without awaiting each one, because every write is a disk flush and a full re-reduce of the log.
 - **Tests:**
   - Vitest unit tests next to the code (`*.test.ts`), with `fake-indexeddb`;
   - Playwright end-to-end tests in `e2e/`, which decode the printed and PDF barcodes with
@@ -146,7 +148,10 @@ the camera, and WebRTC on the local network. Build it with `npm run build:probe`
 
   It prints the median and worst of the runs for each CPU throttle and writes them to
   `test-results/load/*.json`. Settings: `LOAD_RECORDS` (records per session, default 10000),
-  `LOAD_RUNS` (default 5) and `LOAD_THROTTLE` (CDP CPU throttle rates, default `1,4`). Throttling
+  `LOAD_RUNS` (default 5) and `LOAD_THROTTLE` (CDP CPU throttle rates, default `1,4`).
+  `LOAD_PROFILE=1` also saves CPU profiles of both workstations during pairing as
+  `test-results/load/{joiner,inviter}-<rate>x.cpuprofile`, which Chrome DevTools opens. Build with
+  `npx vp build --minify false` first to keep function names readable. Throttling
   slows only the page, not the browser's IndexedDB backend or the disk, so it understates an old
   PC with a slow disk.
 
