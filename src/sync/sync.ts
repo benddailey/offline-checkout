@@ -40,6 +40,8 @@ export class SyncEngine {
   private timer: ReturnType<typeof setInterval> | null = null;
   private connected = new Set<string>();
   private writes: Promise<void> = Promise.resolve();
+  /** Valid records received but not yet handed to a write. */
+  private pending: LogRecord[] = [];
   private running = false;
 
   constructor(o: {
@@ -128,10 +130,17 @@ export class SyncEngine {
         isLogRecord(r) && r.sessionId === this.store.sessionId && r.deviceId !== this.mesh.deviceId,
     );
     if (!valid.length) return;
+    // A write is already queued while records are pending; it takes these too. A catch-up
+    // arrives as many batches at once, and each write is a disk flush and a re-render.
+    const queued = this.pending.length > 0;
+    this.pending.push(...valid);
+    if (queued) return;
     this.writes = this.writes.then(async () => {
+      const batch = this.pending;
+      this.pending = [];
       let fresh: LogRecord[];
       try {
-        fresh = await this.store.put(valid);
+        fresh = await this.store.put(batch);
       } catch (err) {
         // the next vector exchange re-requests these records
         console.error("sync: store.put failed", err);

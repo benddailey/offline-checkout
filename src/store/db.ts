@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import { randomId } from "../log/ids";
-import type { LogRecord, RecordBody, VersionVector } from "../log/types";
+import { randomId, recordId } from "../log/ids";
+import type { LogRecord, RecordBody, RecordId, VersionVector } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
 
 export interface SessionMeta {
@@ -140,15 +140,17 @@ function makeStore(sessionId: string, db: IDBPDatabase<SessionSchema>): SessionS
       const tx = db.transaction(["records", "meta"], "readwrite", STRICT);
       const store = tx.objectStore("records");
       const own = (await tx.objectStore("meta").get(META_KEY))?.deviceId;
-      const stored: LogRecord[] = [];
+      const candidates = new Map<RecordId, LogRecord>();
       for (const r of records) {
         // Only append() writes this machine's records; a peer's copy would collide with it.
         if (r.sessionId !== sessionId || r.deviceId === own) continue;
-        if ((await store.get([r.deviceId, r.seq])) !== undefined) continue;
-        await store.add(r);
-        stored.push(r);
+        if (!candidates.has(recordId(r))) candidates.set(recordId(r), r);
       }
-      await tx.done;
+      // Queue every request before awaiting: a round trip per record is slow on a slow CPU.
+      const fresh = [...candidates.values()];
+      const found = await Promise.all(fresh.map((r) => store.getKey([r.deviceId, r.seq])));
+      const stored = fresh.filter((_, i) => found[i] === undefined);
+      await Promise.all([...stored.map((r) => store.add(r)), tx.done]);
       return stored;
     },
     all: () => db.getAll("records"),

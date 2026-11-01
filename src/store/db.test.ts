@@ -84,6 +84,14 @@ describe("session store", () => {
     expect(await s.all()).toHaveLength(1);
   });
 
+  it("put stores a record repeated within one batch once, beside already stored ones", async () => {
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
+    const [a, b, c] = [1, 2, 3].map((n) => remote(s.sessionId, "x", n));
+    await s.put([a!]);
+    expect(await s.put([a!, b!, c!, b!])).toEqual([b, c]);
+    expect(await s.all()).toHaveLength(3);
+  });
+
   it("put skips records claiming this machine's deviceId, so the next append cannot collide", async () => {
     const dev = await getDeviceId();
     const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
