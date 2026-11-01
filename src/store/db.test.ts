@@ -5,6 +5,7 @@ import type { LogRecord } from "../log/types";
 import {
   acquireSessionLock,
   createSession,
+  deleteSession,
   getDeviceId,
   getWorkstationName,
   listSessions,
@@ -230,6 +231,22 @@ describe("index", () => {
     const list = Object.fromEntries((await listSessions()).map((s) => [s.name, s]));
     expect(list.Open!.workstations).toEqual([{ deviceId: "x", name: "Front desk", lastAt: 4000 }]);
     expect(list.Done!.workstations).toBeUndefined();
+  });
+});
+
+describe("deleteSession", () => {
+  it("removes the session from the list and its log database, and listing does not bring it back", async () => {
+    const a = await createSession({ name: "A", employee: "Ann", withCreatedRecord: true });
+    const b = await createSession({ name: "B", employee: "Ann", withCreatedRecord: true });
+    a.close();
+    b.close();
+    await deleteSession(a.sessionId);
+    expect((await listSessions()).map((x) => x.sessionId)).toEqual([b.sessionId]);
+    const names = async () => (await indexedDB.databases()).map((d) => d.name);
+    expect(await names()).not.toContain(`oc-session-${a.sessionId}`);
+    expect(await names()).toContain(`oc-session-${b.sessionId}`);
+    await listSessions();
+    expect(await names()).not.toContain(`oc-session-${a.sessionId}`);
   });
 });
 

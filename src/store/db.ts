@@ -1,4 +1,4 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from "idb";
 import { randomId, recordId } from "../log/ids";
 import type { LogRecord, RecordBody, RecordId, VersionVector } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
@@ -312,6 +312,17 @@ export async function listSessions(): Promise<SessionSummary[]> {
   } finally {
     index.close();
   }
+}
+
+/** The index entry goes first, so a concurrent listSessions never re-opens (and re-creates) the log. */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const index = await openIndex();
+  try {
+    await index.delete("sessions", sessionId);
+  } finally {
+    index.close();
+  }
+  await deleteDB(`oc-session-${sessionId}`);
 }
 
 export function acquireSessionLock(sessionId: string): Promise<null | (() => void)> {
