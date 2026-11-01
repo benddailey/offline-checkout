@@ -18,6 +18,7 @@ function measure() {
 }
 
 function onPointerDown(e: PointerEvent) {
+  if (e.button !== 0) return;
   if (value.value === 100) return;
   measure();
   startX = e.clientX;

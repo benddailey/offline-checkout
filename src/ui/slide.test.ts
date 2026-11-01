@@ -21,6 +21,11 @@ describe("slideKey", () => {
     expect(slideKey(0, "ArrowLeft")).toEqual({ value: 0, confirm: false });
   });
 
+  it("does not confirm again once already at 100", () => {
+    expect(slideKey(100, "End")).toEqual({ value: 100, confirm: false });
+    expect(slideKey(100, "ArrowRight")).toEqual({ value: 100, confirm: false });
+  });
+
   it("ignores Enter, Space and other keys", () => {
     expect(slideKey(40, "Enter")).toBeNull();
     expect(slideKey(40, " ")).toBeNull();
@@ -32,5 +37,10 @@ describe("slideRelease", () => {
   it("is true within 8 px of the end", () => {
     expect(slideRelease(292, 300)).toBe(true);
     expect(slideRelease(270, 300)).toBe(false);
+  });
+
+  it("checks the 8 px boundary and the exact end", () => {
+    expect(slideRelease(291, 300)).toBe(false);
+    expect(slideRelease(300, 300)).toBe(true);
   });
 });

@@ -9,7 +9,7 @@ export function slideKey(value: number, key: string): { value: number; confirm: 
   else if (key === "End") next = 100;
   else return null;
   next = Math.min(100, Math.max(0, next));
-  return { value: next, confirm: next === 100 };
+  return { value: next, confirm: next === 100 && value < 100 };
 }
 
 export function slideRelease(px: number, trackPx: number): boolean {
