@@ -1,15 +1,18 @@
-// Zips the built app with the shortcut script for a release download.
-// Run after `npm run build`: node scripts/package-windows.ts
+// Zips the built app with the Windows, macOS and Linux setup scripts for a release download.
+// Run after `npm run build`: node scripts/package.ts
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const { version } = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
-const OUT = resolve(ROOT, "dist", `offline-checkout-v${version}-windows.zip`);
+const OUT = resolve(ROOT, "dist", `offline-checkout-v${version}.zip`);
 
 const now = new Date();
 const crlf = (text: string) => Buffer.from(text.replace(/\r?\n/g, "\r\n"));
+const lf = (text: string) => Buffer.from(text.replace(/\r\n/g, "\n"));
+const read = (...path: string[]) => readFileSync(resolve(ROOT, ...path));
+const readText = (...path: string[]) => readFileSync(resolve(ROOT, ...path), "utf8");
 
 /** README.md as Notepad-friendly text: headings underlined, bold, code and link markup removed. */
 function readmeText(md: string): string {
@@ -30,26 +33,31 @@ function readmeText(md: string): string {
   return lines.join("\n").trimEnd() + "\n";
 }
 
-const files: { name: string; data: Buffer }[] = [
+const files: { name: string; data: Buffer; executable?: boolean }[] = [
+  { name: "offline-checkout.html", data: read("dist", "offline-checkout.html") },
+  // cmd.exe needs CRLF and bash needs LF, whatever the checkout did.
   {
-    name: "offline-checkout.html",
-    data: readFileSync(resolve(ROOT, "dist", "offline-checkout.html")),
+    name: "Windows - Create shortcuts.cmd",
+    data: crlf(readText("windows", "Create shortcuts.cmd")),
   },
   {
-    name: "Create shortcuts.cmd",
-    // cmd.exe needs CRLF whatever the checkout did.
-    data: crlf(readFileSync(resolve(ROOT, "windows", "Create shortcuts.cmd"), "utf8")),
+    name: "Mac - Create shortcuts.command",
+    data: lf(readText("macos", "Create shortcuts.command")),
+    executable: true,
   },
-  ...["offline-checkout.ico", "offline-checkout-printer.ico"].map((name) => ({
-    name,
-    data: readFileSync(resolve(ROOT, "windows", name)),
-  })),
-  { name: "README.txt", data: crlf(readmeText(readFileSync(resolve(ROOT, "README.md"), "utf8"))) },
-  { name: "LICENSE.txt", data: crlf(readFileSync(resolve(ROOT, "LICENSE"), "utf8")) },
   {
-    name: "THIRD-PARTY-NOTICES.txt",
-    data: crlf(readFileSync(resolve(ROOT, "dist", "THIRD-PARTY-NOTICES.md"), "utf8")),
+    name: "Linux - Create shortcuts.sh",
+    data: lf(readText("linux", "Create shortcuts.sh")),
+    executable: true,
   },
+  ...["offline-checkout", "offline-checkout-printer"].flatMap((icon) => [
+    { name: `icons/${icon}.ico`, data: read("windows", `${icon}.ico`) },
+    { name: `icons/${icon}.icns`, data: read("macos", `${icon}.icns`) },
+    { name: `icons/${icon}.png`, data: read("linux", `${icon}.png`) },
+  ]),
+  { name: "README.txt", data: crlf(readmeText(readText("README.md"))) },
+  { name: "LICENSE.txt", data: crlf(readText("LICENSE")) },
+  { name: "THIRD-PARTY-NOTICES.txt", data: crlf(readText("dist", "THIRD-PARTY-NOTICES.md")) },
 ];
 
 const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
@@ -58,7 +66,7 @@ const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) 
 const locals: Buffer[] = [];
 const centrals: Buffer[] = [];
 let offset = 0;
-for (const { name, data } of files) {
+for (const { name, data, executable } of files) {
   const nameBuf = Buffer.from(name, "ascii");
   const packed = deflateRawSync(data, { level: 9 });
   const crc = crc32(data);
@@ -76,7 +84,8 @@ for (const { name, data } of files) {
 
   const central = Buffer.alloc(46);
   central.writeUInt32LE(0x02014b50, 0);
-  central.writeUInt16LE(20, 4);
+  // Made by Unix, so unzip, Archive Utility and Linux file managers keep the execute bit.
+  central.writeUInt16LE((3 << 8) | 20, 4);
   central.writeUInt16LE(20, 6);
   central.writeUInt16LE(8, 10);
   central.writeUInt16LE(dosTime, 12);
@@ -85,6 +94,7 @@ for (const { name, data } of files) {
   central.writeUInt32LE(packed.length, 20);
   central.writeUInt32LE(data.length, 24);
   central.writeUInt16LE(nameBuf.length, 28);
+  central.writeUInt32LE(((executable ? 0o100755 : 0o100644) << 16) >>> 0, 38);
   central.writeUInt32LE(offset, 42);
   centrals.push(central, nameBuf);
   offset += local.length + nameBuf.length + packed.length;

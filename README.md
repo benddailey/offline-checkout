@@ -7,15 +7,19 @@ patron's barcode and one barcode per item. Staff keep the receipts at the desk, 
 is back they scan them into the library system. A PDF with a barcode for every patron and item in
 the session is also available as a complete copy.
 
-It runs in Chrome or Edge. It needs no internet, no server, no admin rights and no installs.
+It runs in Chrome, Edge or Chromium on Windows, macOS and Linux. It needs no internet, no server, no
+admin rights and no installs.
 
 ## What you need
 
-- A Windows PC with Chrome (or Edge) at each desk.
+- A computer at each desk with one of these browsers:
+  - Windows: Google Chrome or Microsoft Edge.
+  - Mac: Google Chrome or Microsoft Edge.
+  - Linux: Chromium, Google Chrome or Microsoft Edge.
 - A USB barcode scanner that reads Code 128 barcodes and sends Enter after each scan. To join PCs
   from a printed code, it must also send Enter or Tab after each scan.
 - Optional: a webcam on each PC, to join PCs by holding a QR code up to the camera.
-- A receipt printer for 80 mm paper rolls (72 mm print width) installed in Windows, for the checkout
+- A receipt printer for 80 mm paper rolls (72 mm print width) installed on the computer, for the checkout
   receipts that are scanned back in later, and for printed join codes. Tested with a Star TSP143;
   other receipt printers should work, but print a test receipt and scan it first.
 
@@ -23,23 +27,56 @@ It runs in Chrome or Edge. It needs no internet, no server, no admin rights and 
 
 Do this before an outage, on every desk PC.
 
-1. Download the latest Windows zip from the releases page:
+1. Download the latest zip (`offline-checkout-vX.Y.Z.zip`) from the releases page:
    https://github.com/benddailey/offline-checkout/releases
-2. Right-click the zip, choose **Extract All**, and open the extracted folder.
-3. Double-click **Create shortcuts.cmd**. If Windows warns that the file came from the internet,
-   choose **More info** and **Run anyway** (or **Run**). It installs the app for this Windows user
-   and puts two shortcuts on the desktop:
+   The same zip works on Windows, Mac and Linux.
+2. Extract it and run the setup script for your computer, as described below. It installs the app
+   for this user and creates two shortcuts:
    - **Offline Checkout**: use this every day. Receipts print straight to the printer. Its icon is
      a crossed-out evergreen tree.
    - **Offline Checkout - printer setup**: use this once, to choose the receipt printer. Its icon
      has a small printer in the corner.
-4. Choose the receipt printer:
-   1. Close every Offline Checkout window.
-   2. Open **Offline Checkout - printer setup**, start a session, and click **Receipt printer**
-      under Scanner card.
-   3. In the print dialog choose the receipt printer and click **Print**. Keep the scanner card at the
-      desk.
-   4. Close the window. From now on, use **Offline Checkout**.
+3. Choose the receipt printer, as described after the steps for each system.
+
+### Windows
+
+1. Right-click the zip, choose **Extract All**, and open the extracted folder.
+2. Double-click **Windows - Create shortcuts.cmd**. If Windows warns that the file came from the
+   internet, choose **More info** and **Run anyway** (or **Run**).
+3. The two shortcuts are on the desktop.
+
+### Mac
+
+1. Double-click the zip to extract it, and open the extracted folder.
+2. Double-click **Mac - Create shortcuts.command**. It opens in Terminal.
+3. The first time, macOS says it cannot verify the file. Click **Done**, open **System Settings >
+   Privacy & Security**, scroll down and click **Open Anyway** next to the message about the file,
+   then confirm. Alternatively, open **Terminal**, type `bash ` (with a space), drag the file into
+   the Terminal window and press Return.
+4. The two apps are in the **Applications** folder in your home folder, which the script opens. Drag
+   them to the Dock to keep them handy.
+
+### Linux
+
+1. Extract the zip (in most file managers, right-click it and choose **Extract Here**), and open the
+   extracted folder.
+2. Right-click in the folder, choose **Open in Terminal**, type `bash "Linux - Create shortcuts.sh"`
+   and press Enter. (Double-clicking it usually opens it in a text editor instead.)
+3. The two shortcuts are in the app menu and on the desktop, if the desktop shows icons. On a
+   GNOME desktop, if a shortcut asks first, right-click it and choose **Allow Launching**.
+4. The app and its stored sessions are in the **OfflineCheckout** folder in your home folder. Keep
+   that folder.
+
+### Choose the receipt printer
+
+Do this once on every desk computer, after the setup script:
+
+1. Close every Offline Checkout window.
+2. Open **Offline Checkout - printer setup**, start a session, and click **Receipt printer** under
+   Scanner card.
+3. In the print dialog choose the receipt printer and click **Print**. Keep the scanner card at the
+   desk.
+4. Close the window. From now on, use **Offline Checkout**.
 
 The extracted folder is no longer needed after setup; you can delete it.
 
@@ -49,8 +86,8 @@ Every desk PC must run the same version, or they cannot join each other. The ver
 to the title on the start screen and on the Summary.
 
 1. Finish any running session first. Don't update during an outage.
-2. Download and extract the new zip and run its **Create shortcuts.cmd**, as in setup. Stored
-   sessions and the chosen printer are kept.
+2. Download and extract the new zip and run its setup script, as in setup. Stored sessions and the
+   chosen printer are kept.
 
 ## Using it at the desk
 
@@ -111,7 +148,7 @@ to the title on the start screen and on the Summary.
 - Chrome may ask for camera permission each time you join PCs by webcam.
 - Receipts print without a dialog only from the **Offline Checkout** shortcut. If the print dialog
   appears, close every Offline Checkout window and open the app from that shortcut.
-- To change the receipt printer, repeat step 4 of the setup.
+- To change the receipt printer, repeat **Choose the receipt printer** from the setup.
 - Test the printed barcodes with your own scanners before you rely on them.
 
 ## License
