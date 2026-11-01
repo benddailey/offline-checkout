@@ -50,6 +50,11 @@ barcodes (jsPDF). Receipts are printed with the browser's print dialog, or silen
 
 - Node.js 24 or newer and npm.
 
+## Dev server
+
+`npm run dev` starts Vite on port 5173. The entry page is `offline-checkout.html`, not `index.html`,
+so open http://localhost:5173/offline-checkout.html. The bare root returns a 404.
+
 ## Build
 
 ```
