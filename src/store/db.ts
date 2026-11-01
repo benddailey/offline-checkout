@@ -77,6 +77,10 @@ function openSessionDb(sessionId: string): Promise<IDBPDatabase<SessionSchema>> 
       db.createObjectStore("records", { keyPath: ["deviceId", "seq"] });
       db.createObjectStore("meta");
     },
+    blocking(_current, _blocked, event) {
+      // Another tab is deleting this session: release it so deleteDB can finish.
+      (event.target as IDBDatabase).close();
+    },
   });
 }
 

@@ -250,6 +250,15 @@ describe("deleteSession", () => {
   });
 });
 
+describe("deleteSession with the log open elsewhere", () => {
+  it("resolves and removes the database although a store is still open", async () => {
+    const a = await createSession({ name: "A", employee: "Ann", withCreatedRecord: true });
+    await deleteSession(a.sessionId);
+    const names = (await indexedDB.databases()).map((d) => d.name);
+    expect(names).not.toContain(`oc-session-${a.sessionId}`);
+  });
+});
+
 describe("tab lock", () => {
   it("is exclusive until released", async () => {
     const held = new Set<string>();

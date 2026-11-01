@@ -86,15 +86,23 @@ function exportSession(kind: ExportKind): void {
 
 async function confirm(): Promise<void> {
   const what = confirming.value;
+  if (what === "delete") {
+    await session.deleteSession();
+    confirming.value = null;
+    return;
+  }
   confirming.value = null;
   if (what === "close") await session.closeSession();
-  else if (what === "delete") await session.deleteSession();
   else if (what) runExport(what);
 }
 
 const dialog = useTemplateRef<HTMLElement>("dialog");
 
 /** Keep Tab and Shift+Tab inside the dialog. */
+function dismiss(): void {
+  if (!session.deletingSession) confirming.value = null;
+}
+
 function trapTab(e: KeyboardEvent): void {
   const buttons = [...(dialog.value?.querySelectorAll("button, [role=slider]") ?? [])];
   const first = buttons[0];
@@ -286,7 +294,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
     <div
       v-if="confirming"
       class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6"
-      @keydown.esc="confirming = null"
+      @keydown.esc="dismiss"
       @keydown.tab="trapTab"
     >
       <div
@@ -340,8 +348,15 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
           </p>
         </div>
         <div v-if="confirming === 'delete'" class="flex flex-col gap-3">
-          <SlideToConfirm label="Slide to delete" @confirm="confirm" />
-          <button ref="cancel" type="button" :class="secondary" @click="confirming = null">
+          <p v-if="session.deletingSession" role="status" class="text-2xl font-bold">Deleting…</p>
+          <SlideToConfirm v-else label="Slide to delete" @confirm="confirm" />
+          <button
+            ref="cancel"
+            type="button"
+            :class="secondary"
+            :disabled="session.deletingSession"
+            @click="confirming = null"
+          >
             Cancel
           </button>
         </div>

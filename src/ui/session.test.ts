@@ -1449,6 +1449,19 @@ describe("useSession deleteSession", () => {
     expect(db.deleted).toEqual([sessionId]);
   });
 
+  it("reports deletingSession from the start of the wait until it finishes", async () => {
+    const { s, m } = await closedWithPeer();
+    vi.useFakeTimers();
+    expect(s.deletingSession).toBe(false);
+    const p = s.deleteSession();
+    expect(s.deletingSession).toBe(true);
+    s.leaveSession();
+    expect(s.screen).not.toBe("launch");
+    m.deliver(PEER, { t: "deleted" });
+    await p;
+    expect(s.deletingSession).toBe(false);
+  });
+
   it("names the peers that did not reply in time", async () => {
     const { s, m } = await closedWithPeer();
     vi.useFakeTimers();

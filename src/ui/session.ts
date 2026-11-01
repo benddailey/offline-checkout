@@ -211,7 +211,8 @@ export const useSession = defineStore("session", () => {
   let unsubPeers: (() => void) | null = null;
   let unsubMessages: (() => void) | null = null;
   /** A delete under way here, started by this workstation or a peer; others are ignored. */
-  let deleting: { sessionId: string; by: "self" | "peer" } | null = null;
+  const deleting = shallowRef<{ sessionId: string; by: "self" | "peer" } | null>(null);
+  const deletingSession = computed(() => deleting.value?.by === "self");
   /** While deleteSession waits: the peers yet to reply, and how to stop waiting. */
   let awaitingDeleted: { peers: Set<string>; done: () => void } | null = null;
   const known = new Set<RecordId>();
@@ -260,6 +261,7 @@ export const useSession = defineStore("session", () => {
 
   /** Release the session here (lock, store, mesh) and go back to Launch. */
   function leaveSession(): void {
+    if (deletingSession.value) return;
     teardown();
     screen.value = "launch";
   }
@@ -784,8 +786,8 @@ export const useSession = defineStore("session", () => {
    */
   async function deleteSession(): Promise<void> {
     const m = meta.value;
-    if (deleting || !m || !closed.value) return;
-    deleting = { sessionId: m.sessionId, by: "self" };
+    if (deleting.value || !m || !closed.value) return;
+    deleting.value = { sessionId: m.sessionId, by: "self" };
     try {
       const waiting = new Set(peers.value.filter((p) => p.connected).map((p) => p.deviceId));
       if (waiting.size) {
@@ -810,7 +812,7 @@ export const useSession = defineStore("session", () => {
         `Session ‘${m.name}’ deleted.` +
         (unconfirmed.length ? ` Not confirmed on: ${unconfirmed.join(", ")}.` : "");
     } finally {
-      deleting = null;
+      deleting.value = null;
     }
   }
 
@@ -829,15 +831,15 @@ export const useSession = defineStore("session", () => {
   async function deletedByPeer(peer: string, workstation: unknown): Promise<void> {
     const m = meta.value;
     const reply: DeleteMessage = { t: "deleted" };
-    if (deleting) {
+    if (deleting.value) {
       // Both workstations deleting the same session: confirm, but delete only once.
-      if (deleting.by === "self" && deleting.sessionId === m?.sessionId) {
+      if (deleting.value.by === "self" && deleting.value.sessionId === m?.sessionId) {
         mesh.value?.send(peer, reply);
       }
       return;
     }
     if (!m || !closed.value) return;
-    deleting = { sessionId: m.sessionId, by: "peer" };
+    deleting.value = { sessionId: m.sessionId, by: "peer" };
     try {
       const link = mesh.value;
       link?.send(peer, reply);
@@ -849,7 +851,7 @@ export const useSession = defineStore("session", () => {
       if (!(await removeHere(m.sessionId))) return;
       notice.value = `Session ‘${m.name}’ was deleted on ${from}.`;
     } finally {
-      deleting = null;
+      deleting.value = null;
     }
   }
 
@@ -907,6 +909,7 @@ export const useSession = defineStore("session", () => {
     voidPatron,
     closeSession,
     deleteSession,
+    deletingSession,
     generatePdf,
     exportTable,
     printScannerCard,

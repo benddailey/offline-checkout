@@ -146,7 +146,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
       <button
         type="button"
         :class="tool"
-        :disabled="session.lockedPatron !== null"
+        :disabled="session.lockedPatron !== null || session.deletingSession"
         :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
         @click="exit"
       >
@@ -207,7 +207,12 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
           and re-pair with any workstation.
         </p>
         <div class="flex flex-wrap gap-3">
-          <button type="button" :class="danger" @click="session.leaveSession()">
+          <button
+            type="button"
+            :class="danger"
+            :disabled="session.deletingSession"
+            @click="session.leaveSession()"
+          >
             Yes, exit session
           </button>
           <button ref="cancel" type="button" :class="secondary" @click="dialog = null">

@@ -74,7 +74,8 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
   Deleting a closed session sends `{t:"delete-session", workstation}` to the connected peers and
   waits up to 3 s (`DELETE_REPLY_MS`) for each `{t:"deleted"}`. A peer with that session closed
   replies, waits for the sender to disconnect (or 1 s), then deletes it; a peer with it open ignores
-  the message. The sender then deletes its own copy and shows which peers did not confirm. Peers that
+  the message. A `deleted` reply means the peer accepted the delete and is removing its copy, not
+  that its copy is already gone. The sender then deletes its own copy and shows which peers did not confirm. Peers that
   were not connected keep their copy. The pairing payload is unchanged, so `OC2:` stays.
 - **Tests:**
   - Vitest unit tests next to the code (`*.test.ts`), with `fake-indexeddb`;
