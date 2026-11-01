@@ -69,6 +69,23 @@ describe("reduce", () => {
     ]);
     expect(s.perClerk).toEqual({ A: { patrons: 1, items: 1 }, B: { patrons: 0, items: 1 } });
   });
+  test("perWorkstation counts like perClerk, under '' for records without a workstation", () => {
+    const at = (r: LogRecord, workstation: string) => ({ ...r, workstation });
+    const s = reduce([
+      at(mk("a", 1, { type: "patron-started", patron: "P1" }), "Desk 1"),
+      at(mk("a", 2, { type: "item-scanned", visitId: "a:1", item: "I1" }), "Desk 1"),
+      at(mk("b", 1, { type: "item-scanned", visitId: "a:1", item: "I2" }), "Desk 2"),
+      mk("c", 1, { type: "patron-started", patron: "P2" }),
+      mk("c", 2, { type: "item-scanned", visitId: "c:1", item: "I3" }),
+    ]);
+    expect(s.perWorkstation).toEqual({
+      "": { patrons: 1, items: 1 },
+      "Desk 1": { patrons: 1, items: 1 },
+      "Desk 2": { patrons: 0, items: 1 },
+    });
+    expect(s.visits[0]!.workstation).toBe("Desk 1");
+    expect(s.visits[0]!.items.find((i) => i.barcode === "I2")!.workstation).toBe("Desk 2");
+  });
   test("counts match the PDF: distinct patrons per clerk, distinct (patron, item) pairs", () => {
     const s = reduce([
       mk("a", 1, { type: "patron-started", patron: "P1" }),

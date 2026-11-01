@@ -1,10 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl, resumeAs } from "./helpers/app";
+import { openApp, resumeAs } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { stubPrint } from "./helpers/print";
 
 async function start(page: Page, session: string, clerk: string): Promise<void> {
-  await page.goto(appUrl());
+  await openApp(page);
   await page.getByLabel("Session name").fill(session);
   await page.getByLabel("Clerk name").fill(clerk);
   await page.getByRole("button", { name: "Start session" }).click();
@@ -75,7 +75,7 @@ test("other workstations see a changed clerk; exiting while connected asks first
   try {
     const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
     await start(a!, "Desk", "Ann");
-    await b!.goto(appUrl());
+    await openApp(b!);
     await pairViaPaste(a!, b!, "Ben");
     const benOnA = a!.getByTestId("status-bar").getByRole("listitem").filter({ hasText: "Ben" });
     await expect(benOnA.getByLabel("connected", { exact: true })).toBeVisible({ timeout: 10_000 });

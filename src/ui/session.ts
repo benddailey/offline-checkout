@@ -35,6 +35,8 @@ export interface SessionDeps {
   renderScannerCard: typeof renderScannerCard;
   downloadBlob: typeof downloadBlob;
   getDeviceId: typeof db.getDeviceId;
+  getWorkstationName: typeof db.getWorkstationName;
+  setWorkstationName: typeof db.setWorkstationName;
   /** The live mesh for a session opened here (start or resume). */
   createMesh: (o: MeshOptions) => Mesh;
   /** Answer a pairing offer (Mesh.join). */
@@ -61,6 +63,8 @@ export function createSessionStoreDeps(overrides: Partial<SessionDeps> = {}): Se
     renderScannerCard,
     downloadBlob,
     getDeviceId: db.getDeviceId,
+    getWorkstationName: db.getWorkstationName,
+    setWorkstationName: db.setWorkstationName,
     createMesh: (o) => new Mesh(o),
     joinMesh: (text, o) => Mesh.join(text, o),
     now: () => new Date(),
@@ -119,6 +123,8 @@ export const useSession = defineStore("session", () => {
   const offerScannerCard = ref(false);
   /** A status bar dialog is open: the scanner input stands down. */
   const toolbarDialog = ref(false);
+  /** This workstation's saved name: undefined until loaded, null if it has none yet. */
+  const workstationName = ref<string | null | undefined>(undefined);
 
   const state = computed(() => reduce(records.value));
   /**
@@ -135,27 +141,31 @@ export const useSession = defineStore("session", () => {
    * Other workstations in this session's log that are not connected now: their latest scans may
    * be missing here. Named by the clerk on each one's latest (highest seq) record.
    */
-  const notConnected = computed<{ deviceId: string; employee: string }[]>(() => {
-    const own = meta.value?.deviceId;
-    const connected = new Set(peers.value.filter((p) => p.connected).map((p) => p.deviceId));
-    const latest = new Map<string, LogRecord>();
-    for (const r of records.value) {
-      if (r.deviceId === own || connected.has(r.deviceId)) continue;
-      const prev = latest.get(r.deviceId);
-      if (!prev || r.seq > prev.seq) latest.set(r.deviceId, r);
-    }
-    const out = new Map<string, string>();
-    for (const r of latest.values()) out.set(r.deviceId, r.employee);
-    // Peers seen this page load that dropped, even if none of their records have arrived.
-    for (const p of peers.value) {
-      if (!p.connected && p.deviceId !== own && !out.has(p.deviceId)) {
-        out.set(p.deviceId, p.employee);
+  const notConnected = computed<{ deviceId: string; employee: string; workstation: string }[]>(
+    () => {
+      const own = meta.value?.deviceId;
+      const connected = new Set(peers.value.filter((p) => p.connected).map((p) => p.deviceId));
+      const latest = new Map<string, LogRecord>();
+      for (const r of records.value) {
+        if (r.deviceId === own || connected.has(r.deviceId)) continue;
+        const prev = latest.get(r.deviceId);
+        if (!prev || r.seq > prev.seq) latest.set(r.deviceId, r);
       }
-    }
-    return [...out]
-      .map(([deviceId, employee]) => ({ deviceId, employee }))
-      .sort((a, b) => a.employee.localeCompare(b.employee) || (a.deviceId < b.deviceId ? -1 : 1));
-  });
+      const out = new Map<string, { employee: string; workstation: string }>();
+      for (const r of latest.values()) {
+        out.set(r.deviceId, { employee: r.employee, workstation: r.workstation ?? "" });
+      }
+      // Peers seen this page load that dropped, even if none of their records have arrived.
+      for (const p of peers.value) {
+        if (!p.connected && p.deviceId !== own && !out.has(p.deviceId)) {
+          out.set(p.deviceId, { employee: p.employee, workstation: "" });
+        }
+      }
+      return [...out]
+        .map(([deviceId, d]) => ({ deviceId, ...d }))
+        .sort((a, b) => a.employee.localeCompare(b.employee) || (a.deviceId < b.deviceId ? -1 : 1));
+    },
+  );
   const currentVisit = computed<VisitState | null>(() => {
     const id = currentVisitId.value;
     if (id === null) return null;
@@ -695,6 +705,26 @@ export const useSession = defineStore("session", () => {
     return deps.listSessions();
   }
 
+  async function loadWorkstationName(): Promise<void> {
+    workstationName.value = (await deps.getWorkstationName()) ?? null;
+  }
+
+  /** Save this workstation's name for records written from now on; false if blank or not saved. */
+  async function nameWorkstation(name: string): Promise<boolean> {
+    const clean = clampName(name);
+    if (!clean) return false;
+    try {
+      await deps.setWorkstationName(clean);
+    } catch (err) {
+      console.error("session: could not save the workstation name", err);
+      message.value = { tone: "error", text: "Could not save the workstation name" };
+      return false;
+    }
+    workstationName.value = clean;
+    message.value = null;
+    return true;
+  }
+
   return {
     screen,
     meta,
@@ -734,6 +764,9 @@ export const useSession = defineStore("session", () => {
     joinSession,
     knownDevices,
     listSessions,
+    workstationName,
+    loadWorkstationName,
+    nameWorkstation,
   };
 });
 

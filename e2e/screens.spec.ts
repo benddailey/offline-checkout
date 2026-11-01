@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl } from "./helpers/app";
+import { appUrl, openApp } from "./helpers/app";
 import { stubPrint } from "./helpers/print";
 
 const VIEWPORT = { width: 1366, height: 768 };
@@ -14,9 +14,12 @@ test("the main screens render at 1366x768 (screenshots for review)", async ({ br
   const contexts = await Promise.all([1, 2].map(() => browser.newContext({ viewport: VIEWPORT })));
   try {
     const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
+    await a!.goto(appUrl());
+    await expect(a!.getByTestId("workstation-form")).toBeVisible();
+    await shot(a!, "0-name-workstation");
     for (const page of [a!, b!]) {
       await stubPrint(page);
-      await page.goto(appUrl());
+      await openApp(page);
     }
 
     await expect(a!.getByRole("button", { name: "Start session" })).toBeVisible();

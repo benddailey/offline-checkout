@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl, resumeAs } from "./helpers/app";
+import { openApp, resumeAs } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { stubPrint } from "./helpers/print";
 
@@ -13,7 +13,7 @@ test("three workstations pair by paste, form a mesh and sync scans", async ({ br
   const contexts = await Promise.all([1, 2, 3].map(() => browser.newContext()));
   try {
     const [a, b, c] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
-    for (const page of [a!, b!, c!]) await page.goto(appUrl());
+    for (const page of [a!, b!, c!]) await openApp(page);
 
     await a!.getByLabel("Session name").fill("Outage");
     await a!.getByLabel("Clerk name").fill("Ann");
@@ -47,7 +47,7 @@ test("three workstations pair by paste, form a mesh and sync scans", async ({ br
 
     // A reply code pasted where a join code belongs.
     const d = await contexts[2]!.newPage();
-    await d.goto(appUrl());
+    await openApp(d);
     await d.getByRole("button", { name: "Join session" }).click();
     await d.getByLabel("Pasted code").fill(first.answer);
     await d.getByRole("button", { name: "Use pasted code" }).click();
@@ -76,7 +76,7 @@ test("an isolated workstation re-pairs only with its own session", async ({ brow
     const [a, b, other] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
     for (const page of [a!, b!, other!]) {
       await stubPrint(page);
-      await page.goto(appUrl());
+      await openApp(page);
     }
     for (const [page, session, clerk] of [
       [a!, "Outage", "Ann"],

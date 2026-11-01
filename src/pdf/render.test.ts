@@ -20,6 +20,7 @@ function state(visits: unknown[], name: string | null = "Spring Sale"): SessionS
     patronIndex: new Map(),
     totals: { patrons: 3, items: 4 },
     perClerk: { Zed: { patrons: 1, items: 1 }, Amy: { patrons: 2, items: 3 } },
+    perWorkstation: { "": { patrons: 3, items: 4 } },
   } as unknown as SessionState;
 }
 
@@ -44,7 +45,20 @@ describe("render", () => {
     expect(t).toContain("Spring Sale - 2026-10-10 - Page 1 of 1");
     expect(t).toContain("Patrons: 3");
     expect(t).toContain("Items: 4");
+    expect(t).toContain("By clerk:");
+    expect(t.indexOf("By clerk:")).toBeLessThan(t.indexOf("Amy: 2 patrons, 3 items"));
     expect(t.indexOf("Amy: 2 patrons, 3 items")).toBeLessThan(t.indexOf("Zed: 1 patron, 1 item"));
+    expect(t).not.toContain("By workstation:");
+  });
+
+  test("summary lists workstations once any record has one", () => {
+    const named = {
+      ...state([visit("P0001", ["I0001"])]),
+      perWorkstation: { "": { patrons: 0, items: 1 }, "Desk 1": { patrons: 1, items: 0 } },
+    };
+    const t = texts(raw(buildSessionPdf(named, { date }, false)));
+    expect(t.indexOf("By workstation:")).toBeLessThan(t.indexOf("Desk 1: 1 patron, 0 items"));
+    expect(t).toContain("Not named: 0 patrons, 1 item");
   });
 
   test("barcode A is one rect per bar run", () => {

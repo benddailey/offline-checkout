@@ -1,6 +1,16 @@
 import { recordId } from "./ids";
 import type { ItemState, LogRecord, RecordId, SessionState, VisitState } from "./types";
 
+/** How a workstation is named in summaries: records from before names have none. */
+export function workstationLabel(name: string): string {
+  return name || "Not named";
+}
+
+/** Whether any record has a workstation name, so summaries need a By workstation list. */
+export function hasWorkstations(s: SessionState): boolean {
+  return Object.keys(s.perWorkstation).some((w) => w !== "");
+}
+
 function compare(a: LogRecord, b: LogRecord): number {
   return (
     a.at - b.at || (a.deviceId < b.deviceId ? -1 : a.deviceId > b.deviceId ? 1 : 0) || a.seq - b.seq
@@ -42,6 +52,7 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
           patron: r.patron,
           deviceId: r.deviceId,
           employee: r.employee,
+          workstation: r.workstation ?? "",
           at: r.at,
           ended: false,
           voided: false,
@@ -71,6 +82,7 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
       voided: visit.voided || voidedTargets.has(id),
       at: r.at,
       employee: r.employee,
+      workstation: r.workstation ?? "",
     };
     visit.items.push(item);
   }
@@ -80,8 +92,11 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
   const livePatrons = new Set<string>();
   const perClerk: SessionState["perClerk"] = {};
   const clerk = (e: string) => (perClerk[e] ??= { patrons: 0, items: 0 });
+  const perWorkstation: SessionState["perWorkstation"] = {};
+  const desk = (w: string) => (perWorkstation[w] ??= { patrons: 0, items: 0 });
   // Counted as the PDF prints them: one block per patron, each item once per patron.
   const clerkPatrons = new Set<string>();
+  const deskPatrons = new Set<string>();
   const patronItems = new Set<string>();
   const key = (...parts: string[]) => JSON.stringify(parts);
   for (const v of visitList) {
@@ -95,15 +110,27 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
       clerkPatrons.add(cp);
       clerk(v.employee).patrons++;
     }
+    const dp = key(v.workstation, v.patron);
+    if (!deskPatrons.has(dp)) {
+      deskPatrons.add(dp);
+      desk(v.workstation).patrons++;
+    }
     for (const i of v.items) {
       if (i.voided) continue;
       patronItems.add(key(v.patron, i.barcode));
       clerk(i.employee).items++;
+      desk(i.workstation).items++;
     }
   }
   // Clerks who only scanned items still appear via clerk(); ensure key order is stable.
-  const sortedClerks: SessionState["perClerk"] = {};
-  for (const k of Object.keys(perClerk).sort()) sortedClerks[k] = perClerk[k];
+  const byName = (m: SessionState["perClerk"]) => {
+    const out: SessionState["perClerk"] = {};
+    // "" (no workstation name) last, after the named ones.
+    const keys = Object.keys(m).sort();
+    if (keys[0] === "") keys.push(keys.shift()!);
+    for (const k of keys) out[k] = m[k]!;
+    return out;
+  };
 
   return {
     sessionId,
@@ -112,6 +139,7 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
     visits: visitList,
     patronIndex,
     totals: { patrons: livePatrons.size, items: patronItems.size },
-    perClerk: sortedClerks,
+    perClerk: byName(perClerk),
+    perWorkstation: byName(perWorkstation),
   };
 }

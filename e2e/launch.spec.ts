@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl } from "./helpers/app";
+import { appUrl, openApp } from "./helpers/app";
 import { stubPrint } from "./helpers/print";
 
 async function startSession(page: Page, name: string, clerk: string): Promise<void> {
@@ -19,7 +19,7 @@ test("the start page leads with the latest open session unless it has been idle 
   page,
 }) => {
   await stubPrint(page);
-  await page.goto(appUrl());
+  await openApp(page);
   const startForm = page.getByTestId("start-form");
   const resumeForm = page.getByTestId("resume-form");
   const startToggle = page.getByRole("button", { name: "Start new session" });
@@ -81,4 +81,37 @@ test("the start page leads with the latest open session unless it has been idle 
   await expect(page.getByTestId("resume-list")).toContainText("Sunday");
   await expect(resumeForm).toBeHidden();
   await expect(startToggle).toHaveCount(0);
+});
+
+test("a new workstation must be named before anything else, and can be renamed", async ({
+  page,
+}) => {
+  await page.goto(appUrl());
+  const form = page.getByTestId("workstation-form");
+  await expect(form.getByRole("heading", { name: "Name this workstation" })).toBeVisible();
+  await expect(form.getByLabel("Workstation name")).toBeFocused();
+  await expect(page.getByTestId("start-form")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Join session" })).toHaveCount(0);
+
+  await form.getByLabel("Workstation name").fill("   ");
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(form.getByText("Enter a name for this workstation.")).toBeVisible();
+
+  await form.getByLabel("Workstation name").fill("Front desk 1");
+  await form.getByLabel("Workstation name").press("Enter");
+  await expect(page.getByTestId("workstation")).toHaveText(/Workstation: Front desk 1/);
+  await expect(page.getByTestId("start-form")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByTestId("workstation")).toHaveText(/Workstation: Front desk 1/);
+  await expect(form).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Rename" }).click();
+  await expect(form.getByLabel("Workstation name")).toHaveValue("Front desk 1");
+  await form.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByTestId("workstation")).toHaveText(/Front desk 1/);
+  await page.getByRole("button", { name: "Rename" }).click();
+  await form.getByLabel("Workstation name").fill("Returns desk");
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByTestId("workstation")).toHaveText(/Workstation: Returns desk/);
 });

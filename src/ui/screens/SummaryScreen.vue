@@ -5,6 +5,7 @@ import ScanInput from "../components/ScanInput.vue";
 import SessionClosedBanner from "../components/SessionClosedBanner.vue";
 import { useSession } from "../session";
 import { summaryPatrons } from "../summary";
+import { hasWorkstations, workstationLabel } from "../../log/reduce";
 
 const session = useSession();
 const version = __APP_VERSION__;
@@ -36,7 +37,20 @@ const confirmingExport = computed(() =>
 );
 const cancelButton = useTemplateRef<HTMLButtonElement>("cancel");
 
-const missingNames = computed(() => session.notConnected.map((d) => d.employee || "Unnamed"));
+const workstations = computed(() =>
+  hasWorkstations(session.state)
+    ? Object.entries(session.state.perWorkstation).map(([w, n]) => ({
+        name: workstationLabel(w),
+        ...n,
+      }))
+    : [],
+);
+
+/** "Ann (Front desk 2)": the clerk, and the workstation when its records name one. */
+const who = (d: { employee: string; workstation: string }) =>
+  `${d.employee || "Unnamed"}${d.workstation ? ` (${d.workstation})` : ""}`;
+
+const missingNames = computed(() => session.notConnected.map(who));
 
 const inProgress = computed(() =>
   session.othersInProgress.map((v) => `${v.patron} (${v.employee || "Unnamed"})`),
@@ -121,7 +135,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
       data-testid="not-connected"
     >
       <li v-for="d in session.notConnected" :key="d.deviceId">
-        Not connected: {{ d.employee || "Unnamed" }} — their latest scans may be missing
+        Not connected: {{ who(d) }} — their latest scans may be missing
       </li>
     </ul>
 
@@ -141,6 +155,16 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
             {{ c.items === 1 ? "item" : "items" }}
           </li>
         </ul>
+        <template v-if="workstations.length">
+          <h3 class="mt-4 mb-1 text-lg font-bold text-slate-700">By workstation</h3>
+          <ul class="text-lg" data-testid="per-workstation">
+            <li v-for="w in workstations" :key="w.name">
+              {{ w.name }}: {{ w.patrons }} {{ w.patrons === 1 ? "patron" : "patrons" }},
+              {{ w.items }}
+              {{ w.items === 1 ? "item" : "items" }}
+            </li>
+          </ul>
+        </template>
       </div>
 
       <div

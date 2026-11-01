@@ -29,6 +29,10 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
 - **Storage:** IndexedDB through `idb` (`src/store/`). The `offline-checkout` database indexes the
   sessions, and each session's log is in its own `oc-session-<id>` database. `listSessions` reads
   the log of every session not yet seen closed, to find closes from peers and the last activity.
+  The `device` store also holds the workstation name staff give each browser profile on first
+  launch. `createSession` and `openSessionStore` copy it into the session's meta, and `append()`
+  stamps it on each record as an optional `workstation` field beside `employee`. Records from before
+  names have none and show as "Not named". It is not part of the pairing payload.
   The start page uses that last activity: if an open session has a record from the last 72 hours,
   the page lists open sessions first with the latest one expanded, and the start form sits behind
   a **Start new session** button.

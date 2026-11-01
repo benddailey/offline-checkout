@@ -15,7 +15,7 @@ export function buildCsv(rows: ExportRow[]): string {
   const lines = [COLUMNS.map(field).join(",")];
   for (const r of rows) {
     const time = r.scannedAt === null ? "" : localDateTime(r.scannedAt);
-    lines.push([r.patron, r.item, time, r.clerk, r.session].map(field).join(","));
+    lines.push([r.patron, r.item, time, r.clerk, r.workstation, r.session].map(field).join(","));
   }
   return `﻿${lines.join("\r\n")}\r\n`;
 }

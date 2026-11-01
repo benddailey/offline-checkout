@@ -3,9 +3,23 @@ import { buildXacts } from "./xacts";
 
 test("one Evergreen offline checkout per item, as JSON lines; patrons with no items are skipped", () => {
   const xacts = buildXacts([
-    { patron: "P1", item: "I1", scannedAt: 1793460312999, clerk: "Ann", session: "Outage" },
-    { patron: "P2", item: "", scannedAt: null, clerk: "Ann", session: "Outage" },
-    { patron: "P3", item: "I2", scannedAt: 1793460400000, clerk: "Ben", session: "Outage" },
+    {
+      patron: "P1",
+      item: "I1",
+      scannedAt: 1793460312999,
+      clerk: "Ann",
+      workstation: "",
+      session: "Outage",
+    },
+    { patron: "P2", item: "", scannedAt: null, clerk: "Ann", workstation: "", session: "Outage" },
+    {
+      patron: "P3",
+      item: "I2",
+      scannedAt: 1793460400000,
+      clerk: "Ben",
+      workstation: "",
+      session: "Outage",
+    },
   ]);
   expect(xacts).toBe(
     '{"timestamp":1793460312,"type":"checkout","delta":0,"patron_barcode":"P1","barcode":"I1",' +

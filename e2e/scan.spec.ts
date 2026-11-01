@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { appUrl, resumeAs } from "./helpers/app";
+import { openApp, resumeAs } from "./helpers/app";
 import { stubPrint } from "./helpers/print";
 
 test("scan, void, end patron and resume after reload", async ({ page }) => {
   await stubPrint(page);
-  await page.goto(appUrl());
+  await openApp(page);
   await page.getByLabel("Session name").fill("Scan Test");
   await page.getByLabel("Clerk name").fill("Rae");
   await page.getByRole("button", { name: "Start session" }).click();
@@ -61,7 +61,7 @@ test("a patron in progress locks leaving the scan screen and asks before the tab
   page,
 }) => {
   await stubPrint(page);
-  await page.goto(appUrl());
+  await openApp(page);
   await page.getByLabel("Session name").fill("Lock Test");
   await page.getByLabel("Clerk name").fill("Rae");
   await page.getByRole("button", { name: "Start session" }).click();
@@ -104,7 +104,7 @@ test("a patron in progress locks leaving the scan screen and asks before the tab
 
 test("the scanner card offer closes once the first patron is scanned", async ({ page }) => {
   await stubPrint(page);
-  await page.goto(appUrl());
+  await openApp(page);
   await page.getByLabel("Session name").fill("Offer Test");
   await page.getByLabel("Clerk name").fill("Rae");
   await page.getByRole("button", { name: "Start session" }).click();

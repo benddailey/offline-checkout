@@ -16,9 +16,9 @@ describe("exportRows", () => {
       mk("a", 8, { type: "item-scanned", visitId: "a:7", item: "I3" }),
     ]);
     expect(exportRows(s)).toEqual([
-      { patron: "P1", item: "I1", scannedAt: 3000, clerk: "A", session: "Outage" },
-      { patron: "P1", item: "I2", scannedAt: 5000, clerk: "B", session: "Outage" },
-      { patron: "P2", item: "I3", scannedAt: 8000, clerk: "A", session: "Outage" },
+      { patron: "P1", item: "I1", scannedAt: 3000, clerk: "A", workstation: "", session: "Outage" },
+      { patron: "P1", item: "I2", scannedAt: 5000, clerk: "B", workstation: "", session: "Outage" },
+      { patron: "P2", item: "I3", scannedAt: 8000, clerk: "A", workstation: "", session: "Outage" },
     ]);
   });
 
@@ -32,9 +32,19 @@ describe("exportRows", () => {
       mk("a", 6, { type: "voided", target: "a:4" }),
     ]);
     expect(exportRows(s)).toEqual([
-      { patron: "P1", item: "", scannedAt: null, clerk: "A", session: "" },
+      { patron: "P1", item: "", scannedAt: null, clerk: "A", workstation: "", session: "" },
     ]);
   });
+});
+
+test("rows carry the workstation that scanned the item, or started an empty patron", () => {
+  const at = <T extends object>(r: T, workstation: string) => ({ ...r, workstation });
+  const s = reduce([
+    at(mk("a", 1, { type: "patron-started", patron: "P1" }), "Desk 1"),
+    at(mk("b", 1, { type: "item-scanned", visitId: "a:1", item: "I1" }), "Desk 2"),
+    at(mk("a", 2, { type: "patron-started", patron: "P2" }), "Desk 1"),
+  ]);
+  expect(exportRows(s).map((r) => r.workstation)).toEqual(["Desk 2", "Desk 1"]);
 });
 
 test("localDateTime is local wall-clock time", () => {

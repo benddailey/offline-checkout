@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { hasWorkstations, workstationLabel } from "../log/reduce";
 import type { SessionState } from "../log/types";
 import { blocksFromState } from "./blocks";
 import { CONTROL } from "../log/barcode";
@@ -60,15 +61,21 @@ function ymd(d: Date): string {
 // jsPDF's standard fonts are WinAnsi; "—" and "·" are replaced with ASCII to stay reliably extractable.
 export function buildSessionPdf(state: SessionState, opts: { date: Date }, compress = true): jsPDF {
   const g = GEOMETRY;
+  const counts = (name: string, { patrons, items }: { patrons: number; items: number }) =>
+    `${name}: ${patrons} patron${patrons === 1 ? "" : "s"}, ${items} item${items === 1 ? "" : "s"}`;
   const summary = [
     `Patrons: ${state.totals.patrons}`,
     `Items: ${state.totals.items}`,
+    "By clerk:",
     ...Object.keys(state.perClerk)
       .sort()
-      .map((c) => {
-        const { patrons, items } = state.perClerk[c];
-        return `${c}: ${patrons} patron${patrons === 1 ? "" : "s"}, ${items} item${items === 1 ? "" : "s"}`;
-      }),
+      .map((c) => counts(c, state.perClerk[c])),
+    ...(hasWorkstations(state)
+      ? [
+          "By workstation:",
+          ...Object.entries(state.perWorkstation).map(([w, n]) => counts(workstationLabel(w), n)),
+        ]
+      : []),
   ];
   const { pages, elements } = layout(blocksFromState(state), summary);
   const doc = newDoc(compress);
