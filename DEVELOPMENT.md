@@ -33,6 +33,9 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
   launch. `createSession` and `openSessionStore` copy it into the session's meta, and `append()`
   stamps it on each record as an optional `workstation` field beside `employee`. Records from before
   names have none and show as "Not named". It is not part of the pairing payload.
+  `listSessions` also gives each open session the latest named record of each workstation, and the
+  start page lists the other workstations from them (`src/ui/workstations.ts`). It is only the last
+  activity synced here: the start page has no mesh, so it cannot show which are online.
   The start page uses that last activity: if an open session has a record from the last 72 hours,
   the page lists open sessions first with the latest one expanded, and the start form sits behind
   a **Start new session** button.

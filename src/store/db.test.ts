@@ -211,6 +211,24 @@ describe("index", () => {
     expect(list.Busy!.lastActivityAt).toBe(later);
     expect(list.Done!.lastActivityAt).toBeUndefined();
   });
+
+  it("listSessions gives open sessions each named workstation's latest record", async () => {
+    const open = await createSession({ name: "Open", employee: "Ann", withCreatedRecord: false });
+    await open.put([
+      { ...remote(open.sessionId, "x", 1), workstation: "Desk 1", at: 5000 },
+      { ...remote(open.sessionId, "x", 2), workstation: "Front desk", at: 7000 },
+      { ...remote(open.sessionId, "x", 3), at: 9000 },
+      { ...remote(open.sessionId, "y", 1), at: 8000 },
+    ]);
+    const done = await createSession({ name: "Done", employee: "Ann", withCreatedRecord: false });
+    await done.put([{ ...remote(done.sessionId, "z", 1), workstation: "Back", at: 6000 }]);
+    await done.append({ type: "session-closed" });
+    for (const s of [open, done]) s.close();
+
+    const list = Object.fromEntries((await listSessions()).map((s) => [s.name, s]));
+    expect(list.Open!.workstations).toEqual([{ deviceId: "x", name: "Front desk", lastAt: 7000 }]);
+    expect(list.Done!.workstations).toBeUndefined();
+  });
 });
 
 describe("tab lock", () => {

@@ -118,3 +118,35 @@ test("an isolated workstation re-pairs only with its own session", async ({ brow
     await Promise.all(contexts.map((ctx) => ctx.close()));
   }
 });
+
+test("the start page lists other named workstations from the open sessions", async ({
+  browser,
+}) => {
+  const contexts = await Promise.all([1, 2].map(() => browser.newContext()));
+  try {
+    const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
+    await openApp(a!, "Front desk");
+    await openApp(b!, "Back desk");
+    await expect(a!.getByRole("heading", { name: "Start new session" })).toBeVisible();
+    await expect(a!.getByRole("heading", { name: "Other workstations" })).toBeHidden();
+
+    await a!.getByLabel("Session name").fill("Outage");
+    await a!.getByLabel("Clerk name").fill("Ann");
+    await a!.getByRole("button", { name: "Start session" }).click();
+    await expect(a!.getByLabel("Scanner input")).toBeVisible();
+    await pairViaPaste(a!, b!, "Ben");
+
+    await b!.keyboard.type("P1\n");
+    await expect(b!.getByTestId("patron")).toHaveText("P1");
+    await expect(a!.getByTestId("totals")).toHaveText("Patrons 1 · Items 0", { timeout: 5_000 });
+
+    await a!.reload();
+    const list = a!.getByTestId("other-workstations");
+    await expect(list.getByRole("listitem")).toHaveCount(1);
+    await expect(list).toContainText("Back desk");
+    await expect(list).toContainText("Outage");
+    await expect(list).not.toContainText("Front desk");
+  } finally {
+    await Promise.all(contexts.map((ctx) => ctx.close()));
+  }
+});
