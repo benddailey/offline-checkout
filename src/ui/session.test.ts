@@ -501,6 +501,32 @@ describe("useSession scanning", () => {
     expect(closed.screen).toBe("summary");
   });
 
+  it("resume as a new clerk records later scans under that name; earlier scans keep theirs", async () => {
+    const s = await started();
+    await s.scan("P1");
+    await s.scan("I1");
+    await s.scan("OC-END");
+    const r = reload();
+    await r.resumeSession(s.meta!.sessionId, "  Sam ");
+    expect(r.meta?.employee).toBe("Sam");
+    await r.scan("P2");
+    await r.scan("I2");
+    expect(r.state.perClerk).toEqual({
+      Rae: { patrons: 1, items: 1 },
+      Sam: { patrons: 1, items: 1 },
+    });
+    expect((await r.listSessions())[0]!.employee).toBe("Sam");
+  });
+
+  it("resume with a blank clerk name stays on Launch", async () => {
+    const s = await started();
+    const r = reload();
+    await r.resumeSession(s.meta!.sessionId, "   ");
+    expect(r.screen).toBe("launch");
+    expect(r.meta).toBeNull();
+    expect(r.message?.text).toBe("Enter the clerk's name");
+  });
+
   it("a session open in another tab is a calm notice on Launch, not a fatal stop", async () => {
     const s = await started();
     const sessionId = s.meta!.sessionId;
@@ -710,6 +736,40 @@ function fakeMesh(initial: PeerInfo[] = []) {
     },
   };
 }
+
+describe("useSession changeClerk", () => {
+  it("records later scans under the new clerk and re-announces the name", async () => {
+    const s = await started();
+    const m = fakeMesh();
+    s.attachMesh(m.mesh);
+    await s.scan("P1");
+    await s.scan("I1");
+    await s.scan("OC-END");
+    expect(await s.changeClerk(" Sam ")).toBe(true);
+    expect(s.meta?.employee).toBe("Sam");
+    expect(m.employees).toEqual(["Rae", "Sam"]);
+    await s.scan("P2");
+    expect(s.state.perClerk).toEqual({
+      Rae: { patrons: 1, items: 1 },
+      Sam: { patrons: 1, items: 0 },
+    });
+  });
+
+  it("refuses a blank name", async () => {
+    const s = await started();
+    expect(await s.changeClerk("  ")).toBe(false);
+    expect(s.meta?.employee).toBe("Rae");
+  });
+
+  it("a failed save is fatal and keeps the old name", async () => {
+    const s = await started();
+    db.failSetEmployee(true);
+    expect(await s.changeClerk("Sam")).toBe(false);
+    expect(s.fatal).toMatch(/Could not save the clerk's name/);
+    expect(s.meta?.employee).toBe("Rae");
+    db.failSetEmployee(false);
+  });
+});
 
 describe("useSession mesh", () => {
   it("mirrors peers, pushes local records and merges remote ones once", async () => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import { MAX_NAME } from "../../log/limits";
 import type { SessionSummary } from "../../store/db";
 import logoUrl from "../../../icons/icon-round.svg";
@@ -33,11 +33,40 @@ async function start() {
   }
 }
 
-async function resume(id: string) {
+/** The open session whose clerk field is showing. */
+const expanded = ref<string | null>(null);
+const resumeClerk = ref("");
+const resumeClerkError = ref(false);
+const resumeInput = ref<HTMLInputElement[]>([]);
+
+async function pick(s: SessionSummary) {
   if (busy.value) return;
+  if (s.closedAt !== undefined) {
+    busy.value = true;
+    try {
+      await session.resumeSession(s.sessionId);
+    } finally {
+      busy.value = false;
+    }
+    return;
+  }
+  if (expanded.value === s.sessionId) {
+    expanded.value = null;
+    return;
+  }
+  expanded.value = s.sessionId;
+  resumeClerk.value = "";
+  resumeClerkError.value = false;
+  await nextTick();
+  resumeInput.value[0]?.focus();
+}
+
+async function resume(id: string) {
+  resumeClerkError.value = resumeClerk.value.trim() === "";
+  if (resumeClerkError.value || busy.value) return;
   busy.value = true;
   try {
-    await session.resumeSession(id);
+    await session.resumeSession(id, resumeClerk.value);
   } finally {
     busy.value = false;
   }
@@ -129,15 +158,17 @@ const secondary =
         No sessions are stored on this workstation.
       </p>
       <ul v-else class="flex flex-col gap-2" data-testid="resume-list">
-        <li v-for="s in sessions" :key="s.sessionId">
+        <li v-for="s in sessions" :key="s.sessionId" class="flex flex-col gap-2">
           <button
             type="button"
             :class="[
               secondary,
               'flex w-full flex-wrap items-center justify-between gap-x-4 py-2 text-left',
+              expanded === s.sessionId ? 'border-blue-700 bg-blue-50' : '',
             ]"
             :disabled="busy"
-            @click="resume(s.sessionId)"
+            :aria-expanded="s.closedAt === undefined ? expanded === s.sessionId : undefined"
+            @click="pick(s)"
           >
             <span class="flex items-center gap-3">
               {{ s.name }}
@@ -156,6 +187,37 @@ const secondary =
               </span>
             </span>
           </button>
+          <form
+            v-if="expanded === s.sessionId"
+            class="flex flex-col gap-2 rounded-lg border-2 border-blue-700 bg-blue-50 p-4"
+            :aria-label="`Resume ${s.name}`"
+            data-testid="resume-form"
+            @submit.prevent="resume(s.sessionId)"
+          >
+            <div class="flex flex-wrap items-end gap-3">
+              <label class="flex min-w-64 flex-1 flex-col gap-1 text-lg font-semibold">
+                Clerk name
+                <input
+                  ref="resumeInput"
+                  v-model="resumeClerk"
+                  :class="field"
+                  type="text"
+                  autocomplete="off"
+                  :maxlength="MAX_NAME"
+                  :aria-invalid="resumeClerkError"
+                  aria-describedby="resume-clerk-error"
+                />
+              </label>
+              <button type="submit" :class="primary" :disabled="busy">Resume session</button>
+            </div>
+            <p
+              v-if="resumeClerkError"
+              id="resume-clerk-error"
+              class="text-lg font-semibold text-red-700"
+            >
+              Enter your name to resume.
+            </p>
+          </form>
         </li>
       </ul>
     </section>

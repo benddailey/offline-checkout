@@ -105,21 +105,13 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
       <h1 class="text-3xl font-extrabold text-slate-900">Session summary</h1>
       <span class="text-lg text-slate-600" data-testid="app-version">Version {{ version }}</span>
       <div class="ml-auto flex flex-wrap gap-3">
-        <button
-          v-if="session.closed"
-          type="button"
-          :class="secondary"
-          @click="session.leaveSession()"
-        >
-          Back to start
-        </button>
         <button type="button" :class="secondary" @click="session.screen = 'scan'">
           Back to scanning
         </button>
       </div>
     </div>
 
-    <ScanInput :paused="confirming !== null" @scan="onScan" />
+    <ScanInput :paused="confirming !== null || session.toolbarDialog" @scan="onScan" />
 
     <MessageBanner v-if="session.message" :message="session.message" />
 

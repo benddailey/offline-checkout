@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { appUrl } from "./helpers/app";
+import { appUrl, resumeAs } from "./helpers/app";
 import { stubPrint } from "./helpers/print";
 
 test("scan, void, end patron and resume after reload", async ({ page }) => {
@@ -50,7 +50,7 @@ test("scan, void, end patron and resume after reload", async ({ page }) => {
   const open = page.getByTestId("resume-list").getByRole("button", { name: /Scan Test/ });
   await expect(open).toContainText("Started");
   await expect(open.getByTestId("session-closed")).toBeHidden();
-  await open.click();
+  await resumeAs(page, /Scan Test/, "Rae");
   await expect(page.getByText("Scan patron card")).toBeVisible();
   await expect(page.getByTestId("totals")).toHaveText("Patrons 1 · Items 1");
   // Only this workstation has ever been in the session: nothing to re-pair with.

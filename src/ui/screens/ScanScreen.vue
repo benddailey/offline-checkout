@@ -51,7 +51,7 @@ function printCard(format: "receipt" | "letter") {
       </div>
     </div>
 
-    <ScanInput @scan="session.scan" />
+    <ScanInput :paused="session.toolbarDialog" @scan="session.scan" />
 
     <MessageBanner v-if="session.message" :message="session.message" />
 

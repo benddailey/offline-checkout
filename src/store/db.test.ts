@@ -53,6 +53,12 @@ describe("session store", () => {
     expect((await s.append({ type: "session-closed" })).employee).toBe("Bo");
   });
 
+  it("setEmployee updates the clerk shown in the session list", async () => {
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
+    await s.setEmployee("Bo");
+    expect((await listSessions()).find((x) => x.sessionId === s.sessionId)?.employee).toBe("Bo");
+  });
+
   it("withCreatedRecord appends session-created as seq 1", async () => {
     const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: true });
     const all = await s.all();

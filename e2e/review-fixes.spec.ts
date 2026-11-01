@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl } from "./helpers/app";
+import { appUrl, resumeAs } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 
 async function start(page: Page, name: string, clerk: string): Promise<void> {
@@ -110,14 +110,17 @@ test("the summary names unconnected workstations, confirms before PDF and close,
     await a!.getByRole("button", { name: "Yes, close session" }).click();
     await expect(a!.getByText("Session closed", { exact: true })).toBeVisible();
 
-    await a!.getByRole("button", { name: "Back to start" }).click();
+    await expect(a!.getByRole("button", { name: "Change clerk" })).toBeHidden();
+    // Already disconnected from Ben: nothing to lose, so no confirmation.
+    await a!.getByRole("button", { name: "Exit session" }).click();
     await expect(a!.getByRole("heading", { name: "Offline Checkout" })).toBeVisible();
     const row = a!.getByTestId("resume-list").getByRole("listitem").filter({ hasText: "Warn" });
     await expect(row.getByTestId("session-closed")).toHaveText("Closed");
     await expect(row).toContainText(/Started .+Closed \d/);
 
     await row.getByRole("button").click();
-    await expect(a!.getByRole("button", { name: "Back to start" })).toBeVisible();
+    await expect(a!.getByTestId("resume-form")).toBeHidden();
+    await expect(a!.getByRole("button", { name: "Exit session" })).toBeVisible();
     await expect(a!.getByText("Session closed", { exact: true })).toBeVisible();
     await expect(a!.getByRole("button", { name: "Back to scanning" })).toBeVisible();
   } finally {
@@ -132,10 +135,7 @@ test("a session already open in another tab shows a dismissable notice on Launch
   await start(first, "Two Tabs", "Rae");
   const second = await context.newPage();
   await second.goto(appUrl());
-  await second
-    .getByTestId("resume-list")
-    .getByRole("button", { name: /Two Tabs/ })
-    .click();
+  await resumeAs(second, /Two Tabs/, "Sam");
   const notice = second.getByTestId("notice");
   await expect(notice).toContainText("This session is already open in another tab");
   await expect(second.getByRole("heading", { name: "Stop" })).toBeHidden();
