@@ -71,19 +71,32 @@ so open http://localhost:5173/offline-checkout.html. The bare root returns a 404
 ```
 npm install
 npm run build
-npm run package:windows
+npm run package
 ```
 
 - `npm run build` writes `dist/offline-checkout.html` and `dist/THIRD-PARTY-NOTICES.md`.
-- `npm run package:windows` zips it into `dist/offline-checkout-vX.Y.Z-windows.zip` with:
-  - `windows/Create shortcuts.cmd` (CRLF line endings), which installs the app and the two shortcut
-    icons to `%LOCALAPPDATA%\OfflineCheckout\` and creates the desktop shortcuts;
-  - `windows/offline-checkout.ico` and `windows/offline-checkout-printer.ico`, the shortcut icons;
+- `npm run package` zips it into `dist/offline-checkout-vX.Y.Z.zip`, one download for every system,
+  with:
+  - `Windows - Create shortcuts.cmd` from `windows/Create shortcuts.cmd` (CRLF line endings). It
+    installs the app and the icons to `%LOCALAPPDATA%\OfflineCheckout\` and creates the desktop
+    shortcuts. Chrome, else Edge.
+  - `Mac - Create shortcuts.command` from `macos/Create shortcuts.command` (LF, executable). It
+    installs the app to `~/Library/Application Support/OfflineCheckout/` and builds two launcher
+    apps in `~/Applications` with `osacompile`, so their executable is native and Apple Silicon
+    never asks for Rosetta. Each applet runs its `Contents/Resources/launch.sh`, which runs
+    `open -na <browser> --args ...`; the script swaps in the `.icns` and re-signs the bundle ad hoc.
+    Chrome, else Edge. It must stay compatible with the bash 3.2 that macOS ships.
+  - `Linux - Create shortcuts.sh` from `linux/Create shortcuts.sh` (LF, executable). It installs the
+    app, the icons and the browser profile to `~/OfflineCheckout/` and writes freedesktop `.desktop`
+    launchers to `~/.local/share/applications` and the desktop, which every desktop environment
+    reads. Chromium, else Chrome, else Edge, then the same as Flatpaks. The folder is visible
+    because Snap Chromium, Ubuntu's only Chromium, cannot read hidden folders such as `~/.local`.
+  - `icons/`: the `.ico`, `.icns` and `.png` shortcut icons for the three scripts;
   - `README.txt`, a plain-text copy of `README.md` with the version and date at the top;
   - `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt`.
 
 The version comes from `package.json`. The build puts it in the page as `__APP_VERSION__` and as a
-`<meta name="offline-checkout-version">` tag, which the shortcut script reads.
+`<meta name="offline-checkout-version">` tag, which the setup scripts read.
 
 Keep `README.md` to headings, lists, bold, inline code and links. That is all the `README.txt`
 conversion handles.
@@ -100,7 +113,7 @@ The icon sources are in `icons/`:
 - `icon.svg`: a square, opaque version for the Apple touch icon (iOS and macOS Safari).
 
 After changing one, run `npm run icons` and commit the results. It renders them with
-Playwright's Chromium to `windows/offline-checkout.ico`, `windows/offline-checkout-printer.ico` and
+Playwright's Chromium to the shortcut icons (`windows/*.ico`, `macos/*.icns` and `linux/*.png`) and
 `icons/apple-touch-icon.png`. The build inlines the favicon and the Apple touch icon into the page
 as data URIs, so the single HTML file stays self-contained.
 
@@ -126,9 +139,9 @@ the camera, and WebRTC on the local network. Build it with `npm run build:probe`
    library PCs first.
 4. Bump the version with `npm version <major|minor|patch>`. This updates `package.json` and
    `package-lock.json`, commits, and creates a `vX.Y.Z` tag. Push both: `git push --follow-tags`.
-5. From the tagged commit, run `npm run build && npm run package:windows`, then publish the GitHub
-   release with both files:
-   `gh release create vX.Y.Z dist/offline-checkout.html dist/offline-checkout-vX.Y.Z-windows.zip`.
+5. From the tagged commit, run `npm run build && npm run package`, then publish the GitHub release
+   with both files:
+   `gh release create vX.Y.Z dist/offline-checkout.html dist/offline-checkout-vX.Y.Z.zip`.
 6. Open the built file once from `file://` and do a quick check: start a session, scan a patron and
    an item, close the session and generate the PDF.
 
@@ -138,11 +151,15 @@ that changes the IndexedDB schema (`src/store/db.ts`) needs a migration.
 ## Known limitations
 
 - The field probe must be run on real library PCs before rollout.
+- The setup scripts are unsigned. macOS Gatekeeper blocks the downloaded `.command` until staff
+  allow it in Privacy & Security (README.md has the steps), and Windows SmartScreen may warn.
 - Chrome may ask for camera permission on every pairing when the page is opened from `file://`.
 - Chrome has no flag to name a printer. Kiosk printing uses the last printer chosen in that profile,
   which is why there is a printer setup shortcut without `--kiosk-printing`.
 - Chrome ignores command-line flags when a window of the same profile is already open, so the
-  printer setup window must be closed before opening the everyday shortcut.
+  printer setup window must be closed before opening the everyday shortcut. On macOS Chrome keeps
+  running after its last window closes, so each Mac launcher first stops a running instance of the
+  profile that has the other `--kiosk-printing` setting.
 - Pairing codes carry a format version (`OC2:`). A workstation refuses codes in another format, so
   staff are told to keep every desk on the same release.
 - Barcodes are verified by zxing at 300 dpi, but still confirm them with the library's real scanners.

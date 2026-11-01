@@ -13,7 +13,7 @@ exit /b
 $ErrorActionPreference = 'Stop'
 try {
   $here = Split-Path -Parent $env:OC_SCRIPT
-  $files = 'offline-checkout.html', 'offline-checkout.ico', 'offline-checkout-printer.ico'
+  $files = 'offline-checkout.html', 'icons\offline-checkout.ico', 'icons\offline-checkout-printer.ico'
   foreach ($file in $files) {
     if (-not (Test-Path -LiteralPath (Join-Path $here $file) -PathType Leaf)) {
       throw "$file is not in $here. Keep this script in the folder it was extracted to and run it again."
@@ -25,7 +25,7 @@ try {
   $installed = Join-Path $installDir 'offline-checkout.html'
   New-Item -ItemType Directory -Force -Path $installDir | Out-Null
   foreach ($file in $files) {
-    $target = Join-Path $installDir $file
+    $target = Join-Path $installDir (Split-Path -Leaf $file)
     Copy-Item -LiteralPath (Join-Path $here $file) -Destination $target -Force
     Unblock-File -LiteralPath $target
   }

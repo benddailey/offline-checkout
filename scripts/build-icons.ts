@@ -1,8 +1,9 @@
-// Renders the icon SVGs in icons/ to the PNG and .ico files the app and the Windows zip use.
+// Renders the icon SVGs in icons/ to the PNG, .ico and .icns files the app and the setup scripts use.
 // Run after changing an icon SVG, and commit the results: node scripts/build-icons.ts
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium } from "@playwright/test";
+import { ICNS_SIZES, buildIcns } from "./icns.ts";
 import { buildIco } from "./ico.ts";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -27,9 +28,26 @@ async function writeIco(svgFile: string, out: string): Promise<void> {
   console.log(`Wrote ${out}`);
 }
 
-await writeIco("icon-round.svg", "windows/offline-checkout.ico");
-await writeIco("icon-round-printer.svg", "windows/offline-checkout-printer.ico");
-writeFileSync(resolve(ROOT, "icons/apple-touch-icon.png"), await render("icon.svg", 180));
-console.log("Wrote icons/apple-touch-icon.png");
+async function writeIcns(svgFile: string, out: string): Promise<void> {
+  const images = [];
+  for (const size of ICNS_SIZES) images.push({ size, png: await render(svgFile, size) });
+  writeFileSync(resolve(ROOT, out), buildIcns(images));
+  console.log(`Wrote ${out}`);
+}
+
+async function writePng(svgFile: string, size: number, out: string): Promise<void> {
+  writeFileSync(resolve(ROOT, out), await render(svgFile, size));
+  console.log(`Wrote ${out}`);
+}
+
+for (const [svg, name] of [
+  ["icon-round.svg", "offline-checkout"],
+  ["icon-round-printer.svg", "offline-checkout-printer"],
+] as const) {
+  await writeIco(svg, `windows/${name}.ico`);
+  await writeIcns(svg, `macos/${name}.icns`);
+  await writePng(svg, 256, `linux/${name}.png`);
+}
+await writePng("icon.svg", 180, "icons/apple-touch-icon.png");
 
 await browser.close();
