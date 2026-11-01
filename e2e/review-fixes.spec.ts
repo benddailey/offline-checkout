@@ -79,6 +79,22 @@ test("the summary names unconnected workstations, confirms before PDF and close,
       a!.waitForEvent("download"),
       a!.getByRole("button", { name: "Generate anyway" }).click(),
     ]);
+    // The CSV and Excel downloads warn the same way.
+    await a!.getByRole("button", { name: "Download CSV" }).click();
+    await expect(dialog).toContainText("missing from this CSV file");
+    await expect(dialog).toContainText("Download the CSV file anyway?");
+    const [csv] = await Promise.all([
+      a!.waitForEvent("download"),
+      a!.getByRole("button", { name: "Download anyway" }).click(),
+    ]);
+    expect(csv.suggestedFilename()).toMatch(/\.csv$/);
+    await a!.getByRole("button", { name: "Download Excel" }).click();
+    await expect(dialog).toContainText("missing from this Excel file");
+    const [xlsx] = await Promise.all([
+      a!.waitForEvent("download"),
+      a!.getByRole("button", { name: "Download anyway" }).click(),
+    ]);
+    expect(xlsx.suggestedFilename()).toMatch(/\.xlsx$/);
 
     await a!.getByRole("button", { name: "Close session" }).click();
     await expect(dialog).toContainText(

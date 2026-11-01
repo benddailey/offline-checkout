@@ -10,6 +10,9 @@ import { Mesh, type MeshOptions, type PeerInfo } from "../mesh/mesh";
 import { isPairingText } from "../pairing/chunks";
 import { PairingError, decodePayload, type PairingPayload } from "../pairing/payload";
 import { downloadBlob, renderScannerCard, renderSessionPdf } from "../pdf/render";
+import { buildCsv } from "../export/csv";
+import { exportRows } from "../export/rows";
+import { buildXlsx } from "../export/xlsx";
 import { afterPaint } from "../print/print";
 import { visitReceipt, type VisitReceipt } from "../print/receipt";
 import { printScannerCardReceipt } from "../print/scanner-card";
@@ -617,6 +620,30 @@ export const useSession = defineStore("session", () => {
     }
   }
 
+  function exportTable(format: "csv" | "xlsx"): void {
+    if (!meta.value || state.value.totals.patrons === 0) return;
+    try {
+      const date = deps.now();
+      const rows = exportRows(state.value);
+      const blob =
+        format === "csv"
+          ? new Blob([buildCsv(rows)], { type: "text/csv;charset=utf-8" })
+          : new Blob([buildXlsx(state.value, rows, date)], {
+              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+      deps.downloadBlob(
+        blob,
+        `offline-checkout-${fileSafe(meta.value.name)}-${ymd(date)}.${format}`,
+      );
+    } catch (err) {
+      console.error(`session: ${format} export failed`, err);
+      message.value = {
+        tone: "error",
+        text: `Could not create the ${format === "csv" ? "CSV" : "Excel"} file`,
+      };
+    }
+  }
+
   /** Letter downloads a PDF; a receipt waits for the screen to paint, as window.print() blocks it. */
   async function printScannerCard(format: "receipt" | "letter"): Promise<void> {
     try {
@@ -665,6 +692,7 @@ export const useSession = defineStore("session", () => {
     voidPatron,
     closeSession,
     generatePdf,
+    exportTable,
     printScannerCard,
     attachMesh,
     adoptJoinedSession,

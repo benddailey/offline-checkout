@@ -9,7 +9,7 @@ The app is a Vue 3 + Pinia app built into one self-contained HTML file and opene
 Every scan is appended to a log in IndexedDB. Workstations pair over WebRTC data channels, with the
 offer and answer exchanged as QR codes, pasted text or printed barcodes, so no server is needed. The
 logs sync between paired workstations, and the closed session is exported as a PDF of Code 128
-barcodes (jsPDF). Receipts are printed with the browser's print dialog, or silently with Chrome's
+barcodes (jsPDF), or as CSV or Excel files. Receipts are printed with the browser's print dialog, or silently with Chrome's
 `--kiosk-printing` flag, which the desk shortcuts set.
 
 ## Stack
@@ -38,6 +38,11 @@ barcodes (jsPDF). Receipts are printed with the browser's print dialog, or silen
     is fetched from a CDN. Import it once at startup, before the first decode. There is only one
     copy of `zxing-wasm`, so it can be updated like any other dependency.
 - **PDF:** `jspdf` (`src/pdf/`).
+- **CSV and Excel:** written by hand in `src/export/`, one row per item in the PDF's order.
+  - The CSV has a UTF-8 BOM and CRLF lines. A cell starting with `=`, `+`, `-` or `@` gets a `'`
+    in front so Excel doesn't run it as a formula.
+  - The `.xlsx` is a minimal SpreadsheetML package (inline strings, no shared strings table) zipped
+    with `fflate`, which jsPDF also uses. Barcodes are text cells, so Excel keeps leading zeros.
 - **Pairing and sync:** browser WebRTC data channels, no library (`src/mesh/`, `src/pairing/`,
   `src/sync/`).
 - **Tests:**

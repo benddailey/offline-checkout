@@ -85,6 +85,10 @@ to the title on the start screen and on the Summary.
    scans. Scan the kept receipts into the library system: the patron barcode, then each item.
    **Generate PDF** makes a copy of the whole session on US Letter paper, with a barcode for every
    patron and item. Use it for a receipt that is lost or won't scan, or to check nothing was missed.
+   **Download CSV** and **Download Excel** save the same list as a spreadsheet, one row per item,
+   with the patron, item, time scanned, clerk and session name. Open the Excel file in Excel: it
+   keeps barcodes exactly as scanned. Excel can change barcodes in the CSV, for example by dropping
+   leading zeros, and a barcode that starts with `-` or `+` has a `'` added in front of it.
 
 ## Good to know
 
