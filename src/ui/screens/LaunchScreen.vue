@@ -8,7 +8,7 @@ import WorkstationNameForm from "../components/WorkstationNameForm.vue";
 import { useSession } from "../session";
 import { otherWorkstations, type OtherWorkstation } from "../workstations";
 
-/** An open session with no records for this long is not expanded on the start page. */
+/** An open session with no records for this long is not expanded, nor are its workstations listed. */
 const STALE_MS = 72 * 60 * 60 * 1000;
 
 const session = useSession();
@@ -53,10 +53,7 @@ onMounted(async () => {
     console.error("launch: could not list sessions", err);
     return;
   }
-  session
-    .getDeviceId()
-    .then((id) => (others.value = otherWorkstations(sessions.value, id)))
-    .catch((err) => console.error("launch: could not read the device id", err));
+  others.value = otherWorkstations(sessions.value, Date.now() - STALE_MS);
   const latest = openSessions.value[0];
   if (latest && Date.now() - lastActivity(latest) <= STALE_MS) {
     recentOpen.value = true;

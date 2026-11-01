@@ -705,10 +705,6 @@ export const useSession = defineStore("session", () => {
     return deps.listSessions();
   }
 
-  function getDeviceId(): Promise<string> {
-    return deps.getDeviceId();
-  }
-
   async function loadWorkstationName(): Promise<void> {
     workstationName.value = (await deps.getWorkstationName()) ?? null;
   }
@@ -768,7 +764,6 @@ export const useSession = defineStore("session", () => {
     joinSession,
     knownDevices,
     listSessions,
-    getDeviceId,
     workstationName,
     loadWorkstationName,
     nameWorkstation,

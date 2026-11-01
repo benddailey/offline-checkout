@@ -5,12 +5,12 @@ export interface OtherWorkstation extends SeenWorkstation {
   sessionName: string;
 }
 
-/** Other named workstations in the open sessions, most recently active first. */
-export function otherWorkstations(sessions: SessionSummary[], ownId: string): OtherWorkstation[] {
+/** Other named workstations in the open sessions, active since `since`, most recent first. */
+export function otherWorkstations(sessions: SessionSummary[], since: number): OtherWorkstation[] {
   const latest = new Map<string, OtherWorkstation>();
   for (const s of sessions) {
     for (const w of s.workstations ?? []) {
-      if (w.deviceId === ownId) continue;
+      if (w.lastAt < since) continue;
       const prev = latest.get(w.deviceId);
       if (!prev || w.lastAt > prev.lastAt) latest.set(w.deviceId, { ...w, sessionName: s.name });
     }

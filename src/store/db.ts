@@ -23,7 +23,7 @@ export interface SessionSummary {
   closedAt?: number;
   /** Open sessions only: the latest record time from any workstation, or createdAt. Not stored. */
   lastActivityAt?: number;
-  /** Open sessions only: each workstation's latest record that has a name. Not stored. */
+  /** Open sessions only: each other workstation's latest record, if it has a name. Not stored. */
   workstations?: SeenWorkstation[];
 }
 
@@ -267,20 +267,23 @@ async function readLog(
 ): Promise<{ closedAt?: number; lastAt?: number; workstations: SeenWorkstation[] }> {
   const db = await openSessionDb(sessionId);
   try {
+    const own = (await db.get("meta", META_KEY))?.deviceId;
     let closedAt: number | undefined;
     let lastAt: number | undefined;
-    const named = new Map<string, SeenWorkstation>();
+    const latest = new Map<string, LogRecord>();
     for (const r of await db.getAll("records")) {
       if (r.type === "session-closed" && (closedAt === undefined || r.at < closedAt)) {
         closedAt = r.at;
       }
       if (lastAt === undefined || r.at > lastAt) lastAt = r.at;
-      const prev = named.get(r.deviceId);
-      if (r.workstation && (!prev || r.at > prev.lastAt)) {
-        named.set(r.deviceId, { deviceId: r.deviceId, name: r.workstation, lastAt: r.at });
-      }
+      // By seq, not by clock: a PC's clock can go back.
+      const prev = latest.get(r.deviceId);
+      if (r.deviceId !== own && (!prev || r.seq > prev.seq)) latest.set(r.deviceId, r);
     }
-    return { closedAt, lastAt, workstations: [...named.values()] };
+    const workstations = [...latest.values()].flatMap((r) =>
+      r.workstation ? [{ deviceId: r.deviceId, name: r.workstation, lastAt: r.at }] : [],
+    );
+    return { closedAt, lastAt, workstations };
   } finally {
     db.close();
   }
