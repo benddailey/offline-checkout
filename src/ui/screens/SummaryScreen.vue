@@ -18,13 +18,15 @@ const clerks = computed(() =>
 );
 
 const canGenerate = computed(() => session.state.totals.patrons > 0);
+const hasItems = computed(() => session.state.totals.items > 0);
 
-type ExportKind = "pdf" | "csv" | "xlsx";
+type ExportKind = "pdf" | "csv" | "xlsx" | "xacts";
 
 const EXPORTS: Record<ExportKind, { action: string; verb: string; noun: string }> = {
   pdf: { action: "Generate PDF", verb: "Generate", noun: "PDF" },
   csv: { action: "Download CSV", verb: "Download", noun: "CSV file" },
   xlsx: { action: "Download Excel", verb: "Download", noun: "Excel file" },
+  xacts: { action: "Download for Evergreen", verb: "Download", noun: "Evergreen file" },
 };
 
 /** Which action the confirm dialog is asking about. */
@@ -181,9 +183,21 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
           >
             Download Excel
           </button>
+          <button
+            type="button"
+            :class="secondary"
+            :disabled="!hasItems"
+            :aria-describedby="hasItems ? undefined : 'generate-hint'"
+            @click="exportSession('xacts')"
+          >
+            Download for Evergreen
+          </button>
         </div>
         <p v-if="!canGenerate" id="generate-hint" class="text-lg text-slate-600">
           Scan at least one patron first
+        </p>
+        <p v-else-if="!hasItems" id="generate-hint" class="text-lg text-slate-600">
+          Scan at least one item to download for Evergreen
         </p>
         <h2 class="mt-2 text-2xl font-bold">Scanner card</h2>
         <div class="flex flex-wrap gap-3">

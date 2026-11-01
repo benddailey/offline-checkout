@@ -95,6 +95,9 @@ test("the summary names unconnected workstations, confirms before PDF and close,
       a!.getByRole("button", { name: "Download anyway" }).click(),
     ]);
     expect(xlsx.suggestedFilename()).toMatch(/\.xlsx$/);
+    // A patron with no items gives Evergreen nothing to check out.
+    await expect(a!.getByRole("button", { name: "Download for Evergreen" })).toBeDisabled();
+    await expect(a!.getByText("Scan at least one item to download for Evergreen")).toBeVisible();
 
     await a!.getByRole("button", { name: "Close session" }).click();
     await expect(dialog).toContainText(

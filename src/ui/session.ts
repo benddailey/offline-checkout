@@ -12,6 +12,7 @@ import { PairingError, decodePayload, type PairingPayload } from "../pairing/pay
 import { downloadBlob, renderScannerCard, renderSessionPdf } from "../pdf/render";
 import { buildCsv } from "../export/csv";
 import { exportRows } from "../export/rows";
+import { buildXacts } from "../export/xacts";
 import { buildXlsx } from "../export/xlsx";
 import { afterPaint } from "../print/print";
 import { visitReceipt, type VisitReceipt } from "../print/receipt";
@@ -620,27 +621,28 @@ export const useSession = defineStore("session", () => {
     }
   }
 
-  function exportTable(format: "csv" | "xlsx"): void {
+  function exportTable(format: "csv" | "xlsx" | "xacts"): void {
     if (!meta.value || state.value.totals.patrons === 0) return;
+    if (format === "xacts" && state.value.totals.items === 0) return;
     try {
       const date = deps.now();
       const rows = exportRows(state.value);
       const blob =
         format === "csv"
           ? new Blob([buildCsv(rows)], { type: "text/csv;charset=utf-8" })
-          : new Blob([buildXlsx(state.value, rows, date)], {
-              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            });
+          : format === "xacts"
+            ? new Blob([buildXacts(rows)], { type: "text/plain;charset=utf-8" })
+            : new Blob([buildXlsx(state.value, rows, date)], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              });
       deps.downloadBlob(
         blob,
         `offline-checkout-${fileSafe(meta.value.name)}-${ymd(date)}.${format}`,
       );
     } catch (err) {
       console.error(`session: ${format} export failed`, err);
-      message.value = {
-        tone: "error",
-        text: `Could not create the ${format === "csv" ? "CSV" : "Excel"} file`,
-      };
+      const noun = { csv: "CSV", xlsx: "Excel", xacts: "Evergreen" }[format];
+      message.value = { tone: "error", text: `Could not create the ${noun} file` };
     }
   }
 

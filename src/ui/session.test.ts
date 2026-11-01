@@ -647,17 +647,22 @@ describe("useSession files", () => {
     s.generatePdf();
     s.exportTable("csv");
     s.exportTable("xlsx");
+    s.exportTable("xacts");
     expect(db.downloads).toEqual([]);
     await s.scan("P1");
     s.generatePdf();
     s.exportTable("csv");
     s.exportTable("xlsx");
+    s.exportTable("xacts"); // no items yet: nothing for Evergreen
+    await s.scan("I1");
+    s.exportTable("xacts");
     await s.printScannerCard("letter");
     await s.printScannerCard("receipt");
     expect(db.downloads).toEqual([
       "offline-checkout-Main-Desk-Fri-2026-10-10.pdf",
       "offline-checkout-Main-Desk-Fri-2026-10-10.csv",
       "offline-checkout-Main-Desk-Fri-2026-10-10.xlsx",
+      "offline-checkout-Main-Desk-Fri-2026-10-10.xacts",
       "offline-checkout-scanner-card.pdf",
       "print:scanner-card",
     ]);

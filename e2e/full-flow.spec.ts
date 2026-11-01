@@ -175,6 +175,25 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
       "Outage",
     ]);
     expect(strFromU8(xlsx["xl/worksheets/sheet2.xml"]!)).toContain('<c r="B4"><v>3</v></c>');
+
+    // The Evergreen file has one offline checkout per item, as JSON lines.
+    const xacts = await readFile(
+      await download(b!, "Download for Evergreen", "pending.xacts"),
+      "utf8",
+    );
+    const lines2 = xacts
+      .trimEnd()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    expect(lines2.map((x) => [x.type, x.patron_barcode, x.barcode])).toEqual([
+      ["checkout", "P1", "I1"],
+      ["checkout", "P2", "I3"],
+      ["checkout", "P2", "I1"],
+    ]);
+    for (const x of lines2) {
+      expect(x.timestamp).toBe(Math.floor(Date.parse(x.checkout_time) / 1000));
+      expect(x).not.toHaveProperty("due_date");
+    }
   } finally {
     await Promise.all(contexts.map((ctx) => ctx.close()));
   }
