@@ -49,8 +49,9 @@ test("change clerk, exit and resume as someone else, each needing a typed name",
   const row = page.getByTestId("resume-list").getByRole("button", { name: /Shifts/ });
   await expect(row).toContainText("Sam");
 
-  await row.click();
+  // The session was just used, so it opens expanded with its clerk field focused and empty.
   const form = page.getByTestId("resume-form");
+  await expect(row).toHaveAttribute("aria-expanded", "true");
   await expect(form.getByLabel("Clerk name")).toBeFocused();
   await expect(form.getByLabel("Clerk name")).toHaveValue("");
   await form.getByRole("button", { name: "Resume session" }).click();

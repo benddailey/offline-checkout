@@ -164,6 +164,23 @@ describe("index", () => {
     globalThis.indexedDB.deleteDatabase(`oc-session-${peer.sessionId}`);
     expect((await byName()).Peer).toBe(4000);
   });
+
+  it("listSessions gives open sessions their latest activity from any workstation", async () => {
+    const quiet = await createSession({ name: "Quiet", employee: "Ann", withCreatedRecord: false });
+    const busy = await createSession({ name: "Busy", employee: "Ann", withCreatedRecord: true });
+    const later = Date.now() + 60_000;
+    await busy.put([
+      { ...remote(busy.sessionId, "x", 1), type: "patron-started", patron: "P1", at: later },
+    ]);
+    const closed = await createSession({ name: "Done", employee: "Ann", withCreatedRecord: true });
+    await closed.append({ type: "session-closed" });
+    for (const s of [quiet, busy, closed]) s.close();
+
+    const list = Object.fromEntries((await listSessions()).map((s) => [s.name, s]));
+    expect(list.Quiet!.lastActivityAt).toBe(list.Quiet!.createdAt);
+    expect(list.Busy!.lastActivityAt).toBe(later);
+    expect(list.Done!.lastActivityAt).toBeUndefined();
+  });
 });
 
 describe("tab lock", () => {

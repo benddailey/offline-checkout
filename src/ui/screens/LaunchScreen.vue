@@ -1,43 +1,70 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { MAX_NAME } from "../../log/limits";
 import type { SessionSummary } from "../../store/db";
 import logoUrl from "../../../icons/icon-round.svg";
-import { useSession, ymd } from "../session";
+import StartSessionForm from "../components/StartSessionForm.vue";
+import { useSession } from "../session";
+
+/** An open session with no records for this long is not expanded on the start page. */
+const STALE_MS = 72 * 60 * 60 * 1000;
 
 const session = useSession();
 const version = __APP_VERSION__;
 
-const name = ref(ymd(new Date()));
-const clerk = ref("");
-const clerkError = ref(false);
 const busy = ref(false);
 const sessions = ref<SessionSummary[]>([]);
+/** Set once on load, so the layout doesn't change under the clerk. */
+const recentOpen = ref(false);
+const showStart = ref(false);
+
+const lastActivity = (s: SessionSummary) => s.lastActivityAt ?? s.createdAt;
+const openSessions = computed(() =>
+  sessions.value
+    .filter((s) => s.closedAt === undefined)
+    .sort((a, b) => lastActivity(b) - lastActivity(a)),
+);
+const closedSessions = computed(() => sessions.value.filter((s) => s.closedAt !== undefined));
+const groups = computed(() =>
+  recentOpen.value
+    ? [
+        { id: "open", title: "Open sessions", items: openSessions.value },
+        { id: "closed", title: "Closed sessions", items: closedSessions.value },
+      ].filter((g) => g.items.length > 0)
+    : [{ id: "resume", title: "Resume", items: sessions.value }],
+);
 
 onMounted(async () => {
   try {
     sessions.value = await session.listSessions();
   } catch (err) {
     console.error("launch: could not list sessions", err);
+    return;
+  }
+  const latest = openSessions.value[0];
+  if (latest && Date.now() - lastActivity(latest) <= STALE_MS) {
+    recentOpen.value = true;
+    expand(latest.sessionId);
   }
 });
-
-async function start() {
-  clerkError.value = clerk.value.trim() === "";
-  if (clerkError.value || busy.value) return;
-  busy.value = true;
-  try {
-    await session.startSession(name.value, clerk.value);
-  } finally {
-    busy.value = false;
-  }
-}
 
 /** The open session whose clerk field is showing. */
 const expanded = ref<string | null>(null);
 const resumeClerk = ref("");
 const resumeClerkError = ref(false);
-const resumeInput = ref<HTMLInputElement[]>([]);
+const vFocus = { mounted: (el: HTMLElement) => el.focus() };
+
+function expand(id: string | null) {
+  expanded.value = id;
+  resumeClerk.value = "";
+  resumeClerkError.value = false;
+  if (id !== null) showStart.value = false;
+}
+
+function toggleStart() {
+  showStart.value = !showStart.value;
+  if (showStart.value) expanded.value = null;
+}
 
 async function pick(s: SessionSummary) {
   if (busy.value) return;
@@ -50,15 +77,7 @@ async function pick(s: SessionSummary) {
     }
     return;
   }
-  if (expanded.value === s.sessionId) {
-    expanded.value = null;
-    return;
-  }
-  expanded.value = s.sessionId;
-  resumeClerk.value = "";
-  resumeClerkError.value = false;
-  await nextTick();
-  resumeInput.value[0]?.focus();
+  expand(expanded.value === s.sessionId ? null : s.sessionId);
 }
 
 async function resume(id: string) {
@@ -100,40 +119,8 @@ const secondary =
       </button>
     </div>
 
-    <div class="grid gap-6 md:grid-cols-2">
-      <form
-        class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
-        aria-labelledby="start-title"
-        @submit.prevent="start"
-      >
-        <h2 id="start-title" class="text-2xl font-bold">Start new session</h2>
-        <label class="flex flex-col gap-1 text-lg font-semibold">
-          Session name
-          <input
-            v-model="name"
-            :class="field"
-            type="text"
-            autocomplete="off"
-            :maxlength="MAX_NAME"
-          />
-        </label>
-        <label class="flex flex-col gap-1 text-lg font-semibold">
-          Clerk name
-          <input
-            v-model="clerk"
-            :class="field"
-            type="text"
-            autocomplete="off"
-            :maxlength="MAX_NAME"
-            :aria-invalid="clerkError"
-            aria-describedby="clerk-error"
-          />
-        </label>
-        <p v-if="clerkError" id="clerk-error" class="text-lg font-semibold text-red-700">
-          Enter your name to start.
-        </p>
-        <button type="submit" :class="primary" :disabled="busy">Start session</button>
-      </form>
+    <div v-if="!recentOpen" class="grid gap-6 md:grid-cols-2">
+      <StartSessionForm />
 
       <section
         class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
@@ -149,77 +136,96 @@ const secondary =
       </section>
     </div>
 
-    <section
-      class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
-      aria-labelledby="resume-title"
-    >
-      <h2 id="resume-title" class="text-2xl font-bold">Resume</h2>
-      <p v-if="sessions.length === 0" class="text-lg text-slate-600">
-        No sessions are stored on this workstation.
-      </p>
-      <ul v-else class="flex flex-col gap-2" data-testid="resume-list">
-        <li v-for="s in sessions" :key="s.sessionId" class="flex flex-col gap-2">
+    <template v-for="g in groups" :key="g.id">
+      <section
+        class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
+        :aria-labelledby="`${g.id}-title`"
+      >
+        <h2 :id="`${g.id}-title`" class="text-2xl font-bold">{{ g.title }}</h2>
+        <p v-if="g.items.length === 0" class="text-lg text-slate-600">
+          No sessions are stored on this workstation.
+        </p>
+        <ul v-else class="flex flex-col gap-2" data-testid="resume-list">
+          <li v-for="s in g.items" :key="s.sessionId" class="flex flex-col gap-2">
+            <button
+              type="button"
+              :class="[
+                secondary,
+                'flex w-full flex-wrap items-center justify-between gap-x-4 py-2 text-left',
+                expanded === s.sessionId ? 'border-blue-700 bg-blue-50' : '',
+              ]"
+              :disabled="busy"
+              :aria-expanded="s.closedAt === undefined ? expanded === s.sessionId : undefined"
+              @click="pick(s)"
+            >
+              <span class="flex items-center gap-3">
+                {{ s.name }}
+                <span
+                  v-if="s.closedAt !== undefined && !recentOpen"
+                  class="rounded border-2 border-slate-500 bg-slate-100 px-2 text-base font-semibold text-slate-700"
+                  data-testid="session-closed"
+                >
+                  Closed
+                </span>
+              </span>
+              <span class="flex flex-col text-lg font-normal text-slate-600">
+                <span>{{ s.employee }} · Started {{ new Date(s.createdAt).toLocaleString() }}</span>
+                <span v-if="s.closedAt !== undefined">
+                  Closed {{ new Date(s.closedAt).toLocaleString() }}
+                </span>
+              </span>
+            </button>
+            <form
+              v-if="expanded === s.sessionId"
+              class="flex flex-col gap-2 rounded-lg border-2 border-blue-700 bg-blue-50 p-4"
+              :aria-label="`Resume ${s.name}`"
+              data-testid="resume-form"
+              @submit.prevent="resume(s.sessionId)"
+            >
+              <div class="flex flex-wrap items-end gap-3">
+                <label class="flex min-w-64 flex-1 flex-col gap-1 text-lg font-semibold">
+                  Clerk name
+                  <input
+                    v-focus
+                    v-model="resumeClerk"
+                    :class="field"
+                    type="text"
+                    autocomplete="off"
+                    :maxlength="MAX_NAME"
+                    :aria-invalid="resumeClerkError"
+                    aria-describedby="resume-clerk-error"
+                  />
+                </label>
+                <button type="submit" :class="primary" :disabled="busy">Resume session</button>
+              </div>
+              <p
+                v-if="resumeClerkError"
+                id="resume-clerk-error"
+                class="text-lg font-semibold text-red-700"
+              >
+                Enter your name to resume.
+              </p>
+            </form>
+          </li>
+        </ul>
+      </section>
+
+      <template v-if="g.id === 'open'">
+        <div class="flex flex-wrap gap-4">
           <button
             type="button"
-            :class="[
-              secondary,
-              'flex w-full flex-wrap items-center justify-between gap-x-4 py-2 text-left',
-              expanded === s.sessionId ? 'border-blue-700 bg-blue-50' : '',
-            ]"
-            :disabled="busy"
-            :aria-expanded="s.closedAt === undefined ? expanded === s.sessionId : undefined"
-            @click="pick(s)"
+            :class="[secondary, showStart ? 'border-blue-700 bg-blue-50' : '']"
+            :aria-expanded="showStart"
+            @click="toggleStart"
           >
-            <span class="flex items-center gap-3">
-              {{ s.name }}
-              <span
-                v-if="s.closedAt !== undefined"
-                class="rounded border-2 border-slate-500 bg-slate-100 px-2 text-base font-semibold text-slate-700"
-                data-testid="session-closed"
-              >
-                Closed
-              </span>
-            </span>
-            <span class="flex flex-col text-lg font-normal text-slate-600">
-              <span>{{ s.employee }} · Started {{ new Date(s.createdAt).toLocaleString() }}</span>
-              <span v-if="s.closedAt !== undefined">
-                Closed {{ new Date(s.closedAt).toLocaleString() }}
-              </span>
-            </span>
+            Start new session
           </button>
-          <form
-            v-if="expanded === s.sessionId"
-            class="flex flex-col gap-2 rounded-lg border-2 border-blue-700 bg-blue-50 p-4"
-            :aria-label="`Resume ${s.name}`"
-            data-testid="resume-form"
-            @submit.prevent="resume(s.sessionId)"
-          >
-            <div class="flex flex-wrap items-end gap-3">
-              <label class="flex min-w-64 flex-1 flex-col gap-1 text-lg font-semibold">
-                Clerk name
-                <input
-                  ref="resumeInput"
-                  v-model="resumeClerk"
-                  :class="field"
-                  type="text"
-                  autocomplete="off"
-                  :maxlength="MAX_NAME"
-                  :aria-invalid="resumeClerkError"
-                  aria-describedby="resume-clerk-error"
-                />
-              </label>
-              <button type="submit" :class="primary" :disabled="busy">Resume session</button>
-            </div>
-            <p
-              v-if="resumeClerkError"
-              id="resume-clerk-error"
-              class="text-lg font-semibold text-red-700"
-            >
-              Enter your name to resume.
-            </p>
-          </form>
-        </li>
-      </ul>
-    </section>
+          <button type="button" :class="secondary" @click="session.screen = 'pair-join'">
+            Join session
+          </button>
+        </div>
+        <StartSessionForm v-if="showStart" autofocus />
+      </template>
+    </template>
   </main>
 </template>

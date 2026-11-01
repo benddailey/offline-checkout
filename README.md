@@ -91,11 +91,16 @@ to the title on the start screen and on the Summary.
 
 ## Using it at the desk
 
-1. **Start.** Open **Offline Checkout**. Enter a session name (it defaults to today's date) and your
-   name, and click **Start session**. To go back to a session (after a shift change, a crash or a
-   restart), click it in the **Resume** list, enter your name and click **Resume session**. Each
-   session there shows the last clerk and when it started. Closed sessions are marked **Closed**
-   with the time they were closed, and open straight to their Summary.
+1. **Start.** Open **Offline Checkout**.
+   - **Going back to a session** (after a shift change, a crash or a restart): if a session is still
+     open and anything was scanned in it in the last 3 days, it is at the top under **Open
+     sessions**, ready for your name. Enter your name and click **Resume session**. To resume a
+     different open session, click it instead.
+   - **New session**: enter a session name (it defaults to today's date) and your name, and click
+     **Start session**. When open sessions are listed at the top, click **Start new session** below
+     them first.
+   - Each session shows the last clerk and when it started. Closed sessions show when they were
+     closed, and open straight to their Summary.
 2. **Add another desk PC.**
    1. On the PC already running the session, click **Add workstation**. It shows a join code.
    2. On the new PC, click **Join session** and enter your name.

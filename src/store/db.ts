@@ -19,6 +19,8 @@ export interface SessionSummary {
   createdAt: number;
   /** When the session was first closed, on any workstation. */
   closedAt?: number;
+  /** Open sessions only: the latest record time from any workstation, or createdAt. Not stored. */
+  lastActivityAt?: number;
 }
 
 export interface SessionStore {
@@ -208,16 +210,18 @@ export async function openSessionStore(sessionId: string): Promise<SessionStore>
   return makeStore(sessionId, await openSessionDb(sessionId));
 }
 
-async function findClosedAt(sessionId: string): Promise<number | undefined> {
+async function readLog(sessionId: string): Promise<{ closedAt?: number; lastAt?: number }> {
   const db = await openSessionDb(sessionId);
   try {
     let closedAt: number | undefined;
+    let lastAt: number | undefined;
     for (const r of await db.getAll("records")) {
       if (r.type === "session-closed" && (closedAt === undefined || r.at < closedAt)) {
         closedAt = r.at;
       }
+      if (lastAt === undefined || r.at > lastAt) lastAt = r.at;
     }
-    return closedAt;
+    return { closedAt, lastAt };
   } finally {
     db.close();
   }
@@ -233,8 +237,11 @@ export async function listSessions(): Promise<SessionSummary[]> {
     const all = await index.getAll("sessions");
     for (const s of all) {
       if (s.closedAt !== undefined) continue;
-      const closedAt = await findClosedAt(s.sessionId);
-      if (closedAt === undefined) continue;
+      const { closedAt, lastAt } = await readLog(s.sessionId);
+      if (closedAt === undefined) {
+        s.lastActivityAt = Math.max(s.createdAt, lastAt ?? 0);
+        continue;
+      }
       s.closedAt = closedAt;
       await index.put("sessions", s);
     }
