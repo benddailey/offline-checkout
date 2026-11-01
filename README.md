@@ -89,6 +89,13 @@ to the title on the start screen and on the Summary.
    with the patron, item, time scanned, clerk and session name. Open the Excel file in Excel: it
    keeps barcodes exactly as scanned. Excel can change barcodes in the CSV, for example by dropping
    leading zeros, and a barcode that starts with `-` or `+` has a `'` added in front of it.
+   **Download for Evergreen** saves every checkout as an Evergreen offline transaction file (the
+   same format as Evergreen's `pending.xacts`). To load it, sign in to Evergreen, go to
+   **Circulation > Offline Circulation > Session Management**, click **Import Transactions** and
+   pick the file. The checkouts appear under **Pending Transactions**. Create a session, then click
+   **Upload** and **Process**. Evergreen sets each due date from the library's loan rules, counting
+   from the time the item was scanned, and lists any problems under **Exceptions**. Upload each
+   file once: the second upload would check every item out again.
 
 ## Good to know
 

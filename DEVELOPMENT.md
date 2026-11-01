@@ -9,7 +9,7 @@ The app is a Vue 3 + Pinia app built into one self-contained HTML file and opene
 Every scan is appended to a log in IndexedDB. Workstations pair over WebRTC data channels, with the
 offer and answer exchanged as QR codes, pasted text or printed barcodes, so no server is needed. The
 logs sync between paired workstations, and the closed session is exported as a PDF of Code 128
-barcodes (jsPDF), or as CSV or Excel files. Receipts are printed with the browser's print dialog, or silently with Chrome's
+barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction file. Receipts are printed with the browser's print dialog, or silently with Chrome's
 `--kiosk-printing` flag, which the desk shortcuts set.
 
 ## Stack
@@ -43,6 +43,12 @@ barcodes (jsPDF), or as CSV or Excel files. Receipts are printed with the browse
     in front so Excel doesn't run it as a formula.
   - The `.xlsx` is a minimal SpreadsheetML package (inline strings, no shared strings table) zipped
     with `fflate`, which jsPDF also uses. Barcodes are text cells, so Excel keeps leading zeros.
+- **Evergreen file:** `src/export/xacts.ts` writes Evergreen's offline transaction format (one JSON
+  object per line, as `Open-ILS/web/js/ui/default/staff/offline.js` exports and
+  `Open-ILS/src/offline/offline.pl` reads). Each item is a `checkout` with `patron_barcode`,
+  `barcode`, `timestamp` (epoch seconds) and `checkout_time` (ISO 8601). There is no `due_date`:
+  Evergreen then applies its loan rules from `checkout_time`, and needs no `CIRC_OVERRIDE_DUE_DATE`
+  permission.
 - **Pairing and sync:** browser WebRTC data channels, no library (`src/mesh/`, `src/pairing/`,
   `src/sync/`).
 - **Tests:**
