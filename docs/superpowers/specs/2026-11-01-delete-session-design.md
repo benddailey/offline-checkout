@@ -37,7 +37,8 @@ Evergreen file was never downloaded is not lost by mistake.
     copy." This uses the existing `notConnected` list;
   - a **slide to delete** control and **Cancel**. Cancel has focus when the dialog opens.
 - On confirm, `session.deleteSession()`:
-  1. sends `{ t: "delete-session" }` to each connected peer and waits for each peer's
+  1. sends `{ t: "delete-session", workstation }` (this workstation's name, as the mesh hello
+     carries only the clerk's) to each connected peer and waits for each peer's
      `{ t: "deleted" }` reply, at most 3 seconds. Closing the mesh at once could drop the message,
      because closing a link closes its peer connection;
   2. tears the session down (mesh, store, lock), then `db.deleteSession(sessionId)` removes the
@@ -47,11 +48,12 @@ Evergreen file was never downloaded is not lost by mistake.
 
 ## 3. Delete arriving from a peer
 
-- The session store subscribes to mesh messages. On `{ t: "delete-session" }` it acts only if the
-  session is closed here. If it isn't, it ignores the message, so a delete can never remove an open
-  session.
+- The session store subscribes to mesh messages. On `{ t: "delete-session", workstation }` it acts
+  only if the session is closed here. If it isn't, it ignores the message, so a delete can never
+  remove an open session.
 - Otherwise it replies `{ t: "deleted" }`, then tears down, deletes the session the same way, and
-  shows the start page with the notice "Session ‘Outage’ was deleted on Front desk."
+  shows the start page with the notice "Session ‘Outage’ was deleted on Front desk." When the
+  sender's name is missing or longer than `MAX_NAME`, it says "on another workstation".
 - `SyncEngine` already ignores messages it does not know, and these two are not sync messages.
 
 ## 4. Slide to delete
