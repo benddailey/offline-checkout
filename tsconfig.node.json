@@ -25,7 +25,9 @@
     "vite.harness.config.ts",
     "vite.probe.config.ts",
     "playwright.config.ts",
+    "playwright.load.config.ts",
     "e2e/**/*.ts",
+    "load/**/*.ts",
     "scripts/**/*.ts"
   ]
 }

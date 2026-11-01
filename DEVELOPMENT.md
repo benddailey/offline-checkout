@@ -135,6 +135,20 @@ the camera, and WebRTC on the local network. Build it with `npm run build:probe`
 - `npm run e2e` builds everything and runs the Playwright end-to-end tests. Screenshots of the main
   screens at 1366x768 are written to `test-results/screens/`. The browsers run headless; set
   `HEADED=1` to watch them (`HEADED=1 npm run e2e`, or with `npx playwright test <spec>`).
+- `npm run load-test` builds the app and runs the opt-in load test (`load/sessions.load.ts`, its own
+  `playwright.load.config.ts`, so `npm run e2e` never runs it). It takes a few minutes. For each
+  scenario (one open session, three open, three open and one closed) it seeds a Chromium profile's
+  IndexedDB with logs from three workstations, opens the built file from `file://` and times:
+  - the start page: first render, list shown and latest session expanded;
+  - `listSessions`' IndexedDB work on its own;
+  - resuming a session, opening the summary and each export;
+  - for one open session, `since({})` and pairing a new workstation until it has the whole log.
+
+  It prints the median and worst of the runs for each CPU throttle and writes them to
+  `test-results/load/*.json`. Settings: `LOAD_RECORDS` (records per session, default 10000),
+  `LOAD_RUNS` (default 5) and `LOAD_THROTTLE` (CDP CPU throttle rates, default `1,4`). Throttling
+  slows only the page, not the browser's IndexedDB backend or the disk, so it understates an old
+  PC with a slow disk.
 
 ## Releasing
 
