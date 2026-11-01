@@ -3,6 +3,8 @@ import { computed, nextTick, ref, useTemplateRef } from "vue";
 import MessageBanner from "../components/MessageBanner.vue";
 import ScanInput from "../components/ScanInput.vue";
 import SessionClosedBanner from "../components/SessionClosedBanner.vue";
+import SlideToConfirm from "../components/SlideToConfirm.vue";
+import { exportLines } from "../exports";
 import { useSession } from "../session";
 import { summaryPatrons } from "../summary";
 import { hasWorkstations, workstationLabel } from "../../log/reduce";
@@ -31,9 +33,11 @@ const EXPORTS: Record<ExportKind, { action: string; verb: string; noun: string }
 };
 
 /** Which action the confirm dialog is asking about. */
-const confirming = ref<"close" | ExportKind | null>(null);
+const confirming = ref<"close" | "delete" | ExportKind | null>(null);
 const confirmingExport = computed(() =>
-  confirming.value && confirming.value !== "close" ? EXPORTS[confirming.value] : null,
+  confirming.value && confirming.value !== "close" && confirming.value !== "delete"
+    ? EXPORTS[confirming.value]
+    : null,
 );
 const cancelButton = useTemplateRef<HTMLButtonElement>("cancel");
 
@@ -52,11 +56,18 @@ const who = (d: { employee: string; workstation: string }) =>
 
 const missingNames = computed(() => session.notConnected.map(who));
 
+const exportSummary = computed(() =>
+  exportLines(session.state.exports, (at) =>
+    new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+  ),
+);
+const evergreenExported = computed(() => session.state.exports.some((e) => e.kind === "xacts"));
+
 const inProgress = computed(() =>
   session.othersInProgress.map((v) => `${v.patron} (${v.employee || "Unnamed"})`),
 );
 
-async function ask(what: "close" | ExportKind): Promise<void> {
+async function ask(what: "close" | "delete" | ExportKind): Promise<void> {
   confirming.value = what;
   await nextTick();
   cancelButton.value?.focus();
@@ -77,6 +88,7 @@ async function confirm(): Promise<void> {
   const what = confirming.value;
   confirming.value = null;
   if (what === "close") await session.closeSession();
+  else if (what === "delete") await session.deleteSession();
   else if (what) runExport(what);
 }
 
@@ -84,7 +96,7 @@ const dialog = useTemplateRef<HTMLElement>("dialog");
 
 /** Keep Tab and Shift+Tab inside the dialog. */
 function trapTab(e: KeyboardEvent): void {
-  const buttons = [...(dialog.value?.querySelectorAll("button") ?? [])];
+  const buttons = [...(dialog.value?.querySelectorAll("button, [role=slider]") ?? [])];
   const first = buttons[0];
   const last = buttons.at(-1);
   if (!first || !last) return;
@@ -228,6 +240,10 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
           <h2 class="mt-2 text-2xl font-bold">End the session</h2>
           <button type="button" :class="danger" @click="ask('close')">Close session</button>
         </template>
+        <template v-else>
+          <h2 class="mt-2 text-2xl font-bold">Delete session</h2>
+          <button type="button" :class="danger" @click="ask('delete')">Delete session</button>
+        </template>
       </div>
     </section>
 
@@ -280,10 +296,16 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
         aria-labelledby="confirm-title"
         aria-describedby="confirm-text"
         class="flex max-w-xl flex-col gap-5 rounded-xl border-4 bg-white p-6"
-        :class="confirming === 'close' ? 'border-red-700' : 'border-amber-600'"
+        :class="
+          confirming === 'close' || confirming === 'delete' ? 'border-red-700' : 'border-amber-600'
+        "
       >
         <h2 id="confirm-title" class="text-3xl font-extrabold">
-          {{ confirmingExport?.action ?? "Close session" }}
+          {{
+            confirming === "delete"
+              ? "Delete session"
+              : (confirmingExport?.action ?? "Close session")
+          }}
         </h2>
         <div id="confirm-text" class="flex flex-col gap-3 text-2xl">
           <p v-if="confirming === 'close'">
@@ -292,7 +314,23 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
           <p v-if="confirming === 'close' && inProgress.length" data-testid="in-progress">
             Patron in progress: {{ inProgress.join(", ") }}. Their visits will stay open.
           </p>
-          <p v-if="missingNames.length">
+          <template v-if="confirming === 'delete'">
+            <p>
+              This removes the session from this workstation and from all connected workstations. It
+              cannot be undone.
+            </p>
+            <ul data-testid="export-lines">
+              <li v-for="l in exportSummary" :key="l.kind">{{ l.text }}</li>
+            </ul>
+            <p v-if="!evergreenExported" class="font-semibold text-red-800">
+              Download the Evergreen file first if these checkouts are not in Evergreen yet.
+            </p>
+            <p v-if="missingNames.length">
+              Not connected: {{ missingNames.join(", ") }}.
+              {{ missingNames.length === 1 ? "It keeps its copy." : "They keep their copies." }}
+            </p>
+          </template>
+          <p v-else-if="missingNames.length">
             Not connected: {{ missingNames.join(", ") }}. Their latest scans may be missing{{
               confirmingExport ? ` from this ${confirmingExport.noun}` : ""
             }}.
@@ -301,7 +339,13 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
             {{ confirmingExport.verb }} the {{ confirmingExport.noun }} anyway?
           </p>
         </div>
-        <div class="flex flex-wrap gap-3">
+        <div v-if="confirming === 'delete'" class="flex flex-col gap-3">
+          <SlideToConfirm label="Slide to delete" @confirm="confirm" />
+          <button ref="cancel" type="button" :class="secondary" @click="confirming = null">
+            Cancel
+          </button>
+        </div>
+        <div v-else class="flex flex-wrap gap-3">
           <button type="button" :class="confirming === 'close' ? danger : primary" @click="confirm">
             {{ confirmingExport ? `${confirmingExport.verb} anyway` : "Yes, close session" }}
           </button>
