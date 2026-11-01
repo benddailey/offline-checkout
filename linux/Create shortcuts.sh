@@ -52,7 +52,7 @@ file_url() {
     char=${path:i:1}
     case $char in
       [A-Za-z0-9/._~-]) out+=$char ;;
-      *) out+=$(printf '%%%02X' "'$char") ;;
+      *) out+=$(printf '%%%02X' $(($(printf '%d' "'$char") & 255))) ;;
     esac
   done
   printf 'file://%s' "$out"
@@ -96,7 +96,7 @@ Terminal=false
 Categories=Office;
 DESKTOP
   chmod +x "$applications/$file"
-  if [ -d "$desktop" ]; then
+  if [ -d "$desktop" ] && [ "$desktop" != "$HOME" ]; then
     cp "$applications/$file" "$desktop/$file"
     chmod +x "$desktop/$file"
     # GNOME's desktop icons only start launchers marked as trusted.
@@ -115,7 +115,7 @@ cat <<DONE
 
 Installed Offline Checkout version ${version:-unknown}
 
-Launchers created in the app menu$([ -d "$desktop" ] && printf ' and on the desktop'):
+Launchers created in the app menu$([ -d "$desktop" ] && [ "$desktop" != "$HOME" ] && printf ' and on the desktop'):
   Offline Checkout                   everyday use; receipts print without a dialog
   Offline Checkout - printer setup   use once to choose the receipt printer
 

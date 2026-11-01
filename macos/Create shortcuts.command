@@ -10,6 +10,8 @@ fail() {
 }
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+[ -r "$here" ] && ls "$here" >/dev/null 2>&1 ||
+  fail "Terminal may not read $here. Allow it in System Settings > Privacy & Security > Files and Folders, or move the folder to the Desktop, and run this script again."
 for file in offline-checkout.html icons/offline-checkout.icns icons/offline-checkout-printer.icns; do
   [ -f "$here/$file" ] ||
     fail "$file is not in $here. Keep this script in the folder it was extracted to and run it again."
@@ -43,7 +45,8 @@ file_url() {
     char=${path:i:1}
     case $char in
       [A-Za-z0-9/._~-]) out+=$char ;;
-      *) out+=$(printf '%%%02X' "'$char") ;;
+      # bash 3.2 reads bytes above 127 as negative.
+      *) out+=$(printf '%%%02X' $(($(printf '%d' "'$char") & 255))) ;;
     esac
   done
   printf 'file://%s' "$out"
@@ -54,50 +57,63 @@ sh_quote() {
   printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
 }
 
-xml_escape() {
-  printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
-}
-
 url=$(file_url "$installed")
 profile_dir="$support/$profile_name"
 apps="$HOME/Applications"
 mkdir -p "$apps"
 
+plist() {
+  /usr/libexec/PlistBuddy -c "Set :$1 $2" "$3" 2>/dev/null ||
+    /usr/libexec/PlistBuddy -c "Add :$1 string $2" "$3"
+}
+
+# An AppleScript applet has a native executable, so Apple Silicon Macs never ask for Rosetta.
 make_app() {
-  local name=$1 id=$2 icon=$3 extra=$4
+  local name=$1 id=$2 icon=$3 kiosk=$4
   local app="$apps/$name.app"
+  local resources="$app/Contents/Resources"
+  local flags="--start-maximized --no-first-run --no-default-browser-check"
+  [ "$kiosk" = 1 ] && flags="$flags --kiosk-printing"
   rm -rf "$app"
-  mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-  cp -X "$here/icons/$icon.icns" "$app/Contents/Resources/$icon.icns"
-  cat >"$app/Contents/Info.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key><string>launch</string>
-  <key>CFBundleIconFile</key><string>$icon</string>
-  <key>CFBundleIdentifier</key><string>$id</string>
-  <key>CFBundleName</key><string>$(xml_escape "$name")</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>$(xml_escape "${version:-0}")</string>
-</dict>
-</plist>
-PLIST
-  # open -n starts the browser with these flags even when it already runs with another profile.
-  cat >"$app/Contents/MacOS/launch" <<LAUNCH
+  osacompile -o "$app" \
+    -e 'do shell script "/bin/sh " & quoted form of (POSIX path of (path to me) & "Contents/Resources/launch.sh")'
+  cat >"$resources/launch.sh" <<LAUNCH
 #!/bin/sh
-exec open -na $(sh_quote "$browser") --args $(sh_quote "--app=$url") $(sh_quote "--user-data-dir=$profile_dir") --start-maximized --no-first-run --no-default-browser-check$extra
+# Chrome on macOS keeps running after its last window closes, and a running instance ignores new
+# flags. So first stop an instance of this profile that the other launcher started.
+profile=$(sh_quote "$profile_dir")
+pids=\$(ps -axww -o pid= -o args= | while read -r pid args; do
+  case "\$args" in *--type=*) continue ;; esac
+  case "\$args" in *"--user-data-dir=\$profile "*) ;; *) continue ;; esac
+  case "\$args" in *--kiosk-printing*) running=1 ;; *) running=0 ;; esac
+  [ "\$running" = $kiosk ] || echo "\$pid"
+done)
+if [ -n "\$pids" ]; then
+  kill \$pids 2>/dev/null
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    kill -0 \$pids 2>/dev/null || break
+    sleep 0.5
+  done
+fi
+exec open -na $(sh_quote "$browser") --args $(sh_quote "--app=$url") \\
+  $(sh_quote "--user-data-dir=$profile_dir") $flags
 LAUNCH
-  chmod +x "$app/Contents/MacOS/launch"
+  rm -f "$resources/Assets.car"
+  cp -X "$here/icons/$icon.icns" "$resources/applet.icns"
+  /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$app/Contents/Info.plist" 2>/dev/null || true
+  plist CFBundleIdentifier "$id" "$app/Contents/Info.plist"
+  plist CFBundleShortVersionString "${version:-0}" "$app/Contents/Info.plist"
+  # Editing the bundle breaks the applet's signature, and Apple Silicon only runs signed code.
+  codesign --force --sign - "$app" 2>/dev/null || true
   xattr -cr "$app" 2>/dev/null || true
-  # Makes Finder and the Dock pick up a changed icon straight away.
+  # Makes Finder and the Dock pick up the icon straight away.
   /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$app" 2>/dev/null || true
   touch "$app"
 }
 
-make_app "Offline Checkout" io.github.benddailey.offline-checkout offline-checkout " --kiosk-printing"
+make_app "Offline Checkout" io.github.benddailey.offline-checkout offline-checkout 1
 make_app "Offline Checkout - printer setup" io.github.benddailey.offline-checkout.printer-setup \
-  offline-checkout-printer ""
+  offline-checkout-printer 0
 
 cat <<DONE
 

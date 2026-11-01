@@ -81,10 +81,11 @@ npm run package
     installs the app and the icons to `%LOCALAPPDATA%\OfflineCheckout\` and creates the desktop
     shortcuts. Chrome, else Edge.
   - `Mac - Create shortcuts.command` from `macos/Create shortcuts.command` (LF, executable). It
-    installs the app to `~/Library/Application Support/OfflineCheckout/` and builds two small
-    launcher apps in `~/Applications`, each an `Info.plist`, the `.icns` and a `launch` script that
-    runs `open -na <browser> --args ...`. Chrome, else Edge. It must stay compatible with the bash 3.2
-    that macOS ships.
+    installs the app to `~/Library/Application Support/OfflineCheckout/` and builds two launcher
+    apps in `~/Applications` with `osacompile`, so their executable is native and Apple Silicon
+    never asks for Rosetta. Each applet runs its `Contents/Resources/launch.sh`, which runs
+    `open -na <browser> --args ...`; the script swaps in the `.icns` and re-signs the bundle ad hoc.
+    Chrome, else Edge. It must stay compatible with the bash 3.2 that macOS ships.
   - `Linux - Create shortcuts.sh` from `linux/Create shortcuts.sh` (LF, executable). It installs the
     app, the icons and the browser profile to `~/OfflineCheckout/` and writes freedesktop `.desktop`
     launchers to `~/.local/share/applications` and the desktop, which every desktop environment
@@ -156,7 +157,9 @@ that changes the IndexedDB schema (`src/store/db.ts`) needs a migration.
 - Chrome has no flag to name a printer. Kiosk printing uses the last printer chosen in that profile,
   which is why there is a printer setup shortcut without `--kiosk-printing`.
 - Chrome ignores command-line flags when a window of the same profile is already open, so the
-  printer setup window must be closed before opening the everyday shortcut.
+  printer setup window must be closed before opening the everyday shortcut. On macOS Chrome keeps
+  running after its last window closes, so each Mac launcher first stops a running instance of the
+  profile that has the other `--kiosk-printing` setting.
 - Pairing codes carry a format version (`OC2:`). A workstation refuses codes in another format, so
   staff are told to keep every desk on the same release.
 - Barcodes are verified by zxing at 300 dpi, but still confirm them with the library's real scanners.

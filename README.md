@@ -49,9 +49,9 @@ Do this before an outage, on every desk PC.
 
 1. Double-click the zip to extract it, and open the extracted folder.
 2. Double-click **Mac - Create shortcuts.command**. It opens in Terminal.
-3. The first time, macOS says it cannot verify the file. Click **Done**, open **System Settings >
-   Privacy & Security**, scroll down and click **Open Anyway** next to the message about the file,
-   then confirm. Alternatively, open **Terminal**, type `bash ` (with a space), drag the file into
+3. The first time, macOS says it cannot verify the file. Click **Done**, then open
+   **System Settings > Privacy & Security**, scroll down, click **Open Anyway** next to the message
+   about the file, and confirm. Alternatively, open **Terminal**, type `bash ` (with a space), drag the file into
    the Terminal window and press Return.
 4. The two apps are in the **Applications** folder in your home folder, which the script opens. Drag
    them to the Dock to keep them handy.
