@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, nextTick, ref, shallowRef } from "vue";
 import { CONTROL, normalizeScan, validateBarcode } from "../log/barcode";
-import { clampName } from "../log/limits";
+import { MAX_NAME, clampName } from "../log/limits";
 import { checkItem } from "../log/duplicates";
 import { recordId } from "../log/ids";
 import { reduce } from "../log/reduce";
@@ -36,6 +36,7 @@ export interface SessionDeps {
   createSession: typeof db.createSession;
   openSessionStore: typeof db.openSessionStore;
   listSessions: typeof db.listSessions;
+  deleteSession: typeof db.deleteSession;
   acquireSessionLock: typeof db.acquireSessionLock;
   requestPersistence: typeof db.requestPersistence;
   renderSessionPdf: typeof renderSessionPdf;
@@ -64,6 +65,7 @@ export function createSessionStoreDeps(overrides: Partial<SessionDeps> = {}): Se
     createSession: db.createSession,
     openSessionStore: db.openSessionStore,
     listSessions: db.listSessions,
+    deleteSession: db.deleteSession,
     acquireSessionLock: db.acquireSessionLock,
     requestPersistence: db.requestPersistence,
     renderSessionPdf,
@@ -88,6 +90,11 @@ let activeDeps = createSessionStoreDeps();
 export function setSessionDeps(deps: SessionDeps): void {
   activeDeps = deps;
 }
+
+/** How long deleteSession waits for connected workstations to confirm. */
+export const DELETE_REPLY_MS = 3_000;
+
+type DeleteMessage = { t: "delete-session"; workstation: string } | { t: "deleted" };
 
 export const LOCKED_MESSAGE = "This session is already open in another tab";
 const MESH_FAILED = "Could not start networking on this workstation";
@@ -200,6 +207,11 @@ export const useSession = defineStore("session", () => {
   let releaseLock: (() => void) | null = null;
   let sync: SyncEngine | null = null;
   let unsubPeers: (() => void) | null = null;
+  let unsubMessages: (() => void) | null = null;
+  /** A delete is under way here: further delete calls and messages are ignored. */
+  let deleting = false;
+  /** While deleteSession waits: the peers yet to reply, and how to stop waiting. */
+  let awaitingDeleted: { peers: Set<string>; done: () => void } | null = null;
   const known = new Set<RecordId>();
   /** Every scan and edit runs in arrival order, one append at a time. */
   let queue: Promise<void> = Promise.resolve();
@@ -219,6 +231,8 @@ export const useSession = defineStore("session", () => {
     sync = null;
     unsubPeers?.();
     unsubPeers = null;
+    unsubMessages?.();
+    unsubMessages = null;
     mesh.value?.close();
     mesh.value = null;
     peers.value = [];
@@ -400,6 +414,7 @@ export const useSession = defineStore("session", () => {
     else {
       sync?.stop();
       unsubPeers?.();
+      unsubMessages?.();
     }
     mesh.value = m;
     const setPeers = (list: PeerInfo[]) => {
@@ -408,6 +423,7 @@ export const useSession = defineStore("session", () => {
       if (!isolated.value) hadPeer.value = true;
     };
     unsubPeers = m.onPeerChange(setPeers);
+    unsubMessages = m.onMessage(onDeleteMessage);
     setPeers(m.peers());
     if (meta.value) m.setEmployee(meta.value.employee);
     sync = new SyncEngine({
@@ -714,6 +730,97 @@ export const useSession = defineStore("session", () => {
     }
   }
 
+  /** The workstation name on the device's latest record, else its clerk on the mesh. */
+  function deskName(deviceId: string): string {
+    let latest: LogRecord | undefined;
+    for (const r of records.value) {
+      if (r.deviceId === deviceId && (!latest || r.seq > latest.seq)) latest = r;
+    }
+    return (
+      latest?.workstation || peers.value.find((p) => p.deviceId === deviceId)?.employee || "Unnamed"
+    );
+  }
+
+  /** Tear down, then remove the session's data here; false (and fatal) if that fails. */
+  async function removeHere(sessionId: string): Promise<boolean> {
+    teardown();
+    screen.value = "launch";
+    try {
+      await deps.deleteSession(sessionId);
+      return true;
+    } catch (err) {
+      console.error("session: could not delete", err);
+      fatal.value = `Could not delete the session: ${err instanceof Error ? err.message : String(err)}`;
+      return false;
+    }
+  }
+
+  /**
+   * Delete a closed session here and on the connected workstations. Waits up to DELETE_REPLY_MS
+   * for their replies first, as closing the mesh at once could drop the message.
+   */
+  async function deleteSession(): Promise<void> {
+    const m = meta.value;
+    if (deleting || !m || !closed.value) return;
+    deleting = true;
+    try {
+      const waiting = new Set(peers.value.filter((p) => p.connected).map((p) => p.deviceId));
+      if (waiting.size) {
+        const msg: DeleteMessage = {
+          t: "delete-session",
+          workstation: workstationName.value ?? m.workstation ?? "",
+        };
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(() => done(), DELETE_REPLY_MS);
+          const done = () => {
+            clearTimeout(timer);
+            awaitingDeleted = null;
+            resolve();
+          };
+          awaitingDeleted = { peers: waiting, done };
+          for (const id of waiting) mesh.value?.send(id, msg);
+        });
+      }
+      const unconfirmed = [...waiting].map(deskName);
+      if (!(await removeHere(m.sessionId))) return;
+      notice.value =
+        `Session ‘${m.name}’ deleted.` +
+        (unconfirmed.length ? ` Not confirmed on: ${unconfirmed.join(", ")}.` : "");
+    } finally {
+      deleting = false;
+    }
+  }
+
+  function onDeleteMessage(peer: string, raw: unknown): void {
+    const msg = raw as Partial<Record<string, unknown>> | null;
+    if (typeof msg !== "object" || msg === null) return;
+    if (msg.t === "deleted" && awaitingDeleted) {
+      awaitingDeleted.peers.delete(peer);
+      if (awaitingDeleted.peers.size === 0) awaitingDeleted.done();
+    } else if (msg.t === "delete-session") {
+      void deletedByPeer(peer, msg.workstation);
+    }
+  }
+
+  /** Never removes a session that is still open here. */
+  async function deletedByPeer(peer: string, workstation: unknown): Promise<void> {
+    const m = meta.value;
+    if (deleting || !m || !closed.value) return;
+    deleting = true;
+    try {
+      const reply: DeleteMessage = { t: "deleted" };
+      mesh.value?.send(peer, reply);
+      const from =
+        typeof workstation === "string" && workstation !== "" && workstation.length <= MAX_NAME
+          ? workstation
+          : "another workstation";
+      if (!(await removeHere(m.sessionId))) return;
+      notice.value = `Session ‘${m.name}’ was deleted on ${from}.`;
+    } finally {
+      deleting = false;
+    }
+  }
+
   function listSessions(): Promise<SessionSummary[]> {
     return deps.listSessions();
   }
@@ -767,6 +874,7 @@ export const useSession = defineStore("session", () => {
     endPatron,
     voidPatron,
     closeSession,
+    deleteSession,
     generatePdf,
     exportTable,
     printScannerCard,
