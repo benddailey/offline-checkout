@@ -99,6 +99,13 @@ function makeStore(sessionId: string, db: IDBPDatabase<SessionSchema>): SessionS
       if (!m) throw new Error(`Session ${sessionId} has no metadata`);
       await tx.store.put({ ...m, employee: name }, META_KEY);
       await tx.done;
+      const index = await openIndex();
+      try {
+        const summary = await index.get("sessions", sessionId);
+        if (summary) await index.put("sessions", { ...summary, employee: name });
+      } finally {
+        index.close();
+      }
     },
     async append(body) {
       const tx = db.transaction(["records", "meta"], "readwrite", STRICT);

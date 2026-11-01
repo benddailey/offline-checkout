@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser } from "@playwright/test";
+import { chromium, type Browser, type Page } from "@playwright/test";
 
 /** Set HEADED=1 to watch the browsers. */
 export const HEADLESS = !process.env.HEADED;
@@ -17,4 +17,12 @@ export function appUrl(): string {
 
 export function launchChromium(extraArgs: string[] = []): Promise<Browser> {
   return chromium.launch({ headless: HEADLESS, args: [...CHROMIUM_ARGS, ...extraArgs] });
+}
+
+/** On Launch, open a session that has not been closed as `clerk`. */
+export async function resumeAs(page: Page, session: string | RegExp, clerk: string): Promise<void> {
+  await page.getByTestId("resume-list").getByRole("button", { name: session }).click();
+  const form = page.getByTestId("resume-form");
+  await form.getByLabel("Clerk name").fill(clerk);
+  await form.getByRole("button", { name: "Resume session" }).click();
 }

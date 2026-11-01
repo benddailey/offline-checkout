@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl } from "./helpers/app";
+import { appUrl, resumeAs } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { stubPrint } from "./helpers/print";
 
@@ -91,10 +91,7 @@ test("an isolated workstation re-pairs only with its own session", async ({ brow
     await expectConnected(a!, "Ben");
 
     await b!.reload();
-    await b!
-      .getByTestId("resume-list")
-      .getByRole("button", { name: /Outage/ })
-      .click();
+    await resumeAs(b!, /Outage/, "Ben");
     await expect(b!.getByText("Disconnected — re-pair with any workstation")).toBeVisible();
     await b!.keyboard.type("P2\n");
     await expect(b!.getByTestId("patron")).toHaveText("P2");

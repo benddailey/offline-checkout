@@ -55,9 +55,10 @@ to the title on the start screen and on the Summary.
 ## Using it at the desk
 
 1. **Start.** Open **Offline Checkout**. Enter a session name (it defaults to today's date) and your
-   name, and click **Start session**. After a crash or restart, pick the session from the
-   **Resume** list instead. Each session there shows when it started, and closed sessions are marked
-   **Closed** with the time they were closed. A closed session opens on its Summary.
+   name, and click **Start session**. To go back to a session (after a shift change, a crash or a
+   restart), click it in the **Resume** list, enter your name and click **Resume session**. Each
+   session there shows the last clerk and when it started. Closed sessions are marked **Closed**
+   with the time they were closed, and open straight to their Summary.
 2. **Add another desk PC.**
    1. On the PC already running the session, click **Add workstation**. It shows a join code.
    2. On the new PC, click **Join session** and enter your name.
@@ -81,6 +82,12 @@ to the title on the start screen and on the Summary.
      and is always on the Summary: **Receipt printer** prints it on the receipt roll, and
      **Letter PDF** saves it for a regular printer.
 4. **Summary.** Click **Summary** for totals, a count per clerk, and every patron with their items.
+   - **Change clerk**: when someone takes over the desk, click **Change clerk** and enter your name.
+     Scans from then on are counted under your name; earlier scans keep theirs.
+   - **Exit session** goes back to the start screen. If other desk PCs are connected, it asks first:
+     this PC disconnects, and after resuming you re-pair it with any desk PC.
+   - Finish the current patron first: these buttons, **Add workstation** and **Summary** wait until
+     the patron is ended or voided.
 5. **When the system is back.** On the Summary click **Close session**. Every desk PC stops taking
    scans. Scan the kept receipts into the library system: the patron barcode, then each item.
    **Generate PDF** makes a copy of the whole session on US Letter paper, with a barcode for every

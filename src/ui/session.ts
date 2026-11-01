@@ -117,6 +117,8 @@ export const useSession = defineStore("session", () => {
   const mesh = shallowRef<Mesh | null>(null);
   /** Set after "Start new session" so the scan screen can offer the scanner card. */
   const offerScannerCard = ref(false);
+  /** A status bar dialog is open: the scanner input stands down. */
+  const toolbarDialog = ref(false);
 
   const state = computed(() => reduce(records.value));
   /**
@@ -219,6 +221,7 @@ export const useSession = defineStore("session", () => {
     message.value = null;
     notice.value = null;
     offerScannerCard.value = false;
+    toolbarDialog.value = false;
     hadPeer.value = false;
   }
 
@@ -294,8 +297,14 @@ export const useSession = defineStore("session", () => {
     screen.value = "scan";
   }
 
-  async function resumeSession(sessionId: string): Promise<void> {
-    if (!(await open(sessionId, () => deps.openSessionStore(sessionId)))) return;
+  /** An open session needs the clerk's name; a closed one opens on its summary without one. */
+  async function resumeSession(sessionId: string, employee?: string): Promise<void> {
+    const clerk = employee === undefined ? undefined : clampName(employee);
+    if (clerk === "") {
+      message.value = { tone: "error", text: "Enter the clerk's name" };
+      return;
+    }
+    if (!(await open(sessionId, () => deps.openSessionStore(sessionId), clerk))) return;
     ensureMesh();
     const own = meta.value!.deviceId;
     let latest: VisitState | null = null;
@@ -305,6 +314,26 @@ export const useSession = defineStore("session", () => {
     }
     currentVisitId.value = latest?.id ?? null;
     screen.value = closed.value ? "summary" : "scan";
+  }
+
+  /** Later scans here are recorded under `employee`; returns false if the name is blank or not saved. */
+  async function changeClerk(employee: string): Promise<boolean> {
+    const clerk = clampName(employee);
+    if (!clerk) return false;
+    let saved = false;
+    await enqueue(async () => {
+      if (!store) return;
+      try {
+        await store.setEmployee(clerk);
+        meta.value = await store.meta();
+        mesh.value?.setEmployee(clerk);
+        saved = true;
+      } catch (err) {
+        console.error("session: could not save the clerk name", err);
+        fatal.value = `Could not save the clerk's name: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    });
+    return saved;
   }
 
   async function adoptJoinedSession(
@@ -688,6 +717,8 @@ export const useSession = defineStore("session", () => {
     startSession,
     leaveSession,
     resumeSession,
+    changeClerk,
+    toolbarDialog,
     scan,
     voidRecord,
     endPatron,

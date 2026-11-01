@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { appUrl } from "./helpers/app";
+import { appUrl, resumeAs } from "./helpers/app";
 import { pdfText } from "./helpers/pdf";
 import {
   decodePrintedBarcodes,
@@ -86,7 +86,7 @@ test("ending a patron prints a 72 mm receipt and gives focus back to the scanner
   await expect(page.locator("#oc-print-root")).toHaveCount(0);
 
   await page.reload();
-  await page.getByTestId("resume-list").getByRole("button", { name: SESSION }).click();
+  await resumeAs(page, SESSION, "Rae");
   await expect(page.getByText("Scan patron card")).toBeVisible();
   await expect(page.getByTestId("totals")).toHaveText("Patrons 2 · Items 2");
 
