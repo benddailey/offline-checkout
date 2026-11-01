@@ -75,6 +75,7 @@ test("a closed session is deleted on two workstations with the slide control", a
     });
     await expect(b!.getByTestId("resume-list")).toBeHidden();
 
+    await expect(b!.getByTestId("notice")).not.toContainText("Not confirmed on");
     await expect(a!.getByTestId("notice")).toContainText(
       "Session ‘Outage’ was deleted on Back desk.",
       { timeout: 10_000 },
@@ -101,5 +102,6 @@ test("a session with no exports warns about Evergreen and deletes with the End k
   await page.keyboard.press("End");
 
   await expect(page.getByTestId("notice")).toContainText("Session ‘Outage’ deleted.");
+  await expect(page.getByTestId("notice")).not.toContainText("Not confirmed on");
   await expect(page.getByTestId("resume-list")).toBeHidden();
 });
