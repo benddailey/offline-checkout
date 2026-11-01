@@ -93,6 +93,8 @@ export function setSessionDeps(deps: SessionDeps): void {
 
 /** How long deleteSession waits for connected workstations to confirm. */
 export const DELETE_REPLY_MS = 3_000;
+/** How long a deleted workstation keeps its mesh open for its `deleted` reply to get out. */
+export const DELETED_LINGER_MS = 1_000;
 
 type DeleteMessage = { t: "delete-session"; workstation: string } | { t: "deleted" };
 
@@ -208,8 +210,8 @@ export const useSession = defineStore("session", () => {
   let sync: SyncEngine | null = null;
   let unsubPeers: (() => void) | null = null;
   let unsubMessages: (() => void) | null = null;
-  /** A delete is under way here: further delete calls and messages are ignored. */
-  let deleting = false;
+  /** A delete under way here, started by this workstation or a peer; others are ignored. */
+  let deleting: { sessionId: string; by: "self" | "peer" } | null = null;
   /** While deleteSession waits: the peers yet to reply, and how to stop waiting. */
   let awaitingDeleted: { peers: Set<string>; done: () => void } | null = null;
   const known = new Set<RecordId>();
@@ -741,18 +743,39 @@ export const useSession = defineStore("session", () => {
     );
   }
 
-  /** Tear down, then remove the session's data here; false (and fatal) if that fails. */
+  /**
+   * Remove the session's data here, first tearing it down if it is still the open one.
+   * True if it was the open one and is gone; on failure sets fatal.
+   */
   async function removeHere(sessionId: string): Promise<boolean> {
-    teardown();
-    screen.value = "launch";
+    const current = meta.value?.sessionId === sessionId;
+    if (current) {
+      teardown();
+      screen.value = "launch";
+    }
     try {
       await deps.deleteSession(sessionId);
-      return true;
+      return current;
     } catch (err) {
       console.error("session: could not delete", err);
       fatal.value = `Could not delete the session: ${err instanceof Error ? err.message : String(err)}`;
       return false;
     }
+  }
+
+  /** Resolves once `peer` is no longer connected on `m`, or after `ms`. */
+  function untilDisconnected(m: Mesh, peer: string, ms: number): Promise<void> {
+    const gone = (list: PeerInfo[]) => !list.some((p) => p.deviceId === peer && p.connected);
+    if (gone(m.peers())) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        unsub();
+        resolve();
+      };
+      const timer = setTimeout(done, ms);
+      const unsub = m.onPeerChange((list) => gone(list) && done());
+    });
   }
 
   /**
@@ -762,7 +785,7 @@ export const useSession = defineStore("session", () => {
   async function deleteSession(): Promise<void> {
     const m = meta.value;
     if (deleting || !m || !closed.value) return;
-    deleting = true;
+    deleting = { sessionId: m.sessionId, by: "self" };
     try {
       const waiting = new Set(peers.value.filter((p) => p.connected).map((p) => p.deviceId));
       if (waiting.size) {
@@ -787,7 +810,7 @@ export const useSession = defineStore("session", () => {
         `Session ‘${m.name}’ deleted.` +
         (unconfirmed.length ? ` Not confirmed on: ${unconfirmed.join(", ")}.` : "");
     } finally {
-      deleting = false;
+      deleting = null;
     }
   }
 
@@ -805,11 +828,20 @@ export const useSession = defineStore("session", () => {
   /** Never removes a session that is still open here. */
   async function deletedByPeer(peer: string, workstation: unknown): Promise<void> {
     const m = meta.value;
-    if (deleting || !m || !closed.value) return;
-    deleting = true;
+    const reply: DeleteMessage = { t: "deleted" };
+    if (deleting) {
+      // Both workstations deleting the same session: confirm, but delete only once.
+      if (deleting.by === "self" && deleting.sessionId === m?.sessionId) {
+        mesh.value?.send(peer, reply);
+      }
+      return;
+    }
+    if (!m || !closed.value) return;
+    deleting = { sessionId: m.sessionId, by: "peer" };
     try {
-      const reply: DeleteMessage = { t: "deleted" };
-      mesh.value?.send(peer, reply);
+      const link = mesh.value;
+      link?.send(peer, reply);
+      if (link) await untilDisconnected(link, peer, DELETED_LINGER_MS);
       const from =
         typeof workstation === "string" && workstation !== "" && workstation.length <= MAX_NAME
           ? workstation
@@ -817,7 +849,7 @@ export const useSession = defineStore("session", () => {
       if (!(await removeHere(m.sessionId))) return;
       notice.value = `Session ‘${m.name}’ was deleted on ${from}.`;
     } finally {
-      deleting = false;
+      deleting = null;
     }
   }
 
