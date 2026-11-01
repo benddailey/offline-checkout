@@ -10,10 +10,23 @@ const CARD_MODULE_IN = 0.015;
 const CARD_BAR_H = 0.7;
 
 function newDoc(compress: boolean): jsPDF {
-  return new jsPDF({ unit: "in", format: "letter", orientation: "portrait", compress });
+  return new jsPDF({
+    unit: "in",
+    format: "letter",
+    orientation: "portrait",
+    compress,
+    floatPrecision: 3,
+  });
 }
 
-/** Filled black vector rects, one per run of bars. Returns the x of the bar area's left edge. */
+/** Points to at most 3 decimals, as jsPDF writes them with floatPrecision 3. */
+const pt = (v: number) => String(Math.round(v * 1000) / 1000);
+
+/**
+ * One filled path of vector rects, one per run of bars. Returns the x of the bar area's left edge.
+ * Written straight into the page stream in module units (scaled by `cm`), so each bar is a few
+ * small integers: a jsPDF rect() per bar was most of a big session's PDF time and size.
+ */
 function drawBars(
   doc: jsPDF,
   text: string,
@@ -24,10 +37,14 @@ function drawBars(
 ): { left: number; width: number } {
   const modules = code128Modules(text);
   const left = x + QUIET_MODULES * module;
+  const k = doc.internal.scaleFactor;
+  const top = doc.internal.pageSize.getHeight() - y;
+  const h = pt(-barH / module);
+  const path = [`q ${pt(module * k)} 0 0 ${pt(module * k)} ${pt(left * k)} ${pt(top * k)} cm`];
+  for (const m of modules.matchAll(/1+/g)) path.push(`${m.index} 0 ${m[0].length} ${h} re`);
+  path.push("f Q");
   doc.setFillColor(0, 0, 0);
-  for (const m of modules.matchAll(/1+/g)) {
-    doc.rect(left + m.index * module, y, m[0].length * module, barH, "F");
-  }
+  (doc.internal as unknown as { write(s: string): void }).write(path.join("\n"));
   return { left, width: modules.length * module };
 }
 
