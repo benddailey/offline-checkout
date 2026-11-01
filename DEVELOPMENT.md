@@ -42,7 +42,10 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
     `src/qr/zxing.ts` hands the inlined `.wasm` to that reader with `prepareZXingModule`, so nothing
     is fetched from a CDN. Import it once at startup, before the first decode. There is only one
     copy of `zxing-wasm`, so it can be updated like any other dependency.
-- **PDF:** `jspdf` (`src/pdf/`).
+- **PDF:** `jspdf` (`src/pdf/`). `drawBars` writes each barcode straight into the page stream as one
+  filled path in module units, scaled with `cm`, through the untyped `doc.internal.write`. A
+  `rect()` call per bar was most of a large session's PDF time and size. Coordinates are kept to 3
+  decimals of a point (`floatPrecision: 3`), far finer than a printer dot.
 - **CSV and Excel:** written by hand in `src/export/`, one row per item in the PDF's order.
   - The CSV has a UTF-8 BOM and CRLF lines. A cell starting with `=`, `+`, `-` or `@` gets a `'`
     in front so Excel doesn't run it as a formula.
