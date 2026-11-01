@@ -1,11 +1,18 @@
 import { defineStore } from "pinia";
 import { computed, nextTick, ref, shallowRef } from "vue";
 import { CONTROL, normalizeScan, validateBarcode } from "../log/barcode";
-import { clampName } from "../log/limits";
+import { MAX_NAME, clampName } from "../log/limits";
 import { checkItem } from "../log/duplicates";
 import { recordId } from "../log/ids";
 import { reduce } from "../log/reduce";
-import type { ItemState, LogRecord, RecordBody, RecordId, VisitState } from "../log/types";
+import type {
+  ExportKind,
+  ItemState,
+  LogRecord,
+  RecordBody,
+  RecordId,
+  VisitState,
+} from "../log/types";
 import { Mesh, type MeshOptions, type PeerInfo } from "../mesh/mesh";
 import { isPairingText } from "../pairing/chunks";
 import { PairingError, decodePayload, type PairingPayload } from "../pairing/payload";
@@ -29,6 +36,7 @@ export interface SessionDeps {
   createSession: typeof db.createSession;
   openSessionStore: typeof db.openSessionStore;
   listSessions: typeof db.listSessions;
+  deleteSession: typeof db.deleteSession;
   acquireSessionLock: typeof db.acquireSessionLock;
   requestPersistence: typeof db.requestPersistence;
   renderSessionPdf: typeof renderSessionPdf;
@@ -57,6 +65,7 @@ export function createSessionStoreDeps(overrides: Partial<SessionDeps> = {}): Se
     createSession: db.createSession,
     openSessionStore: db.openSessionStore,
     listSessions: db.listSessions,
+    deleteSession: db.deleteSession,
     acquireSessionLock: db.acquireSessionLock,
     requestPersistence: db.requestPersistence,
     renderSessionPdf,
@@ -81,6 +90,13 @@ let activeDeps = createSessionStoreDeps();
 export function setSessionDeps(deps: SessionDeps): void {
   activeDeps = deps;
 }
+
+/** How long deleteSession waits for connected workstations to confirm. */
+export const DELETE_REPLY_MS = 3_000;
+/** How long a deleted workstation keeps its mesh open for its `deleted` reply to get out. */
+export const DELETED_LINGER_MS = 1_000;
+
+type DeleteMessage = { t: "delete-session"; workstation: string } | { t: "deleted" };
 
 export const LOCKED_MESSAGE = "This session is already open in another tab";
 const MESH_FAILED = "Could not start networking on this workstation";
@@ -193,6 +209,12 @@ export const useSession = defineStore("session", () => {
   let releaseLock: (() => void) | null = null;
   let sync: SyncEngine | null = null;
   let unsubPeers: (() => void) | null = null;
+  let unsubMessages: (() => void) | null = null;
+  /** A delete under way here, started by this workstation or a peer; others are ignored. */
+  const deleting = shallowRef<{ sessionId: string; by: "self" | "peer" } | null>(null);
+  const deletingSession = computed(() => deleting.value?.by === "self");
+  /** While deleteSession waits: the peers yet to reply, and how to stop waiting. */
+  let awaitingDeleted: { peers: Set<string>; done: () => void } | null = null;
   const known = new Set<RecordId>();
   /** Every scan and edit runs in arrival order, one append at a time. */
   let queue: Promise<void> = Promise.resolve();
@@ -212,6 +234,8 @@ export const useSession = defineStore("session", () => {
     sync = null;
     unsubPeers?.();
     unsubPeers = null;
+    unsubMessages?.();
+    unsubMessages = null;
     mesh.value?.close();
     mesh.value = null;
     peers.value = [];
@@ -237,6 +261,7 @@ export const useSession = defineStore("session", () => {
 
   /** Release the session here (lock, store, mesh) and go back to Launch. */
   function leaveSession(): void {
+    if (deletingSession.value) return;
     teardown();
     screen.value = "launch";
   }
@@ -393,6 +418,7 @@ export const useSession = defineStore("session", () => {
     else {
       sync?.stop();
       unsubPeers?.();
+      unsubMessages?.();
     }
     mesh.value = m;
     const setPeers = (list: PeerInfo[]) => {
@@ -401,6 +427,7 @@ export const useSession = defineStore("session", () => {
       if (!isolated.value) hadPeer.value = true;
     };
     unsubPeers = m.onPeerChange(setPeers);
+    unsubMessages = m.onMessage(onDeleteMessage);
     setPeers(m.peers());
     if (meta.value) m.setEmployee(meta.value.employee);
     sync = new SyncEngine({
@@ -648,12 +675,17 @@ export const useSession = defineStore("session", () => {
     });
   }
 
+  function recordExport(kind: ExportKind): void {
+    void enqueue(async () => void (await commit({ type: "exported", kind }, "change")));
+  }
+
   function generatePdf(): void {
     if (!meta.value || state.value.totals.patrons === 0) return;
     try {
       const date = deps.now();
       const blob = deps.renderSessionPdf(state.value, { date });
       deps.downloadBlob(blob, `offline-checkout-${fileSafe(meta.value.name)}-${ymd(date)}.pdf`);
+      recordExport("pdf");
     } catch (err) {
       console.error("session: PDF failed", err);
       message.value = { tone: "error", text: "Could not create the PDF" };
@@ -678,6 +710,7 @@ export const useSession = defineStore("session", () => {
         blob,
         `offline-checkout-${fileSafe(meta.value.name)}-${ymd(date)}.${format}`,
       );
+      recordExport(format);
     } catch (err) {
       console.error(`session: ${format} export failed`, err);
       const noun = { csv: "CSV", xlsx: "Excel", xacts: "Evergreen" }[format];
@@ -698,6 +731,127 @@ export const useSession = defineStore("session", () => {
     } catch (err) {
       console.error("session: scanner card failed", err);
       message.value = { tone: "error", text: "Could not create the scanner card" };
+    }
+  }
+
+  /** The workstation name on the device's latest record, else its clerk on the mesh. */
+  function deskName(deviceId: string): string {
+    let latest: LogRecord | undefined;
+    for (const r of records.value) {
+      if (r.deviceId === deviceId && (!latest || r.seq > latest.seq)) latest = r;
+    }
+    return (
+      latest?.workstation || peers.value.find((p) => p.deviceId === deviceId)?.employee || "Unnamed"
+    );
+  }
+
+  /**
+   * Remove the session's data here, first tearing it down if it is still the open one.
+   * True if it was the open one and is gone; on failure sets fatal.
+   */
+  async function removeHere(sessionId: string): Promise<boolean> {
+    const current = meta.value?.sessionId === sessionId;
+    if (current) {
+      teardown();
+      screen.value = "launch";
+    }
+    try {
+      await deps.deleteSession(sessionId);
+      return current;
+    } catch (err) {
+      console.error("session: could not delete", err);
+      fatal.value = `Could not delete the session: ${err instanceof Error ? err.message : String(err)}`;
+      return false;
+    }
+  }
+
+  /** Resolves once `peer` is no longer connected on `m`, or after `ms`. */
+  function untilDisconnected(m: Mesh, peer: string, ms: number): Promise<void> {
+    const gone = (list: PeerInfo[]) => !list.some((p) => p.deviceId === peer && p.connected);
+    if (gone(m.peers())) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        unsub();
+        resolve();
+      };
+      const timer = setTimeout(done, ms);
+      const unsub = m.onPeerChange((list) => gone(list) && done());
+    });
+  }
+
+  /**
+   * Delete a closed session here and on the connected workstations. Waits up to DELETE_REPLY_MS
+   * for their replies first, as closing the mesh at once could drop the message.
+   */
+  async function deleteSession(): Promise<void> {
+    const m = meta.value;
+    if (deleting.value || !m || !closed.value) return;
+    deleting.value = { sessionId: m.sessionId, by: "self" };
+    try {
+      const waiting = new Set(peers.value.filter((p) => p.connected).map((p) => p.deviceId));
+      if (waiting.size) {
+        const msg: DeleteMessage = {
+          t: "delete-session",
+          workstation: workstationName.value ?? m.workstation ?? "",
+        };
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(() => done(), DELETE_REPLY_MS);
+          const done = () => {
+            clearTimeout(timer);
+            awaitingDeleted = null;
+            resolve();
+          };
+          awaitingDeleted = { peers: waiting, done };
+          for (const id of waiting) mesh.value?.send(id, msg);
+        });
+      }
+      const unconfirmed = [...waiting].map(deskName);
+      if (!(await removeHere(m.sessionId))) return;
+      notice.value =
+        `Session ‘${m.name}’ deleted.` +
+        (unconfirmed.length ? ` Not confirmed on: ${unconfirmed.join(", ")}.` : "");
+    } finally {
+      deleting.value = null;
+    }
+  }
+
+  function onDeleteMessage(peer: string, raw: unknown): void {
+    const msg = raw as Partial<Record<string, unknown>> | null;
+    if (typeof msg !== "object" || msg === null) return;
+    if (msg.t === "deleted" && awaitingDeleted) {
+      awaitingDeleted.peers.delete(peer);
+      if (awaitingDeleted.peers.size === 0) awaitingDeleted.done();
+    } else if (msg.t === "delete-session") {
+      void deletedByPeer(peer, msg.workstation);
+    }
+  }
+
+  /** Never removes a session that is still open here. */
+  async function deletedByPeer(peer: string, workstation: unknown): Promise<void> {
+    const m = meta.value;
+    const reply: DeleteMessage = { t: "deleted" };
+    if (deleting.value) {
+      // Both workstations deleting the same session: confirm, but delete only once.
+      if (deleting.value.by === "self" && deleting.value.sessionId === m?.sessionId) {
+        mesh.value?.send(peer, reply);
+      }
+      return;
+    }
+    if (!m || !closed.value) return;
+    deleting.value = { sessionId: m.sessionId, by: "peer" };
+    try {
+      const link = mesh.value;
+      link?.send(peer, reply);
+      if (link) await untilDisconnected(link, peer, DELETED_LINGER_MS);
+      const from =
+        typeof workstation === "string" && workstation !== "" && workstation.length <= MAX_NAME
+          ? workstation
+          : "another workstation";
+      if (!(await removeHere(m.sessionId))) return;
+      notice.value = `Session ‘${m.name}’ was deleted on ${from}.`;
+    } finally {
+      deleting.value = null;
     }
   }
 
@@ -754,6 +908,8 @@ export const useSession = defineStore("session", () => {
     endPatron,
     voidPatron,
     closeSession,
+    deleteSession,
+    deletingSession,
     generatePdf,
     exportTable,
     printScannerCard,

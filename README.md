@@ -161,6 +161,13 @@ to the title on the start screen and on the Summary.
    **Upload** and **Process**. Evergreen sets each due date from the library's loan rules, counting
    from the time the item was scanned, and lists any problems under **Exceptions**. Upload each
    file once: the second upload would check every item out again.
+6. **Deleting a closed session.** When every export you need is done, click **Delete session** on
+   the Summary of a closed session. It lists each export (PDF, CSV, Excel, Evergreen) with the time,
+   clerk and desk PC that downloaded it, or says none was downloaded. If the Evergreen file was never
+   downloaded, download it first unless the checkouts are already in Evergreen. Drag the slider all
+   the way to the end to delete. The session is removed from this PC and from every connected desk PC,
+   and it cannot be undone. A desk PC that was not connected keeps its copy until you delete it there.
+   A session that is still open can't be deleted.
 
 ## Good to know
 

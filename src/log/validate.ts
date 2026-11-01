@@ -50,6 +50,8 @@ export function isLogRecord(x: unknown): x is LogRecord {
       return isRecordId(r.target);
     case "session-closed":
       return true;
+    case "exported":
+      return r.kind === "pdf" || r.kind === "csv" || r.kind === "xlsx" || r.kind === "xacts";
     default:
       return false;
   }

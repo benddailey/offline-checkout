@@ -138,4 +138,24 @@ describe("reduce", () => {
     const r = mk("a", 1, { type: "patron-started", patron: "P1" });
     expect(reduce([r, r]).visits).toHaveLength(1);
   });
+  test("exported records are listed in order and change nothing else", () => {
+    const base = [
+      mk("a", 1, { type: "patron-started", patron: "P1" }),
+      mk("a", 2, { type: "item-scanned", visitId: "a:1", item: "I1" }),
+      mk("a", 3, { type: "session-closed" }),
+    ];
+    const s = reduce([
+      ...base,
+      mk("a", 4, { type: "exported", kind: "xacts" }),
+      { ...mk("b", 5, { type: "exported", kind: "pdf" }), workstation: "Back" },
+    ]);
+    expect(s.exports).toEqual([
+      { kind: "xacts", at: 4000, employee: "A", workstation: "" },
+      { kind: "pdf", at: 5000, employee: "B", workstation: "Back" },
+    ]);
+    const without = reduce(base);
+    expect(s.totals).toEqual(without.totals);
+    expect(s.closed).toBe(true);
+    expect(without.exports).toEqual([]);
+  });
 });

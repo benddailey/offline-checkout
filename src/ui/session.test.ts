@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { recordId } from "../log/ids";
 import { MAX_BARCODE, MAX_NAME } from "../log/limits";
 import { isLogRecord } from "../log/validate";
@@ -9,7 +9,13 @@ import type { Mesh, MeshOptions, PeerInfo } from "../mesh/mesh";
 import { encodePayload, type PairingPayload } from "../pairing/payload";
 import type { VisitReceipt } from "../print/receipt";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
-import { createSessionStoreDeps, setSessionDeps, useSession } from "./session";
+import {
+  DELETED_LINGER_MS,
+  DELETE_REPLY_MS,
+  createSessionStoreDeps,
+  setSessionDeps,
+  useSession,
+} from "./session";
 
 const CONTROL_END = "OC-END";
 const DEVICE = "deviceaaaa";
@@ -36,6 +42,8 @@ function fakeDb() {
   let nextId = 1;
   let workstation: string | undefined;
   let failNameWorkstation = false;
+  let failDelete = false;
+  const deleted: string[] = [];
   /** Wall-clock time stamped on the next append (seq → at). */
   let clock = (seq: number) => 1000 + seq;
 
@@ -124,6 +132,12 @@ function fakeDb() {
       locks.add(sessionId);
       return () => locks.delete(sessionId);
     },
+    async deleteSession(sessionId) {
+      if (failDelete) throw new Error("blocked");
+      deleted.push(sessionId);
+      metas.delete(sessionId);
+      logs.delete(sessionId);
+    },
     async requestPersistence() {
       persistCalls++;
       return true;
@@ -168,6 +182,10 @@ function fakeDb() {
     closes,
     meshes,
     meshOptions,
+    deleted,
+    failDelete(v: boolean) {
+      failDelete = v;
+    },
     failSetEmployee(v: boolean) {
       failSetEmployee = v;
     },
@@ -703,6 +721,34 @@ describe("useSession files", () => {
       "offline-checkout-scanner-card.pdf",
       "print:scanner-card",
     ]);
+  });
+});
+
+describe("useSession export records", () => {
+  it("records each successful export with the clerk's name", async () => {
+    const s = await started();
+    await s.scan("P1");
+    await s.scan("I1"); // xacts needs at least one item
+    await s.closeSession();
+    s.generatePdf();
+    s.exportTable("xacts");
+    await s.closeSession(); // already closed: just waits for the queue
+    expect(s.state.exports.map((e) => e.kind)).toEqual(["pdf", "xacts"]);
+    expect(s.state.exports.map((e) => e.employee)).toEqual(["Rae", "Rae"]);
+  });
+
+  it("records nothing when the download fails", async () => {
+    setSessionDeps({
+      ...db.deps,
+      downloadBlob: () => {
+        throw new Error("blocked");
+      },
+    });
+    const s = await started();
+    await s.scan("P1");
+    s.exportTable("csv");
+    await s.closeSession();
+    expect(s.state.exports).toEqual([]);
   });
 });
 
@@ -1349,5 +1395,228 @@ describe("useSession workstation name", () => {
     expect(s.workstationName).toBeUndefined();
     expect(s.message?.tone).toBe("error");
     err.mockRestore();
+  });
+});
+
+/** The delete messages among those sent, without the sync traffic. */
+const deleteMsgs = (sent: unknown[]) =>
+  sent.filter((x) => ["delete-session", "deleted"].includes((x as { t: string }).t));
+
+describe("useSession deleteSession", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A closed session "Outage" here, with a connected peer whose records name it "Back desk". */
+  async function closedWithPeer() {
+    const s = useSession();
+    await s.nameWorkstation("Main desk");
+    await s.startSession("Outage", "Rae");
+    const sessionId = s.meta!.sessionId;
+    const m = fakeMesh([{ deviceId: PEER, employee: "Sam", connected: true }]);
+    s.attachMesh(m.mesh);
+    const rec = (seq: number, workstation?: string): LogRecord => ({
+      sessionId,
+      deviceId: PEER,
+      seq,
+      employee: "Sam",
+      at: 5000 + seq,
+      type: "patron-started",
+      patron: `P${seq}`,
+      ...(workstation === undefined ? {} : { workstation }),
+    });
+    m.deliver(PEER, { t: "recs", records: [rec(1, "Old name"), rec(2, "Back desk")] });
+    await tick();
+    await tick();
+    await s.closeSession();
+    return { s, m, sessionId };
+  }
+
+  it("asks connected peers, waits for their replies, then deletes here", async () => {
+    const { s, m, sessionId } = await closedWithPeer();
+    vi.useFakeTimers();
+    let done = false;
+    const p = s.deleteSession().then(() => (done = true));
+    expect(deleteMsgs(m.sent)).toEqual([{ t: "delete-session", workstation: "Main desk" }]);
+    await vi.advanceTimersByTimeAsync(DELETE_REPLY_MS - 1);
+    expect(done).toBe(false);
+    m.deliver(PEER, { t: "deleted" });
+    await p;
+    expect(s.screen).toBe("launch");
+    expect(s.notice).toBe("Session ‘Outage’ deleted.");
+    expect(m.state.closed).toBe(true);
+    expect(s.meta).toBeNull();
+    expect(db.deleted).toEqual([sessionId]);
+  });
+
+  it("reports deletingSession from the start of the wait until it finishes", async () => {
+    const { s, m } = await closedWithPeer();
+    vi.useFakeTimers();
+    expect(s.deletingSession).toBe(false);
+    const p = s.deleteSession();
+    expect(s.deletingSession).toBe(true);
+    s.leaveSession();
+    expect(s.screen).not.toBe("launch");
+    m.deliver(PEER, { t: "deleted" });
+    await p;
+    expect(s.deletingSession).toBe(false);
+  });
+
+  it("names the peers that did not reply in time", async () => {
+    const { s, m } = await closedWithPeer();
+    vi.useFakeTimers();
+    const p = s.deleteSession();
+    await vi.advanceTimersByTimeAsync(DELETE_REPLY_MS);
+    await p;
+    expect(m.state.closed).toBe(true);
+    expect(s.notice).toBe("Session ‘Outage’ deleted. Not confirmed on: Back desk.");
+  });
+
+  it("names a peer with no records by its clerk", async () => {
+    const { s, m } = await closedWithPeer();
+    m.setPeers([
+      { deviceId: PEER, employee: "Sam", connected: true },
+      { deviceId: "devicecccc", employee: "Cy", connected: true },
+    ]);
+    vi.useFakeTimers();
+    const p = s.deleteSession();
+    m.deliver(PEER, { t: "deleted" });
+    await vi.advanceTimersByTimeAsync(DELETE_REPLY_MS);
+    await p;
+    expect(s.notice).toBe("Session ‘Outage’ deleted. Not confirmed on: Cy.");
+  });
+
+  it("does not wait with no connected peers", async () => {
+    const s = await started();
+    await s.closeSession();
+    const sessionId = s.meta!.sessionId;
+    vi.useFakeTimers();
+    await s.deleteSession();
+    expect(deleteMsgs(db.meshes[0].sent)).toEqual([]);
+    expect(db.deleted).toEqual([sessionId]);
+    expect(s.notice).toBe("Session ‘2026-10-10’ deleted.");
+  });
+
+  it("does nothing on a session that is not closed", async () => {
+    const s = await started();
+    await s.deleteSession();
+    expect(db.deleted).toEqual([]);
+    expect(s.screen).toBe("scan");
+    expect(s.meta).not.toBeNull();
+  });
+
+  it("a second call during the delete is ignored", async () => {
+    const { s, m } = await closedWithPeer();
+    vi.useFakeTimers();
+    const first = s.deleteSession();
+    const second = s.deleteSession();
+    m.deliver(PEER, { t: "deleted" });
+    await Promise.all([first, second]);
+    expect(deleteMsgs(m.sent)).toEqual([{ t: "delete-session", workstation: "Main desk" }]);
+    expect(db.deleted).toHaveLength(1);
+    expect(s.notice).toBe("Session ‘Outage’ deleted.");
+  });
+
+  it("a failed delete is fatal", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const s = await started();
+    await s.closeSession();
+    db.failDelete(true);
+    await s.deleteSession();
+    expect(s.fatal).toBe("Could not delete the session: blocked");
+    err.mockRestore();
+  });
+
+  it("a delete from a peer removes a closed session here, once", async () => {
+    const { s, m, sessionId } = await closedWithPeer();
+    m.deliver(PEER, { t: "delete-session", workstation: "Front desk" });
+    m.deliver(PEER, { t: "delete-session", workstation: "Front desk" });
+    await tick();
+    expect(deleteMsgs(m.sent)).toEqual([{ t: "deleted" }]);
+    expect(m.state.closed).toBe(false); // the reply is still on its way
+    m.setPeers([{ deviceId: PEER, employee: "Sam", connected: false }]);
+    await tick();
+    expect(m.state.closed).toBe(true);
+    expect(s.screen).toBe("launch");
+    expect(s.notice).toBe("Session ‘Outage’ was deleted on Front desk.");
+    expect(db.deleted).toEqual([sessionId]);
+  });
+
+  it("names the sender only when its name is valid", async () => {
+    for (const workstation of [undefined, "", 7, "W".repeat(MAX_NAME + 1)]) {
+      setActivePinia(createPinia());
+      const { s, m } = await closedWithPeer();
+      m.deliver(PEER, { t: "delete-session", workstation });
+      m.setPeers([]);
+      await tick();
+      expect(s.notice).toBe("Session ‘Outage’ was deleted on another workstation.");
+    }
+  });
+
+  it("a delete from a peer lingers at most DELETED_LINGER_MS for the sender to go", async () => {
+    const { s, m, sessionId } = await closedWithPeer();
+    vi.useFakeTimers();
+    m.deliver(PEER, { t: "delete-session", workstation: "Front desk" });
+    await vi.advanceTimersByTimeAsync(DELETED_LINGER_MS - 1);
+    expect(m.state.closed).toBe(false);
+    expect(db.deleted).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(m.state.closed).toBe(true);
+    expect(db.deleted).toEqual([sessionId]);
+    expect(s.notice).toBe("Session ‘Outage’ was deleted on Front desk.");
+    expect(m.listeners()).toBe(0);
+  });
+
+  it("answers a peer deleting the same session while this one is deleting it", async () => {
+    const { s, m } = await closedWithPeer();
+    vi.useFakeTimers();
+    const p = s.deleteSession();
+    m.deliver(PEER, { t: "delete-session", workstation: "Back desk" });
+    expect(deleteMsgs(m.sent)).toEqual([
+      { t: "delete-session", workstation: "Main desk" },
+      { t: "deleted" },
+    ]);
+    m.deliver(PEER, { t: "deleted" });
+    await p;
+    expect(db.deleted).toHaveLength(1);
+    expect(s.notice).toBe("Session ‘Outage’ deleted.");
+  });
+
+  it("a session opened during the wait stays open; the deleted one's data still goes", async () => {
+    const { s, sessionId } = await closedWithPeer();
+    const other = useSession();
+    vi.useFakeTimers();
+    const p = s.deleteSession();
+    s.leaveSession();
+    const opening = other.startSession("Next", "Rae");
+    await vi.advanceTimersByTimeAsync(100);
+    await opening;
+    const nextId = other.meta!.sessionId;
+    expect(db.deleted).toEqual([]);
+    await vi.advanceTimersByTimeAsync(DELETE_REPLY_MS);
+    await p;
+    expect(db.deleted).toEqual([sessionId]);
+    expect(s.meta?.sessionId).toBe(nextId);
+    expect(s.screen).toBe("scan");
+    expect(s.notice).toBeNull();
+  });
+
+  it("ignores a delete from a peer while the session is open here", async () => {
+    const s = await started();
+    const m = fakeMesh([{ deviceId: PEER, employee: "Sam", connected: true }]);
+    s.attachMesh(m.mesh);
+    m.deliver(PEER, { t: "delete-session", workstation: "Front desk" });
+    await tick();
+    expect(deleteMsgs(m.sent)).toEqual([]);
+    expect(db.deleted).toEqual([]);
+    expect(s.screen).toBe("scan");
+    expect(s.meta).not.toBeNull();
+    expect(m.state.closed).toBe(false);
+  });
+
+  it("stops listening once the mesh is detached", async () => {
+    const { s, m } = await closedWithPeer();
+    s.leaveSession();
+    expect(m.listeners()).toBe(0);
   });
 });
