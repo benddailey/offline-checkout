@@ -122,9 +122,13 @@ to the title on the start screen and on the Summary.
       or click **Print code** on the first PC and scan every barcode on the receipt with the new
       PC's scanner, in any order. The progress line shows which
       barcodes are still missing. Scanning one twice does no harm, and **Start over** clears them.
+      Or click **Save to file** and put the file where the new PC can reach it, such as a shared
+      network drive or a flash drive. On the new PC, click **Load code from file** (or drag the
+      file onto the code box).
    4. The new PC then shows a reply code. Give it to the first PC the same way, the other way round.
 
-   Codes expire after 5 minutes and work once. If one expires, click **Try again** for a new one.
+   Codes expire after 15 minutes and work once. A saved code file is temporary and works once, so
+   delete it after pairing. If one expires, click **Try again** for a new one. If one expires, click **Try again** for a new one.
 
 3. **Scan.** Scan the patron's card, then each item. There is no need to click anything first. The
    bar at the top shows totals and a green or red dot for each desk PC.

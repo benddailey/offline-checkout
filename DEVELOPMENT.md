@@ -7,7 +7,7 @@ is for working on the app.
 
 The app is a Vue 3 + Pinia app built into one self-contained HTML file and opened from `file://`.
 Every scan is appended to a log in IndexedDB. Workstations pair over WebRTC data channels, with the
-offer and answer exchanged as QR codes, pasted text or printed barcodes, so no server is needed. The
+offer and answer exchanged as QR codes, pasted text, printed barcodes or temporary code files, so no server is needed. The
 logs sync between paired workstations, and the closed session is exported as a PDF of Code 128
 barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction file. Receipts are printed with the browser's print dialog, or silently with Chrome's
 `--kiosk-printing` flag, which the desk shortcuts set.
@@ -68,7 +68,10 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
   Evergreen then applies its loan rules from `checkout_time`, and needs no `CIRC_OVERRIDE_DUE_DATE`
   permission.
 - **Pairing and sync:** browser WebRTC data channels, no library (`src/mesh/`, `src/pairing/`,
-  `src/sync/`). A catch-up arrives as many 200-record batches at once. `SyncEngine` writes all the
+  `src/sync/`). Code files (`src/pairing/file.ts`) are saved with `showSaveFilePicker`, so staff can
+  pick a network share or flash drive, and fall back to a download; loading takes the first `OC<n>:`
+  code in the text. `CODE_TTL_MS` (15 minutes, `src/pairing/payload.ts`) is checked locally and is
+  not in the payload, so changing it needs no prefix bump. A catch-up arrives as many 200-record batches at once. `SyncEngine` writes all the
   batches that arrive during a write in one `put()`, and `put()` queues its IndexedDB requests
   without awaiting each one, because every write is a disk flush and a full re-reduce of the log.
   Deleting a closed session sends `{t:"delete-session", workstation}` to the connected peers and
