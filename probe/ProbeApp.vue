@@ -56,6 +56,7 @@ async function testCamera() {
   cam.decodeDetail = "";
   cam.open = "running";
   cam.openDetail = "";
+  cam.scanning = false;
   cam.decode = "idle";
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });

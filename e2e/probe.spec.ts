@@ -93,3 +93,24 @@ test("probe: pressing Host twice shows one working code", async () => {
     await browser.close();
   }
 });
+
+test("probe: a camera that fails on a second test hides the earlier scanner", async () => {
+  const browser = await launchChromium();
+  try {
+    const page = await (await browser.newContext()).newPage();
+    await page.goto(probeUrl);
+    const camera = page.getByTestId("camera");
+    await camera.getByRole("button", { name: "Test camera" }).click();
+    await expect(camera.getByText("Reads a QR code:")).toBeVisible();
+
+    await page.evaluate(() => {
+      navigator.mediaDevices.getUserMedia = () =>
+        Promise.reject(new DOMException("Permission denied", "NotAllowedError"));
+    });
+    await camera.getByRole("button", { name: "Test camera" }).click();
+    await expect(camera.getByText("The camera could not be used from this page.")).toBeVisible();
+    await expect(camera.getByText("Reads a QR code:")).toHaveCount(0);
+  } finally {
+    await browser.close();
+  }
+});
