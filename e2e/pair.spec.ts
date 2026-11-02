@@ -59,7 +59,7 @@ test("three workstations pair by paste, form a mesh and sync scans", async ({ br
     await expect(a!.getByRole("alert")).toContainText("That is a join code, not a reply code");
     await a!.getByRole("button", { name: "Try again" }).click();
     await expect(a!.getByLabel("Join code", { exact: true })).not.toHaveValue(first.offer);
-    await expect(a!.getByText(/Expires in [45]:\d\d/)).toBeVisible();
+    await expect(a!.getByText(/Expires in 1[45]:\d\d/)).toBeVisible();
     await a!.getByRole("button", { name: "Back" }).click();
     await expect(a!.getByLabel("Scanner input")).toBeVisible();
   } finally {
