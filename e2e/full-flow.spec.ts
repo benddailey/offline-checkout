@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { strFromU8, unzipSync } from "fflate";
 import { expect, test, type Page } from "@playwright/test";
-import { openApp } from "./helpers/app";
+import { openApp, startSession } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { decodePdfBarcodes, pdfText } from "./helpers/pdf";
 import { stubPrint } from "./helpers/print";
@@ -39,10 +39,7 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     let downloadsOnA = 0;
     a!.on("download", () => downloadsOnA++);
 
-    await a!.getByLabel("Session name").fill("Outage");
-    await a!.getByLabel("Clerk name").fill("Ann");
-    await a!.getByRole("button", { name: "Start session" }).click();
-    await expect(a!.getByLabel("Scanner input")).toBeVisible();
+    await startSession(a!, "Outage", "Ann");
 
     // The scanner card offered at session start downloads and scans as the control codes.
     const card = await download(a!, "Letter PDF", "scanner-card.pdf");

@@ -1,21 +1,15 @@
-import { expect, test, type Page } from "@playwright/test";
-import { openApp, resumeAs } from "./helpers/app";
+import { expect, test } from "@playwright/test";
+import { openApp, resumeAs, startSession } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { stubPrint } from "./helpers/print";
-
-async function start(page: Page, session: string, clerk: string): Promise<void> {
-  await openApp(page);
-  await page.getByLabel("Session name").fill(session);
-  await page.getByLabel("Clerk name").fill(clerk);
-  await page.getByRole("button", { name: "Start session" }).click();
-  await page.getByRole("button", { name: "Not now" }).click();
-}
 
 test("change clerk, exit and resume as someone else, each needing a typed name", async ({
   page,
 }) => {
   await stubPrint(page);
-  await start(page, "Shifts", "Rae");
+  await openApp(page);
+  await startSession(page, "Shifts", "Rae");
+  await page.getByRole("button", { name: "Not now" }).click();
   const bar = page.getByTestId("status-bar");
   await page.keyboard.type("P1\nI1\n");
   await expect(page.getByTestId("item")).toHaveCount(1);
@@ -74,7 +68,9 @@ test("other workstations see a changed clerk; exiting while connected asks first
   const contexts = await Promise.all([1, 2].map(() => browser.newContext()));
   try {
     const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
-    await start(a!, "Desk", "Ann");
+    await openApp(a!);
+    await startSession(a!, "Desk", "Ann");
+    await a!.getByRole("button", { name: "Not now" }).click();
     await openApp(b!);
     await pairViaPaste(a!, b!, "Ben");
     const benOnA = a!.getByTestId("status-bar").getByRole("listitem").filter({ hasText: "Ben" });

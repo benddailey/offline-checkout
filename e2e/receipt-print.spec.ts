@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { openApp, resumeAs } from "./helpers/app";
+import { openApp, resumeAs, startSession } from "./helpers/app";
 import { pdfText } from "./helpers/pdf";
 import {
   decodePrintedBarcodes,
@@ -40,9 +40,7 @@ test("ending a patron prints a 72 mm receipt and gives focus back to the scanner
 }) => {
   await stubPrint(page);
   await openApp(page);
-  await page.getByLabel("Session name").fill(SESSION);
-  await page.getByLabel("Clerk name").fill("Ann");
-  await page.getByRole("button", { name: "Start session" }).click();
+  await startSession(page, SESSION, "Ann");
 
   const input = page.getByLabel("Scanner input");
   await expect(input).toBeFocused();
@@ -104,9 +102,7 @@ test("ending a patron prints a 72 mm receipt and gives focus back to the scanner
 async function endVisit(page: Page, scans: string[]): Promise<Printed> {
   await stubPrint(page);
   await openApp(page);
-  await page.getByLabel("Session name").fill("Long visit");
-  await page.getByLabel("Clerk name").fill("Ann");
-  await page.getByRole("button", { name: "Start session" }).click();
+  await startSession(page, "Long visit", "Ann");
   await expect(page.getByLabel("Scanner input")).toBeFocused();
   await page.keyboard.type(`${scans.join("\n")}\nOC-END\n`);
   await expect.poll(async () => (await printed(page)).length).toBe(1);
@@ -156,9 +152,7 @@ test("an item too long for the paper prints as text, not a barcode", async ({ pa
 test("the scanner input takes focus back when the print dialog closes", async ({ page }) => {
   await stubPrint(page);
   await openApp(page);
-  await page.getByLabel("Session name").fill("Focus");
-  await page.getByLabel("Clerk name").fill("Ann");
-  await page.getByRole("button", { name: "Start session" }).click();
+  await startSession(page, "Focus", "Ann");
   const input = page.getByLabel("Scanner input");
   await expect(input).toBeFocused();
   await page.keyboard.type("P1\n");
@@ -184,9 +178,7 @@ test("the scanner input takes focus back when the print dialog closes", async ({
 test("a failed print leaves no print container and tells the clerk", async ({ page }) => {
   await stubPrint(page, { throws: true });
   await openApp(page);
-  await page.getByLabel("Session name").fill("Broken printer");
-  await page.getByLabel("Clerk name").fill("Ann");
-  await page.getByRole("button", { name: "Start session" }).click();
+  await startSession(page, "Broken printer", "Ann");
   await expect(page.getByLabel("Scanner input")).toBeFocused();
   await page.keyboard.type("P1\nI1\nOC-END\n");
   await expect(page.getByTestId("message")).toHaveText("Could not print the receipt");
@@ -212,9 +204,7 @@ test("on the receipt printer's roll paper the receipt starts at the top, so noth
 test("the scanner card prints on the receipt printer at the top of the roll", async ({ page }) => {
   await stubPrint(page);
   await openApp(page);
-  await page.getByLabel("Session name").fill("Card");
-  await page.getByLabel("Clerk name").fill("Ann");
-  await page.getByRole("button", { name: "Start session" }).click();
+  await startSession(page, "Card", "Ann");
   await page.getByRole("button", { name: "Receipt printer" }).click();
   await expect.poll(async () => (await printed(page)).length).toBe(1);
   const [card] = await printed(page);

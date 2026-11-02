@@ -1,17 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp } from "./helpers/app";
+import { openApp, startSession } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { stubPrint } from "./helpers/print";
 
 async function scan(page: Page, ...codes: string[]): Promise<void> {
   for (const code of codes) await page.keyboard.type(`${code}\n`);
-}
-
-async function startSession(page: Page): Promise<void> {
-  await page.getByLabel("Session name").fill("Outage");
-  await page.getByLabel("Clerk name").fill("Ann");
-  await page.getByRole("button", { name: "Start session" }).click();
-  await expect(page.getByLabel("Scanner input")).toBeVisible();
 }
 
 async function closeSession(page: Page): Promise<void> {
@@ -35,7 +28,7 @@ test("a closed session is deleted on two workstations with the slide control", a
       await stubPrint(page);
       await openApp(page, desk);
     }
-    await startSession(a!);
+    await startSession(a!, "Outage", "Ann");
     await pairViaPaste(a!, b!, "Ben");
 
     await scan(a!, "P1", "I1", "OC-END");
@@ -91,7 +84,7 @@ test("a session with no exports warns about Evergreen and deletes with the End k
 }) => {
   await stubPrint(page);
   await openApp(page);
-  await startSession(page);
+  await startSession(page, "Outage", "Ann");
   await scan(page, "P1", "I1", "OC-END");
   await closeSession(page);
 

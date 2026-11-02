@@ -1,13 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { openApp, resumeAs } from "./helpers/app";
+import { openApp, resumeAs, startSession } from "./helpers/app";
 import { stubPrint } from "./helpers/print";
 
 test("scan, void, end patron and resume after reload", async ({ page }) => {
   await stubPrint(page);
   await openApp(page);
-  await page.getByLabel("Session name").fill("Scan Test");
-  await page.getByLabel("Clerk name").fill("Rae");
-  await page.getByRole("button", { name: "Start session" }).click();
+  await startSession(page, "Scan Test", "Rae");
 
   const input = page.getByLabel("Scanner input");
   await expect(page.getByText("Scan patron card")).toBeVisible();
@@ -62,9 +60,7 @@ test("a patron in progress locks leaving the scan screen and asks before the tab
 }) => {
   await stubPrint(page);
   await openApp(page);
-  await page.getByLabel("Session name").fill("Lock Test");
-  await page.getByLabel("Clerk name").fill("Rae");
-  await page.getByRole("button", { name: "Start session" }).click();
+  await startSession(page, "Lock Test", "Rae");
   await page.getByRole("button", { name: "Not now" }).click();
 
   const summary = page.getByRole("button", { name: "Summary" });
@@ -105,9 +101,7 @@ test("a patron in progress locks leaving the scan screen and asks before the tab
 test("the scanner card offer closes once the first patron is scanned", async ({ page }) => {
   await stubPrint(page);
   await openApp(page);
-  await page.getByLabel("Session name").fill("Offer Test");
-  await page.getByLabel("Clerk name").fill("Rae");
-  await page.getByRole("button", { name: "Start session" }).click();
+  await startSession(page, "Offer Test", "Rae");
 
   const offer = page.getByText("Print the scanner card with the");
   await expect(offer).toBeVisible();

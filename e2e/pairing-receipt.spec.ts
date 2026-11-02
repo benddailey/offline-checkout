@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { addScan, emptyCollector, type Collector } from "../src/pairing/chunks";
-import { openApp } from "./helpers/app";
+import { openApp, startSession } from "./helpers/app";
 import { decodePrintedBarcodes, printed, printToPdf, stubPrint } from "./helpers/print";
 
 const SESSION = "Front desk";
@@ -16,10 +16,7 @@ async function stations(
     await stubPrint(page);
     await openApp(page);
   }
-  await inviter!.getByLabel("Session name").fill(SESSION);
-  await inviter!.getByLabel("Clerk name").fill("Ann");
-  await inviter!.getByRole("button", { name: "Start session" }).click();
-  await expect(inviter!.getByLabel("Scanner input")).toBeVisible();
+  await startSession(inviter!, SESSION, "Ann");
   return {
     inviter: inviter!,
     joiner: joiner!,
