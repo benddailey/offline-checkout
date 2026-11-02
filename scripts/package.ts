@@ -2,7 +2,7 @@
 // Run after `npm run build`: node scripts/package.ts
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { crc32, deflateRawSync } from "node:zlib";
+import { zipSync } from "fflate";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const { version } = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
@@ -60,53 +60,10 @@ const files: { name: string; data: Buffer; executable?: boolean }[] = [
   { name: "THIRD-PARTY-NOTICES.txt", data: crlf(readText("dist", "THIRD-PARTY-NOTICES.md")) },
 ];
 
-const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
-const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
-
-const locals: Buffer[] = [];
-const centrals: Buffer[] = [];
-let offset = 0;
-for (const { name, data, executable } of files) {
-  const nameBuf = Buffer.from(name, "ascii");
-  const packed = deflateRawSync(data, { level: 9 });
-  const crc = crc32(data);
-  const local = Buffer.alloc(30);
-  local.writeUInt32LE(0x04034b50, 0);
-  local.writeUInt16LE(20, 4);
-  local.writeUInt16LE(8, 8);
-  local.writeUInt16LE(dosTime, 10);
-  local.writeUInt16LE(dosDate, 12);
-  local.writeUInt32LE(crc, 14);
-  local.writeUInt32LE(packed.length, 18);
-  local.writeUInt32LE(data.length, 22);
-  local.writeUInt16LE(nameBuf.length, 26);
-  locals.push(local, nameBuf, packed);
-
-  const central = Buffer.alloc(46);
-  central.writeUInt32LE(0x02014b50, 0);
-  // Made by Unix, so unzip, Archive Utility and Linux file managers keep the execute bit.
-  central.writeUInt16LE((3 << 8) | 20, 4);
-  central.writeUInt16LE(20, 6);
-  central.writeUInt16LE(8, 10);
-  central.writeUInt16LE(dosTime, 12);
-  central.writeUInt16LE(dosDate, 14);
-  central.writeUInt32LE(crc, 16);
-  central.writeUInt32LE(packed.length, 20);
-  central.writeUInt32LE(data.length, 24);
-  central.writeUInt16LE(nameBuf.length, 28);
-  central.writeUInt32LE(((executable ? 0o100755 : 0o100644) << 16) >>> 0, 38);
-  central.writeUInt32LE(offset, 42);
-  centrals.push(central, nameBuf);
-  offset += local.length + nameBuf.length + packed.length;
-}
-
-const centralDir = Buffer.concat(centrals);
-const end = Buffer.alloc(22);
-end.writeUInt32LE(0x06054b50, 0);
-end.writeUInt16LE(files.length, 8);
-end.writeUInt16LE(files.length, 10);
-end.writeUInt32LE(centralDir.length, 12);
-end.writeUInt32LE(offset, 16);
-
-writeFileSync(OUT, Buffer.concat([...locals, centralDir, end]));
+// Made by Unix (os 3), so unzip, Archive Utility and Linux file managers keep the execute bit.
+const entries = files.map(({ name, data, executable }) => [
+  name,
+  [data, { level: 9, os: 3, attrs: (executable ? 0o100755 : 0o100644) << 16, mtime: now }],
+]);
+writeFileSync(OUT, zipSync(Object.fromEntries(entries)));
 console.log(`Wrote ${OUT}`);
