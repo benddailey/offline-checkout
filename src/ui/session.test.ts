@@ -1069,6 +1069,30 @@ describe("useSession session lifecycle", () => {
     expect(db.logs.get(first)!.map((r) => r.type)).toContain("patron-started");
   });
 
+  it("of two overlapping opens, only the later one is kept", async () => {
+    const s = await started();
+    const a = s.meta!.sessionId;
+    await s.startSession("Second", "Rae");
+    const b = s.meta!.sessionId;
+    s.leaveSession();
+    const acquire = db.deps.acquireSessionLock;
+    let releaseA!: () => void;
+    const heldA = new Promise<void>((r) => (releaseA = r));
+    db.deps.acquireSessionLock = async (id) => {
+      if (id === a) await heldA;
+      return acquire(id);
+    };
+    const first = s.resumeSession(a, "Rae");
+    await tick();
+    await s.resumeSession(b, "Rae");
+    releaseA();
+    await first;
+    expect(s.meta!.sessionId).toBe(b);
+    expect([...db.locks]).toEqual([b]);
+    expect(s.records).toEqual(db.logs.get(b));
+    expect(s.fatal).toBeNull();
+  });
+
   it("a scan queued for the old session does not run against the new one", async () => {
     const s = await started();
     const release = db.holdAppends();
