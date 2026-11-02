@@ -26,6 +26,8 @@ export class PairingError extends Error {
 }
 
 export const PAIRING_PREFIX = "OC2:";
+/** How long a join code and its reply stay usable. Checked locally, not carried in the code. */
+export const CODE_TTL_MS = 15 * 60_000;
 /** Any version's whole code, e.g. a v1 "OC1:" one from a workstation not yet updated. */
 export const ANY_PAIRING_PREFIX = /^OC\d+:/;
 

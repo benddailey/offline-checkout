@@ -1,10 +1,11 @@
 import QRCode from "qrcode";
 import { splitCode } from "../pairing/chunks";
+import { clock, type CodeLabel } from "../pairing/file";
 import { BAR_LEFT_DOTS, code128Svg, DOT_MM } from "./code128";
 import { printElement, RECEIPT_WIDTH_MM } from "./print";
 
 export interface PairingReceipt {
-  label: "Join code" | "Reply code";
+  label: CodeLabel;
   code: string;
   sessionName?: string;
   expiresAt?: number;
@@ -58,11 +59,6 @@ function line(text: string, style: Partial<CSSStyleDeclaration> = {}): HTMLDivEl
   div.textContent = text;
   Object.assign(div.style, style);
   return div;
-}
-
-function clock(ms: number): string {
-  const d = new Date(ms);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 /** QR first, then every chunk as `n of N`. Throws Error("too long") if the code needs too many barcodes. */

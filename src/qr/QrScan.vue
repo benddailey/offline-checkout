@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, useTemplateRef } from "vue";
 import {
   addScan,
   emptyCollector,
@@ -7,8 +7,11 @@ import {
   OTHER_SET_MESSAGE,
   progressText,
 } from "../pairing/chunks";
+import { codeFromFile } from "../pairing/file";
 import QrCamera from "./QrCamera.vue";
 
+/** `files` adds Load code from file and drag-and-drop of a saved pairing file. */
+const props = defineProps<{ files?: boolean }>();
 const emit = defineEmits<{ decoded: [text: string] }>();
 
 const cameraError = ref(false);
@@ -79,10 +82,40 @@ function onScannerKey(e: KeyboardEvent) {
 function usePasted() {
   emitText(pasted.value);
 }
+
+const picker = useTemplateRef<HTMLInputElement>("picker");
+const fileError = ref("");
+const dragging = ref(false);
+
+async function loadFile(file: File | undefined) {
+  if (!file) return;
+  fileError.value = "";
+  const code = codeFromFile(await file.text());
+  if (code) emitText(code);
+  else
+    fileError.value = `${file.name} has no pairing code in it. Pick the file saved on the other workstation.`;
+}
+
+async function onPicked() {
+  const input = picker.value;
+  await loadFile(input?.files?.[0]);
+  if (input) input.value = "";
+}
+
+function onDrop(e: DragEvent) {
+  dragging.value = false;
+  if (props.files) void loadFile(e.dataTransfer?.files[0]);
+}
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
+  <div
+    class="flex flex-col gap-3 rounded"
+    :class="{ 'ring-4 ring-blue-400': dragging }"
+    @dragover.prevent="dragging = !!files"
+    @dragleave="dragging = false"
+    @drop.prevent="onDrop"
+  >
     <div class="relative h-72 w-full overflow-hidden rounded bg-slate-900">
       <QrCamera :paused="paused" @detect="onDetect" @error="cameraError = true" />
     </div>
@@ -136,5 +169,30 @@ function usePasted() {
     >
       Use pasted code
     </button>
+    <template v-if="files">
+      <input
+        ref="picker"
+        type="file"
+        accept=".txt,text/plain"
+        class="hidden"
+        data-testid="code-file"
+        @change="onPicked"
+      />
+      <button
+        type="button"
+        class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
+        title="Open the temporary code file saved on the other workstation, from a shared network drive or flash drive. You can also drag the file here. Delete the file after pairing."
+        @click="picker?.click()"
+      >
+        Load code from file
+      </button>
+      <p
+        v-if="fileError"
+        role="alert"
+        class="rounded bg-red-100 p-2 text-base font-semibold text-red-900"
+      >
+        {{ fileError }}
+      </p>
+    </template>
   </div>
 </template>

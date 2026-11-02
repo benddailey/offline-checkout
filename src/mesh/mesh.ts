@@ -1,5 +1,6 @@
 import { randomId } from "../log/ids";
 import {
+  CODE_TTL_MS,
   PairingError,
   decodePayload,
   encodePayload,
@@ -95,7 +96,7 @@ export class Mesh {
     this.employee = o.employee;
     this.rtc = o.rtc ?? browserRtc;
     this.knownDevices = o.knownDevices;
-    this.ttl = o.offerTtlMs ?? 300_000;
+    this.ttl = o.offerTtlMs ?? CODE_TTL_MS;
     this.now = o.now ?? Date.now;
     this.retryMs = o.retryMs ?? 10_000;
     this.retryTimer = setInterval(() => this.reconnect(), this.retryMs);

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import QRCode from "qrcode";
 import { ref, useTemplateRef, watchEffect } from "vue";
+import { pairingFileText, saveTextFile, type CodeLabel } from "../pairing/file";
 import { printErrorText, printPairingCode } from "../print/pairing-receipt";
 
 const props = defineProps<{
   text: string;
-  label: "Join code" | "Reply code";
+  label: CodeLabel;
   sessionName?: string;
   expiresAt?: number;
+  /** Shows Save to file when set. */
+  fileName?: string;
 }>();
 
 const dataUrl = ref("");
@@ -37,6 +40,15 @@ async function copy() {
 }
 
 const printError = ref("");
+const saved = ref(false);
+
+async function save() {
+  if (!props.fileName) return;
+  const text = pairingFileText(props.label, props.text, props.expiresAt);
+  if (!(await saveTextFile(props.fileName, text))) return;
+  saved.value = true;
+  setTimeout(() => (saved.value = false), 1500);
+}
 
 function print() {
   printError.value = "";
@@ -72,7 +84,7 @@ function print() {
         @focus="area?.select()"
       />
     </label>
-    <div class="flex gap-3">
+    <div class="flex flex-wrap justify-center gap-3">
       <button
         type="button"
         class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
@@ -86,6 +98,15 @@ function print() {
         @click="print"
       >
         Print code
+      </button>
+      <button
+        v-if="fileName"
+        type="button"
+        class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
+        title="Save the code as a temporary file on a shared network drive or flash drive, then load it on the other workstation. Delete the file after pairing."
+        @click="save"
+      >
+        {{ saved ? "Saved" : "Save to file" }}
       </button>
     </div>
     <p v-if="printError" role="alert" class="rounded bg-amber-100 p-2 text-base text-amber-900">
