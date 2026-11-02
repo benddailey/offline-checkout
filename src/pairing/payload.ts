@@ -25,14 +25,18 @@ export class PairingError extends Error {
   }
 }
 
-export const PAIRING_PREFIX = "OC2:";
+export const PAIRING_PREFIX = "OC3:";
 /** How long a join code and its reply stay usable. Checked locally, not carried in the code. */
 export const CODE_TTL_MS = 15 * 60_000;
 /** Any version's whole code, e.g. a v1 "OC1:" one from a workstation not yet updated. */
 export const ANY_PAIRING_PREFIX = /^OC\d+:/;
 
-/** First byte: 0x20 plus flags. Never 0, so the printed barcodes' decimal form keeps every byte. */
-const VERSION = 0x20;
+/**
+ * First byte: VERSION plus flags. Never 0, so the printed barcodes' decimal form keeps every byte.
+ * Printed barcodes carry only the bytes, so this changes with PAIRING_PREFIX: 0x20 was OC2.
+ */
+const VERSION = 0x28;
+const PREVIOUS_VERSIONS = [0x20];
 const ANSWER = 1;
 const PACKED_SESSION = 2;
 const PACKED_DEVICE = 4;
@@ -63,10 +67,10 @@ export function fromBase64Url(text: string): Uint8Array {
   return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
 
-/** The bytes of a whole code, whitespace from copy/paste or QR wrapping ignored. Throws if not OC2. */
+/** A whole code's bytes, ignoring copy/paste or QR whitespace. Throws on another prefix. */
 export function codeBytes(text: string): Uint8Array {
   const compact = text.replace(/\s+/g, "");
-  if (!compact.startsWith(PAIRING_PREFIX)) throw new Error("missing OC2 prefix");
+  if (!compact.startsWith(PAIRING_PREFIX)) throw new Error(`missing ${PAIRING_PREFIX} prefix`);
   return fromBase64Url(compact.slice(PAIRING_PREFIX.length));
 }
 
@@ -197,7 +201,7 @@ function fingerprintText(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).toUpperCase().padStart(2, "0")).join(":");
 }
 
-/** "OC2:" + base64url of a packed binary record: about 110 bytes for a real offer. */
+/** "OC3:" + base64url of a packed binary record: about 110 bytes for a real offer. */
 export function encodePayload(p: PairingPayload): string {
   const packSession = PACKABLE_ID.test(p.sessionId);
   const packDevice = PACKABLE_ID.test(p.deviceId);
@@ -275,15 +279,24 @@ function parse(text: string): PairingPayload {
   };
 }
 
+/** -1 when the text is not a current-prefix code with at least one byte. */
+function firstByte(compact: string): number {
+  try {
+    return codeBytes(compact)[0] ?? -1;
+  } catch {
+    return -1;
+  }
+}
+
+const oldVersion = () =>
+  new PairingError("old-version", "This code is from a different version of Offline Checkout");
+
 /** Decode scanned or pasted text. Every failure is a PairingError; kind mismatch is "wrong-kind". */
 export function decodePayload(text: string, expect: "offer" | "answer"): PairingPayload {
   const compact = text.replace(/\s+/g, "");
-  if (ANY_PAIRING_PREFIX.test(compact) && !compact.startsWith(PAIRING_PREFIX)) {
-    throw new PairingError(
-      "old-version",
-      "This code is from a different version of Offline Checkout",
-    );
-  }
+  if (ANY_PAIRING_PREFIX.test(compact) && !compact.startsWith(PAIRING_PREFIX)) throw oldVersion();
+  // An older code reassembled from printed barcodes gets today's prefix but keeps its first byte.
+  if (PREVIOUS_VERSIONS.includes(firstByte(compact) & ~7)) throw oldVersion();
   let p: PairingPayload;
   try {
     p = parse(compact);

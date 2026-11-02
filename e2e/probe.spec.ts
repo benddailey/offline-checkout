@@ -19,14 +19,14 @@ test("probe: IndexedDB passes and two pages connect over pasted codes", async ()
 
     await host.getByRole("button", { name: "I am PC A (Host)" }).click();
     const offer = await host.getByTestId("rtc-offer").locator("textarea").inputValue();
-    expect(offer).toMatch(/^OC2:/);
+    expect(offer).toMatch(/^OC3:/);
 
     await guest.getByRole("button", { name: "I am PC B (Guest)" }).click();
     const offerIn = guest.getByTestId("rtc-offer-in");
     await offerIn.getByLabel("Pasted code").fill(offer);
     await offerIn.getByRole("button", { name: "Use pasted code" }).click();
     const answer = await guest.getByTestId("rtc-answer").locator("textarea").inputValue();
-    expect(answer).toMatch(/^OC2:/);
+    expect(answer).toMatch(/^OC3:/);
 
     const answerIn = host.getByTestId("rtc-answer-in");
     await answerIn.getByLabel("Pasted code").fill(answer);
@@ -85,7 +85,7 @@ test("probe: pressing Host twice shows one working code", async () => {
     const hostButton = page.getByRole("button", { name: "I am PC A (Host)" });
     await hostButton.click();
     await hostButton.click();
-    await expect(page.getByTestId("rtc-offer").locator("textarea")).toHaveValue(/^OC2:/);
+    await expect(page.getByTestId("rtc-offer").locator("textarea")).toHaveValue(/^OC3:/);
     await page.waitForTimeout(1_500);
     await expect(page.getByTestId("rtc-status")).toHaveText("RUNNING...");
     await expect(page.getByTestId("rtc-detail")).toHaveCount(0);

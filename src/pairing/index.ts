@@ -1,4 +1,4 @@
-export { minifySdp, rebuildSdp, type SdpParts } from "./sdp";
+export { minifySdp, passiveAnswer, rebuildSdp, type SdpParts } from "./sdp";
 export {
   PairingError,
   decodePayload,

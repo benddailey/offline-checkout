@@ -63,7 +63,8 @@ test("minified offer/answer through the QR codec opens a data channel", async ()
     expect(offerText.length).toBeLessThanOrEqual(400);
 
     const answerText = await joiner.evaluate(async (text) => {
-      const { decodePayload, encodePayload, minifySdp, rebuildSdp } = (window as any).Pairing;
+      const { decodePayload, encodePayload, minifySdp, passiveAnswer, rebuildSdp } = (window as any)
+        .Pairing;
       const offer = decodePayload(text, "offer");
       const pc = new RTCPeerConnection({ iceServers: [] });
       (window as any).pc = pc;
@@ -79,7 +80,10 @@ test("minified offer/answer through the QR codec opens a data channel", async ()
         };
       });
       await pc.setRemoteDescription({ type: "offer", sdp: rebuildSdp(offer.sdp, "offer") });
-      await pc.setLocalDescription(await pc.createAnswer());
+      // As Mesh.join does: the joiner is DTLS-passive, so the reply can be applied much later.
+      const local = await pc.createAnswer();
+      await pc.setLocalDescription({ type: "answer", sdp: passiveAnswer(local.sdp) });
+      if (!pc.localDescription!.sdp.includes("a=setup:passive")) throw new Error("not passive");
       await new Promise<void>((done) => {
         if (pc.iceGatheringState === "complete") return done();
         pc.onicegatheringstatechange = () => pc.iceGatheringState === "complete" && done();

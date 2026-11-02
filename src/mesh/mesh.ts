@@ -6,7 +6,7 @@ import {
   encodePayload,
   type PairingPayload,
 } from "../pairing/payload";
-import { minifySdp, rebuildSdp, type SdpParts } from "../pairing/sdp";
+import { minifySdp, passiveAnswer, rebuildSdp, type SdpParts } from "../pairing/sdp";
 import { Link } from "./link";
 import type { HelloMsg, IntroMsg, SignalMsg, WireMsg } from "./protocol";
 
@@ -30,7 +30,7 @@ export interface MeshOptions {
   now?: () => number;
 }
 export interface Invite {
-  /** "OC2:…" text for the QR code / copy box. */
+  /** "OC3:…" text for the QR code / copy box. */
   payload: string;
   expiresAt: number;
   /** Resolves when the joiner's hello arrives. PairingError: expired (TTL, cancelled or second use), wrong-session, malformed, wrong-kind. */
@@ -189,7 +189,9 @@ export class Mesh {
         linkId: "",
       });
       await link.pc.setRemoteDescription({ type: "offer", sdp: rebuildSdp(offer.sdp, "offer") });
-      await link.pc.setLocalDescription(await link.pc.createAnswer());
+      // The reply may be applied up to CODE_TTL_MS later, so the inviter starts DTLS.
+      const local = await link.pc.createAnswer();
+      await link.pc.setLocalDescription({ type: "answer", sdp: passiveAnswer(local.sdp ?? "") });
       const answer = encodePayload({
         kind: "answer",
         sessionId: offer.sessionId,

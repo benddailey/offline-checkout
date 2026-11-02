@@ -25,27 +25,27 @@ describe("pairingFileName", () => {
 
 describe("pairingFileText", () => {
   test("says it is temporary, when it expires, and puts the code on its own line", () => {
-    const text = pairingFileText("Join code", "OC2:abc", at + 15 * 60_000);
+    const text = pairingFileText("Join code", "OC3:abc", at + 15 * 60_000);
     expect(text).toContain("Offline Checkout join code");
     expect(text).toContain("Temporary");
     expect(text).toContain("14:20");
     expect(text).toContain("Delete this file");
-    expect(text.split("\r\n")).toContain("OC2:abc");
+    expect(text.split("\r\n")).toContain("OC3:abc");
   });
 
   test("a reply code has no expiry time of its own", () => {
-    expect(pairingFileText("Reply code", "OC2:abc")).not.toMatch(/\d\d:\d\d/);
+    expect(pairingFileText("Reply code", "OC3:abc")).not.toMatch(/\d\d:\d\d/);
   });
 });
 
 describe("codeFromFile", () => {
   test("finds the code in a saved file", () => {
-    const text = pairingFileText("Join code", "OC2:AbC-_09", at);
-    expect(codeFromFile(text)).toBe("OC2:AbC-_09");
+    const text = pairingFileText("Join code", "OC3:AbC-_09", at);
+    expect(codeFromFile(text)).toBe("OC3:AbC-_09");
   });
 
   test("takes a bare code, and an other-version code so its error can be shown", () => {
-    expect(codeFromFile("  OC2:xyz\n")).toBe("OC2:xyz");
+    expect(codeFromFile("  OC3:xyz\n")).toBe("OC3:xyz");
     expect(codeFromFile("OC1:old")).toBe("OC1:old");
   });
 
