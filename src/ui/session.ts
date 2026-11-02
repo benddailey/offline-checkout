@@ -266,30 +266,53 @@ export const useSession = defineStore("session", () => {
     screen.value = "launch";
   }
 
-  /** Lock, load and show the session; on a held lock sets `notice`, on failure sets `fatal`, and returns false. */
+  let opening = 0;
+
+  /**
+   * Lock, load and show the session; on a held lock sets `notice`, on failure sets `fatal`, and returns false.
+   * Also returns false, releasing what it took, if a later call has started meanwhile.
+   */
   async function open(
     sessionId: string,
     openStore: () => Promise<SessionStore>,
     employee?: string,
   ): Promise<boolean> {
     teardown();
+    const gen = ++opening;
+    let release: (() => void) | null = null;
+    let opened: SessionStore | null = null;
     try {
-      const release = await deps.acquireSessionLock(sessionId);
+      release = await deps.acquireSessionLock(sessionId);
+      if (gen !== opening) {
+        release?.();
+        return false;
+      }
       if (!release) {
         notice.value = LOCKED_MESSAGE;
         screen.value = "launch";
         return false;
       }
-      releaseLock = release;
-      store = await openStore();
-      if (employee !== undefined && (await store.meta()).employee !== employee) {
-        await store.setEmployee(employee);
+      opened = await openStore();
+      if (employee !== undefined && (await opened.meta()).employee !== employee) {
+        await opened.setEmployee(employee);
       }
-      meta.value = await store.meta();
-      merge(await store.all());
+      const m = await opened.meta();
+      const recs = await opened.all();
+      if (gen !== opening) {
+        opened.close();
+        release();
+        return false;
+      }
+      store = opened;
+      releaseLock = release;
+      meta.value = m;
+      merge(recs);
       void deps.requestPersistence();
       return true;
     } catch (err) {
+      opened?.close();
+      release?.();
+      if (gen !== opening) return false;
       console.error("session: could not open", err);
       fatal.value = `Could not open the session: ${err instanceof Error ? err.message : String(err)}`;
       teardown();
