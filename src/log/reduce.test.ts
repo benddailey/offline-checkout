@@ -1,9 +1,7 @@
 import { test, expect, describe } from "vite-plus/test";
 import { reduce } from "./reduce";
-import type { LogRecord, SessionState } from "./types";
+import type { LogRecord } from "./types";
 import { mk, SID } from "./helpers.test-util";
-
-const plain = (s: SessionState) => JSON.stringify({ ...s, patronIndex: [...s.patronIndex] });
 
 describe("reduce", () => {
   test("visit with two items", () => {
@@ -43,7 +41,7 @@ describe("reduce", () => {
       mk("a", 2, { type: "patron-ended", visitId: "a:1" }),
       mk("a", 3, { type: "patron-started", patron: "P1" }),
     ]);
-    expect(s.patronIndex.get("P1")).toHaveLength(2);
+    expect(s.visits.filter((v) => v.patron === "P1")).toHaveLength(2);
     expect(s.totals.patrons).toBe(1);
     expect(s.visits[0].ended).toBe(true);
     expect(s.visits[1].ended).toBe(false);
@@ -122,7 +120,7 @@ describe("reduce", () => {
       mk("b", 5, { type: "voided", target: "b:1" }),
       mk("a", 7, { type: "session-closed" }),
     ];
-    const expected = plain(reduce(log));
+    const expected = JSON.stringify(reduce(log));
     let seed = 7;
     const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
     for (let n = 0; n < 20; n++) {
@@ -131,7 +129,7 @@ describe("reduce", () => {
         const j = Math.floor(rand() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
-      expect(plain(reduce(shuffled))).toBe(expected);
+      expect(JSON.stringify(reduce(shuffled))).toBe(expected);
     }
   });
   test("duplicate delivery of a record is ignored", () => {

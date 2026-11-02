@@ -104,7 +104,6 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
   }
 
   const visitList = [...visits.values()]; // already in sorted order
-  const patronIndex = new Map<string, RecordId[]>();
   const livePatrons = new Set<string>();
   const perClerk: SessionState["perClerk"] = {};
   const clerk = (e: string) => (perClerk[e] ??= { patrons: 0, items: 0 });
@@ -116,9 +115,6 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
   const patronItems = new Set<string>();
   const key = (...parts: string[]) => JSON.stringify(parts);
   for (const v of visitList) {
-    const ids = patronIndex.get(v.patron) ?? [];
-    ids.push(v.id);
-    patronIndex.set(v.patron, ids);
     if (v.voided) continue;
     livePatrons.add(v.patron);
     const cp = key(v.employee, v.patron);
@@ -153,7 +149,6 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
     name,
     closed,
     visits: visitList,
-    patronIndex,
     totals: { patrons: livePatrons.size, items: patronItems.size },
     perClerk: byName(perClerk),
     perWorkstation: byName(perWorkstation),
