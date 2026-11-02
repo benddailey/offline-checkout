@@ -59,23 +59,28 @@ interface SavePicker {
 
 /**
  * Chrome's save dialog lets staff pick a network share or flash drive. Without it the file goes to
- * Downloads. Resolves false if they cancel the dialog.
+ * Downloads. Resolves false if they cancel the dialog; rejects if writing to the chosen place fails.
  */
 export async function saveTextFile(name: string, text: string): Promise<boolean> {
   const blob = new Blob([text], { type: "text/plain" });
   const picker = (window as SavePicker).showSaveFilePicker;
   if (picker) {
+    let handle;
     try {
-      const handle = await picker({
+      handle = await picker({
         suggestedName: name,
         types: [{ description: "Pairing code", accept: { "text/plain": [".txt"] } }],
       });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return false;
+      handle = null; // The picker itself is unusable here (e.g. SecurityError): download instead.
+    }
+    if (handle) {
+      // Once staff picked a place, a write failure must reach them, not fall back to Downloads.
       const out = await handle.createWritable();
       await out.write(blob);
       await out.close();
       return true;
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return false;
     }
   }
   const url = URL.createObjectURL(blob);

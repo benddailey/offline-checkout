@@ -45,7 +45,13 @@ const saved = ref(false);
 async function save() {
   if (!props.fileName) return;
   const text = pairingFileText(props.label, props.text, props.expiresAt);
-  if (!(await saveTextFile(props.fileName, text))) return;
+  printError.value = "";
+  try {
+    if (!(await saveTextFile(props.fileName, text))) return;
+  } catch {
+    printError.value = "Could not save the file there. Try again or pick another folder.";
+    return;
+  }
   saved.value = true;
   setTimeout(() => (saved.value = false), 1500);
 }

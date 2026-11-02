@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vite-plus/test";
-import { codeFromFile, pairingFileName, pairingFileText } from "./file";
+import { afterEach, describe, expect, test, vi } from "vite-plus/test";
+import { codeFromFile, pairingFileName, pairingFileText, saveTextFile } from "./file";
 
 const at = new Date(2026, 10, 1, 14, 5, 9).getTime();
 
@@ -52,5 +52,61 @@ describe("codeFromFile", () => {
   test("returns null when there is no code", () => {
     expect(codeFromFile("shopping list\nmilk")).toBeNull();
     expect(codeFromFile("")).toBeNull();
+  });
+});
+
+describe("saveTextFile", () => {
+  const download = vi.fn();
+  function stubBrowser(showSaveFilePicker?: unknown) {
+    vi.stubGlobal("window", { showSaveFilePicker });
+    vi.stubGlobal("document", {
+      createElement: () => ({ click: download }),
+    });
+    vi.stubGlobal("URL", { createObjectURL: () => "blob:x", revokeObjectURL: () => {} });
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    download.mockReset();
+  });
+
+  test("writes through the picked handle", async () => {
+    const write = vi.fn();
+    stubBrowser(async () => ({
+      createWritable: async () => ({ write, close: async () => {} }),
+    }));
+    expect(await saveTextFile("a.txt", "x")).toBe(true);
+    expect(write).toHaveBeenCalled();
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  test("a write failure rejects and does not download", async () => {
+    stubBrowser(async () => ({
+      createWritable: async () => ({
+        write: async () => {
+          throw new Error("share dropped");
+        },
+        close: async () => {},
+      }),
+    }));
+    await expect(saveTextFile("a.txt", "x")).rejects.toThrow("share dropped");
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  test("cancelling the dialog resolves false and does not download", async () => {
+    stubBrowser(async () => {
+      throw new DOMException("cancelled", "AbortError");
+    });
+    expect(await saveTextFile("a.txt", "x")).toBe(false);
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  test("downloads when the picker is missing or rejects before giving a handle", async () => {
+    stubBrowser(undefined);
+    expect(await saveTextFile("a.txt", "x")).toBe(true);
+    stubBrowser(async () => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    expect(await saveTextFile("a.txt", "x")).toBe(true);
+    expect(download).toHaveBeenCalledTimes(2);
   });
 });
