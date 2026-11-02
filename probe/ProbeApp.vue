@@ -6,6 +6,7 @@ import {
   decodePayload,
   encodePayload,
   minifySdp,
+  passiveAnswer,
   rebuildSdp,
 } from "../src/pairing/index";
 import QrDisplay from "../src/qr/QrDisplay.vue";
@@ -254,7 +255,8 @@ async function onOffer(text: string) {
     watchConnection(conn);
     conn.ondatachannel = (e) => wireChannel(e.channel, "guest", mine);
     await conn.setRemoteDescription({ type: "offer", sdp: rebuildSdp(offer.sdp, "offer") });
-    await conn.setLocalDescription(await conn.createAnswer());
+    const local = await conn.createAnswer();
+    await conn.setLocalDescription({ type: "answer", sdp: passiveAnswer(local.sdp ?? "") });
     await waitForGathering(conn);
     if (mine !== attempt) return;
     const sdp = conn.localDescription!.sdp;
