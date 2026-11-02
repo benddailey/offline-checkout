@@ -7,6 +7,10 @@ const session = useSession();
 
 const dialog = ref<"clerk" | "exit" | null>(null);
 watch(dialog, (d) => (session.toolbarDialog = d !== null));
+watch(
+  () => session.closed,
+  (c) => c && dialog.value === "clerk" && (dialog.value = null),
+);
 
 const clerk = ref("");
 const clerkError = ref(false);
