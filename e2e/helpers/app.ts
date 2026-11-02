@@ -29,6 +29,15 @@ export async function resumeAs(page: Page, session: string | RegExp, clerk: stri
   await form.getByRole("button", { name: "Resume session" }).click();
 }
 
+/** On Launch, start a new session as `clerk` and wait for the scan screen. */
+export async function startSession(page: Page, session: string, clerk: string): Promise<void> {
+  const form = page.getByTestId("start-form");
+  await form.getByLabel("Session name").fill(session);
+  await form.getByLabel("Clerk name").fill(clerk);
+  await form.getByRole("button", { name: "Start session" }).click();
+  await expect(page.getByLabel("Scanner input")).toBeVisible();
+}
+
 /** Open the app; on a workstation with no name yet, name it `workstation` first. */
 export async function openApp(page: Page, workstation = "Desk 1"): Promise<void> {
   await page.goto(appUrl());

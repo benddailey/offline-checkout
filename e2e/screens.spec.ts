@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl, openApp } from "./helpers/app";
+import { appUrl, openApp, startSession } from "./helpers/app";
 import { stubPrint } from "./helpers/print";
 
 const VIEWPORT = { width: 1366, height: 768 };
@@ -25,10 +25,7 @@ test("the main screens render at 1366x768 (screenshots for review)", async ({ br
     await expect(a!.getByRole("button", { name: "Start session" })).toBeVisible();
     await shot(a!, "1-launch");
 
-    await a!.getByLabel("Session name").fill("Saturday Outage");
-    await a!.getByLabel("Clerk name").fill("Ann");
-    await a!.getByRole("button", { name: "Start session" }).click();
-    await expect(a!.getByLabel("Scanner input")).toBeVisible();
+    await startSession(a!, "Saturday Outage", "Ann");
     await shot(a!, "2-scan-empty");
 
     await a!.getByRole("button", { name: "Not now" }).click();

@@ -1,19 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
-import { openApp, resumeAs } from "./helpers/app";
+import { expect, test } from "@playwright/test";
+import { openApp, resumeAs, startSession } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
-
-async function start(page: Page, name: string, clerk: string): Promise<void> {
-  await openApp(page);
-  await page.getByLabel("Session name").fill(name);
-  await page.getByLabel("Clerk name").fill(clerk);
-  await page.getByRole("button", { name: "Start session" }).click();
-  await expect(page.getByLabel("Scanner input")).toBeVisible();
-}
 
 test("a patron scanned on Add workstation opens on the scan screen; the paste box still types", async ({
   page,
 }) => {
-  await start(page, "Pair Scan", "Rae");
+  await openApp(page);
+  await startSession(page, "Pair Scan", "Rae");
 
   await page.getByRole("button", { name: "Add workstation" }).click();
   await expect(page.getByLabel("Join code", { exact: true })).not.toHaveValue("", {
@@ -43,7 +36,8 @@ test("the summary names unconnected workstations, confirms before PDF and close,
   const contexts = await Promise.all([1, 2].map(() => browser.newContext()));
   try {
     const [a, b] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
-    await start(a!, "Warn", "Ann");
+    await openApp(a!);
+    await startSession(a!, "Warn", "Ann");
     await openApp(b!, "Back desk");
     await pairViaPaste(a!, b!, "Ben");
     await b!.keyboard.type("P2\n");
@@ -132,7 +126,8 @@ test("a session already open in another tab shows a dismissable notice on Launch
   context,
 }) => {
   const first = await context.newPage();
-  await start(first, "Two Tabs", "Rae");
+  await openApp(first);
+  await startSession(first, "Two Tabs", "Rae");
   const second = await context.newPage();
   await openApp(second);
   await resumeAs(second, /Two Tabs/, "Sam");

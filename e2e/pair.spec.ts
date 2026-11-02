@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resumeAs } from "./helpers/app";
+import { openApp, resumeAs, startSession } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { stubPrint } from "./helpers/print";
 
@@ -15,10 +15,7 @@ test("three workstations pair by paste, form a mesh and sync scans", async ({ br
     const [a, b, c] = await Promise.all(contexts.map((ctx) => ctx.newPage()));
     for (const page of [a!, b!, c!]) await openApp(page);
 
-    await a!.getByLabel("Session name").fill("Outage");
-    await a!.getByLabel("Clerk name").fill("Ann");
-    await a!.getByRole("button", { name: "Start session" }).click();
-    await expect(a!.getByLabel("Scanner input")).toBeVisible();
+    await startSession(a!, "Outage", "Ann");
 
     const first = await pairViaPaste(a!, b!, "Ben");
     await pairViaPaste(a!, c!, "Cat");
@@ -78,15 +75,8 @@ test("an isolated workstation re-pairs only with its own session", async ({ brow
       await stubPrint(page);
       await openApp(page);
     }
-    for (const [page, session, clerk] of [
-      [a!, "Outage", "Ann"],
-      [other!, "Elsewhere", "Oz"],
-    ] as const) {
-      await page.getByLabel("Session name").fill(session);
-      await page.getByLabel("Clerk name").fill(clerk);
-      await page.getByRole("button", { name: "Start session" }).click();
-      await expect(page.getByLabel("Scanner input")).toBeVisible();
-    }
+    await startSession(a!, "Outage", "Ann");
+    await startSession(other!, "Elsewhere", "Oz");
     await pairViaPaste(a!, b!, "Ben");
     await expectConnected(a!, "Ben");
 
@@ -130,10 +120,7 @@ test("the start page lists other named workstations from the open sessions", asy
     await expect(a!.getByRole("heading", { name: "Start new session" })).toBeVisible();
     await expect(a!.getByRole("heading", { name: "Other workstations" })).toBeHidden();
 
-    await a!.getByLabel("Session name").fill("Outage");
-    await a!.getByLabel("Clerk name").fill("Ann");
-    await a!.getByRole("button", { name: "Start session" }).click();
-    await expect(a!.getByLabel("Scanner input")).toBeVisible();
+    await startSession(a!, "Outage", "Ann");
     await pairViaPaste(a!, b!, "Ben");
 
     await b!.keyboard.type("P1\n");

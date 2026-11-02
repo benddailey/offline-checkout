@@ -1,14 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appUrl, openApp } from "./helpers/app";
+import { appUrl, openApp, startSession } from "./helpers/app";
 import { stubPrint } from "./helpers/print";
-
-async function startSession(page: Page, name: string, clerk: string): Promise<void> {
-  const form = page.getByTestId("start-form");
-  await form.getByLabel("Session name").fill(name);
-  await form.getByLabel("Clerk name").fill(clerk);
-  await form.getByRole("button", { name: "Start session" }).click();
-  await expect(page.getByLabel("Scanner input")).toBeVisible();
-}
 
 async function exitSession(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Exit session" }).click();
