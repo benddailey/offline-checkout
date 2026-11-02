@@ -57,7 +57,7 @@ export function layout(
   let maxW = 0;
   for (const b of blocks) {
     maxW = Math.max(maxW, barcodeWidth(b.patron));
-    for (const i of b.items) maxW = Math.max(maxW, barcodeWidth(i));
+    for (const i of b.items) maxW = Math.max(maxW, barcodeWidth(i.barcode));
   }
   const columns =
     maxW === 0 ? 1 : Math.max(1, Math.floor((usableW + g.gutter) / (maxW + g.gutter)));
@@ -115,7 +115,7 @@ export function layout(
           page,
           x,
           y: boxY + g.boxPad + i * g.itemRowH,
-          text: b.items[placed + i],
+          text: b.items[placed + i].barcode,
           role: "item",
         });
       }

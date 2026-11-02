@@ -61,8 +61,6 @@ export interface SessionState {
   closed: boolean;
   /** Sorted by (at, deviceId, seq). */
   visits: VisitState[];
-  /** Patron barcode to visit ids (including voided visits). */
-  patronIndex: Map<string, RecordId[]>;
   /**
    * Distinct patrons with at least one non-voided visit; distinct (patron, item) pairs among
    * non-voided items in non-voided visits — the PDF's blocks and lines.
