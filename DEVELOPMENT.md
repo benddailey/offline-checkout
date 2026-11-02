@@ -7,9 +7,10 @@ is for working on the app.
 
 The app is a Vue 3 + Pinia app built into one self-contained HTML file and opened from `file://`.
 Every scan is appended to a log in IndexedDB. Workstations pair over WebRTC data channels, with the
-offer and answer exchanged as QR codes, pasted text or printed barcodes, so no server is needed. The
-logs sync between paired workstations, and the closed session is exported as a PDF of Code 128
-barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction file. Receipts are printed with the browser's print dialog, or silently with Chrome's
+offer and answer exchanged as QR codes, pasted text, printed barcodes or temporary code files, so no
+server is needed. The logs sync between paired workstations, and the closed session is exported as a
+PDF of Code 128 barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction
+file. Receipts are printed with the browser's print dialog, or silently with Chrome's
 `--kiosk-printing` flag, which the desk shortcuts set.
 
 ## Stack
@@ -68,15 +69,23 @@ barcodes (jsPDF), as CSV or Excel files, or as an Evergreen offline transaction 
   Evergreen then applies its loan rules from `checkout_time`, and needs no `CIRC_OVERRIDE_DUE_DATE`
   permission.
 - **Pairing and sync:** browser WebRTC data channels, no library (`src/mesh/`, `src/pairing/`,
-  `src/sync/`). A catch-up arrives as many 200-record batches at once. `SyncEngine` writes all the
-  batches that arrive during a write in one `put()`, and `put()` queues its IndexedDB requests
-  without awaiting each one, because every write is a disk flush and a full re-reduce of the log.
-  Deleting a closed session sends `{t:"delete-session", workstation}` to the connected peers and
-  waits up to 3 s (`DELETE_REPLY_MS`) for each `{t:"deleted"}`. A peer with that session closed
-  replies, waits for the sender to disconnect (or 1 s), then deletes it; a peer with it open ignores
-  the message. A `deleted` reply means the peer accepted the delete and is removing its copy, not
-  that its copy is already gone. The sender then deletes its own copy and shows which peers did not confirm. Peers that
-  were not connected keep their copy. The pairing payload is unchanged, so `OC2:` stays.
+  `src/sync/`). Code files (`src/pairing/file.ts`) are saved with `showSaveFilePicker`, so staff can
+  pick a network share or flash drive, and fall back to a download; loading takes the first `OC<n>:`
+  code in the text. `CODE_TTL_MS` (15 minutes, `src/pairing/payload.ts`) is checked locally and is
+  not in the payload. The joiner's answer is DTLS-passive (`passiveAnswer` in `src/pairing/sdp.ts`,
+  set in `Mesh.join`, and `rebuildSdp` writes `passive` for answers), because the reply can be
+  applied up to `CODE_TTL_MS` later: an active joiner keeps resending its ClientHello and Chromium
+  gives up after about 222 s. That changed the handshake, so the prefix went to `OC3:` and the
+  payload's first byte to `0x28` (printed barcodes carry only the bytes). Mesh introductions relay
+  full SDPs and keep the browser's roles. A catch-up arrives as many 200-record batches at once.
+  `SyncEngine` writes all the batches that arrive during a write in one `put()`, and `put()` queues
+  its IndexedDB requests without awaiting each one, because every write is a disk flush and a full
+  re-reduce of the log. Deleting a closed session sends `{t:"delete-session", workstation}` to the
+  connected peers and waits up to 3 s (`DELETE_REPLY_MS`) for each `{t:"deleted"}`. A peer with that
+  session closed replies, waits for the sender to disconnect (or 1 s), then deletes it; a peer with
+  it open ignores the message. A `deleted` reply means the peer accepted the delete and is removing
+  its copy, not that its copy is already gone. The sender then deletes its own copy and shows which
+  peers did not confirm. Peers that were not connected keep their copy.
 - **Tests:**
   - Vitest unit tests next to the code (`*.test.ts`), with `fake-indexeddb`;
   - Playwright end-to-end tests in `e2e/`, which decode the printed and PDF barcodes with
@@ -203,7 +212,7 @@ that changes the IndexedDB schema (`src/store/db.ts`) needs a migration.
   printer setup window must be closed before opening the everyday shortcut. On macOS Chrome keeps
   running after its last window closes, so each Mac launcher first stops a running instance of the
   profile that has the other `--kiosk-printing` setting.
-- Pairing codes carry a format version (`OC2:`). A workstation refuses codes in another format, so
+- Pairing codes carry a format version (`OC3:`). A workstation refuses codes in another format, so
   staff are told to keep every desk on the same release.
 - Barcodes are verified by zxing at 300 dpi, but still confirm them with the library's real scanners.
 

@@ -37,7 +37,16 @@ export function minifySdp(sdp: string): SdpParts {
   return { ufrag, pwd, fingerprint: fingerprint.toUpperCase(), candidates };
 }
 
-/** Build a data-channel-only SDP from minified parts. */
+/**
+ * A pairing-code answer is DTLS-passive: the inviter (active) starts the DTLS handshake when the
+ * reply is applied, which may be up to CODE_TTL_MS later. An active joiner would retry its
+ * ClientHello and Chromium gives up after about 222 s, failing the connection.
+ */
+export function passiveAnswer(sdp: string): string {
+  return sdp.replace(/^a=setup:\w+/gm, "a=setup:passive");
+}
+
+/** Build a data-channel-only SDP from minified parts. Answers are passive (see passiveAnswer). */
 export function rebuildSdp(p: SdpParts, role: "offer" | "answer"): string {
   const sessionId = Array.from({ length: 16 }, () => Math.floor(Math.random() * 10)).join("");
   const lines = [
@@ -56,7 +65,7 @@ export function rebuildSdp(p: SdpParts, role: "offer" | "answer"): string {
     `a=ice-pwd:${p.pwd}`,
     "a=ice-options:trickle",
     `a=fingerprint:sha-256 ${p.fingerprint}`,
-    `a=setup:${role === "offer" ? "actpass" : "active"}`,
+    `a=setup:${role === "offer" ? "actpass" : "passive"}`,
     "a=mid:0",
     "a=sctp-port:5000",
     "a=max-message-size:262144",

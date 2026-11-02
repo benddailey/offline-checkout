@@ -13,5 +13,5 @@
   headless (`HEADED=1` shows the browsers), and it rebuilds and clears `dist/`.
 - `windows/Create shortcuts.cmd` must stay ASCII. It is checked out with CRLF line endings
   (.gitattributes). `macos/Create shortcuts.command` must run on the bash 3.2 that macOS ships.
-- All workstations must run the same version, because pairing codes carry a format version (`OC2:`).
+- All workstations must run the same version, because pairing codes carry a format version (`OC3:`).
   Changing the pairing payload means bumping that prefix.

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
-import { decodePayload, encodePayload, PairingError } from "../pairing/payload";
+import { CODE_TTL_MS, decodePayload, encodePayload, PairingError } from "../pairing/payload";
 import { createFakeRtcNetwork, type FakeRtcNetwork } from "./fake-rtc";
 import { NO_ADDRESS } from "./link";
 import { dev, mk, SID } from "../log/helpers.test-util";
@@ -9,7 +9,7 @@ import { SyncEngine, type StoreLike } from "../sync/sync";
 import { Mesh, type MeshOptions, type PeerInfo } from "./mesh";
 
 const RETRY = 10_000;
-const TTL = 300_000;
+const TTL = CODE_TTL_MS;
 const SESSION = { sessionId: "s1", sessionName: "Book Fair" };
 
 let net: FakeRtcNetwork;
@@ -98,6 +98,25 @@ describe("QR pairing", () => {
     await expect(j.connected).resolves.toMatchObject({ deviceId: "A" });
   });
 
+  test("the joiner's answer is DTLS-passive, so a reply applied minutes later still connects", async () => {
+    const a = founder();
+    const invite = await a.createInvite();
+    const pcs: RTCPeerConnection[] = [];
+    const factory = net.factoryFor("B");
+    const rtc = (c: RTCConfiguration) => {
+      const pc = factory(c);
+      pcs.push(pc);
+      return pc;
+    };
+    const j = await Mesh.join(invite.payload, opts("B", "Bob", { rtc }));
+    track(j.mesh);
+    expect(pcs).toHaveLength(1);
+    expect(pcs[0]!.localDescription?.sdp).toContain("a=setup:passive");
+    expect(pcs[0]!.localDescription?.sdp).not.toContain("a=setup:active");
+    await invite.accept(j.answer);
+    await expect(j.connected).resolves.toMatchObject({ deviceId: "A" });
+  });
+
   test("app message A→B is delivered; send to an unknown peer is a silent no-op", async () => {
     const a = founder();
     const { mesh: b } = await pair(a, "B", "Bob");
@@ -121,6 +140,25 @@ describe("QR pairing", () => {
     vi.advanceTimersByTime(TTL);
     await expectPairingError(invite.accept(j.answer), "expired");
     expect(a.peers()).toEqual([]);
+  });
+
+  test("a pairing that finishes early does not hold up the next invite", async () => {
+    const a = founder();
+    vi.advanceTimersByTime(6 * 60_000);
+    const { invite: first } = await pair(a, "B", "Bob");
+    vi.advanceTimersByTime(TTL);
+    await settle();
+    expect(view(a)).toEqual({ B: true });
+    const second = await a.createInvite();
+    expect(second.expiresAt).toBe(Date.now() + TTL);
+    expect(second.expiresAt).toBeGreaterThan(first.expiresAt);
+    vi.advanceTimersByTime(TTL - 1_000);
+    const j = await Mesh.join(second.payload, opts("C", "Cat"));
+    track(j.mesh);
+    await second.accept(j.answer);
+    await expect(j.connected).resolves.toMatchObject({ deviceId: "A" });
+    await settle();
+    expect(view(a)).toEqual({ B: true, C: true });
   });
 
   test("expiry uses the injected clock", async () => {
@@ -435,7 +473,7 @@ describe("robustness", () => {
     await vi.advanceTimersByTimeAsync(4_999);
     expect(invite).toBeUndefined();
     await vi.advanceTimersByTimeAsync(1);
-    expect(invite?.payload).toMatch(/^OC2:/);
+    expect(invite?.payload).toMatch(/^OC3:/);
   });
 
   test("ICE gathering finds no address: createInvite and join fail clearly", async () => {

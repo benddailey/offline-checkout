@@ -49,7 +49,7 @@ describe("payload codec", () => {
       },
     };
     const text = encodePayload(real);
-    expect(text.startsWith("OC2:")).toBe(true);
+    expect(text.startsWith("OC3:")).toBe(true);
     expect(codeBytes(text).length).toBeLessThanOrEqual(112);
     expect(decodePayload(text, "offer")).toEqual(real);
   });
@@ -93,7 +93,17 @@ describe("payload codec", () => {
 
   test("a code from the previous version says so", () => {
     expect(code(() => decodePayload("OC1:WyJvIl0", "offer"))).toBe("old-version");
-    expect(code(() => decodePayload("OC3:abc", "offer"))).toBe("old-version");
+    expect(code(() => decodePayload(encodePayload(offer).replace("OC3:", "OC2:"), "offer"))).toBe(
+      "old-version",
+    );
+    expect(code(() => decodePayload("OC4:abc", "offer"))).toBe("old-version");
+  });
+
+  test("an OC2 code reassembled from printed barcodes says it is from another version", () => {
+    // Printed barcodes carry only the bytes, so an OC2 receipt scans back with today's prefix.
+    const bytes = codeBytes(encodePayload(offer));
+    bytes[0] = 0x20 | (bytes[0]! & 7);
+    expect(code(() => decodePayload(codeFromBytes(bytes), "offer"))).toBe("old-version");
   });
 
   test("round-trips", () => {
@@ -138,13 +148,13 @@ describe("payload codec", () => {
     const bad = [
       "hello",
       "",
-      "OC2:",
-      "OC2:abc",
-      "OC2:!!!!",
+      "OC3:",
+      "OC3:abc",
+      "OC3:!!!!",
       good.slice(0, good.length - 20),
       good + "AA",
       withHead(0x00),
-      withHead(0x28),
+      withHead(0x30),
       codeFromBytes(bytes.slice(0, -3)),
       encodePayload({ ...offer, sdp: { ...sdp, candidates: [] } }),
       encodePayload({ ...offer, sdp: { ...sdp, candidates: [{ address: "1.2.3.4", port: 0 }] } }),

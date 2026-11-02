@@ -118,7 +118,7 @@ describe("isPairingText", () => {
   });
 
   it("leaves patron and item barcodes alone", () => {
-    for (const text of ["31234567890123", "P1", "OC-END", "OC2", ""]) {
+    for (const text of ["31234567890123", "P1", "OC-END", "OC3", ""]) {
       expect(isPairingText(text), text).toBe(false);
     }
   });
@@ -184,7 +184,7 @@ describe("addScan", () => {
   });
 
   it("passes a whole code of any version through", () => {
-    expect(addScan(emptyCollector(), "  OC2:abc ")).toEqual({ kind: "full", code: "OC2:abc" });
+    expect(addScan(emptyCollector(), "  OC3:abc ")).toEqual({ kind: "full", code: "OC3:abc" });
     expect(addScan(emptyCollector(), "OC1:abc")).toEqual({ kind: "full", code: "OC1:abc" });
   });
 

@@ -1,5 +1,5 @@
 import { test, expect, describe } from "vite-plus/test";
-import { minifySdp, rebuildSdp } from "./sdp";
+import { minifySdp, passiveAnswer, rebuildSdp } from "./sdp";
 
 const files = import.meta.glob<string>("./fixtures/*.sdp", {
   query: "?raw",
@@ -56,6 +56,19 @@ describe("rebuildSdp", () => {
   test("sets the DTLS role by SDP type", () => {
     const parts = minifySdp(fixture("offer-ip"));
     expect(rebuildSdp(parts, "offer")).toContain("a=setup:actpass");
-    expect(rebuildSdp(parts, "answer")).toContain("a=setup:active");
+    expect(rebuildSdp(parts, "answer")).toContain("a=setup:passive");
+    expect(rebuildSdp(parts, "answer")).not.toContain("a=setup:active");
+  });
+});
+
+describe("passiveAnswer", () => {
+  test("turns a browser's active answer passive and keeps everything else", () => {
+    const sdp = fixture("answer-ip");
+    expect(sdp).toContain("a=setup:active");
+    const out = passiveAnswer(sdp);
+    expect(out).toContain("a=setup:passive\r\n");
+    expect(out).not.toContain("a=setup:active");
+    expect(out.replace("a=setup:passive", "a=setup:active")).toBe(sdp);
+    expect(minifySdp(out)).toEqual(minifySdp(sdp));
   });
 });

@@ -320,7 +320,7 @@ describe("useSession scanning", () => {
   it("does not record a pairing barcode scanned on the scan screen", async () => {
     const s = await started();
     await s.scan("1".repeat(40));
-    await s.scan("OC2:abc");
+    await s.scan("OC3:abc");
     expect(s.records).toHaveLength(1);
     expect(s.message).toEqual({
       tone: "error",

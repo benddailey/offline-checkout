@@ -93,7 +93,12 @@ class FakePeerConnection {
           ? []
           : [{ address: `${this.owner}.local`, port: 50000 + this.net.counter }],
     };
-    return { type, sdp: rebuildSdp(parts, type) };
+    const sdp = rebuildSdp(parts, type);
+    // Like Chromium, a fresh answer is DTLS-active; Mesh.join makes its own passive.
+    return {
+      type,
+      sdp: type === "answer" ? sdp.replace("a=setup:passive", "a=setup:active") : sdp,
+    };
   }
 
   async createOffer(): Promise<RTCSessionDescriptionInit> {

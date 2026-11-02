@@ -4,7 +4,8 @@ import { normalizeScan } from "../../log/barcode";
 import { MAX_NAME } from "../../log/limits";
 import type { Invite, Mesh } from "../../mesh/mesh";
 import { isPairingText } from "../../pairing/chunks";
-import { PairingError, type PairingPayload } from "../../pairing/payload";
+import { pairingFileName } from "../../pairing/file";
+import { CODE_TTL_MS, PairingError, type PairingPayload } from "../../pairing/payload";
 import QrDisplay from "../../qr/QrDisplay.vue";
 import QrScan from "../../qr/QrScan.vue";
 import MessageBanner from "../components/MessageBanner.vue";
@@ -18,8 +19,8 @@ const session = useSession();
 
 /** How long the inviter waits for the data channel once the reply code has been entered. */
 const CONNECT_TIMEOUT_MS = 45_000;
-/** The joiner's reply may be printed and scanned, so it waits as long as the join code lives. */
-const JOIN_WAIT_MS = 300_000;
+/** The joiner's reply may be printed or carried as a file, so it waits as long as the join code lives. */
+const JOIN_WAIT_MS = CODE_TTL_MS;
 
 /** A join started while a session is open here is a re-pair of that session. */
 const repair = props.mode === "join" && session.meta !== null;
@@ -97,6 +98,7 @@ async function startInvite(): Promise<void> {
     if (!alive) return created.cancel();
     invite.value = created;
     now.value = Date.now();
+    codeMadeAt.value = now.value;
     ticker = setInterval(() => {
       now.value = Date.now();
       if (remainingMs.value <= 0 && phase.value === "scan") {
@@ -178,6 +180,7 @@ async function submitName(): Promise<void> {
   if (!alive) return joined.mesh.close();
   pending = joined.mesh;
   answer.value = joined.answer;
+  codeMadeAt.value = Date.now();
   phase.value = "answer";
   try {
     await withTimeout(joined.connected, JOIN_WAIT_MS);
@@ -251,6 +254,22 @@ async function recordScan(code: string): Promise<void> {
   };
 }
 
+// ---- Saved code files ----
+
+/** When the shown code was made, so each saved file gets its own name. */
+const codeMadeAt = ref(0);
+const inviteFile = computed(() =>
+  pairingFileName("Join code", session.meta?.name, session.workstationName, codeMadeAt.value),
+);
+const answerFile = computed(() =>
+  pairingFileName(
+    "Reply code",
+    offer.value?.sessionName,
+    session.workstationName,
+    codeMadeAt.value,
+  ),
+);
+
 // ---- Common ----
 
 function tryAgain(): void {
@@ -265,14 +284,23 @@ function leave(): void {
   session.screen = backTo;
 }
 
+/** A code file dropped just outside the code box must not open in the tab and end the pairing. */
+function blockFileDrop(e: DragEvent) {
+  if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+}
+
 onMounted(() => {
   document.addEventListener("keydown", onKeydown, true);
+  window.addEventListener("dragover", blockFileDrop);
+  window.addEventListener("drop", blockFileDrop);
   if (props.mode === "invite") void startInvite();
   else startJoin();
 });
 
 onUnmounted(() => {
   document.removeEventListener("keydown", onKeydown, true);
+  window.removeEventListener("dragover", blockFileDrop);
+  window.removeEventListener("drop", blockFileDrop);
   alive = false;
   dropInvite();
   dropPending();
@@ -330,6 +358,7 @@ const step = "text-2xl font-bold text-slate-900";
           label="Join code"
           :session-name="session.meta?.name"
           :expires-at="invite.expiresAt"
+          :file-name="inviteFile"
         />
         <p class="text-lg text-slate-700" data-testid="countdown">
           Expires in <span class="font-mono font-bold">{{ countdown }}</span>
@@ -337,7 +366,7 @@ const step = "text-2xl font-bold text-slate-900";
       </section>
       <section class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5">
         <h2 :class="step">2. Scan the reply code shown on the new workstation</h2>
-        <QrScan ref="scanner" :key="attempt" @decoded="onAnswer" />
+        <QrScan ref="scanner" :key="attempt" files @decoded="onAnswer" />
       </section>
     </div>
 
@@ -349,7 +378,7 @@ const step = "text-2xl font-bold text-slate-900";
       <h2 :class="step">
         Scan the join code shown under Add workstation on a workstation already in the session
       </h2>
-      <QrScan ref="scanner" :key="attempt" @decoded="onOffer" />
+      <QrScan ref="scanner" :key="attempt" files @decoded="onOffer" />
     </section>
 
     <section
@@ -397,7 +426,12 @@ const step = "text-2xl font-bold text-slate-900";
       <h2 :class="step">
         On {{ offer?.employee || "the other" }}'s workstation, scan this reply code
       </h2>
-      <QrDisplay :text="answer" label="Reply code" :session-name="offer?.sessionName" />
+      <QrDisplay
+        :text="answer"
+        label="Reply code"
+        :session-name="offer?.sessionName"
+        :file-name="answerFile"
+      />
       <p class="text-lg text-slate-700" role="status">Waiting for the other workstation…</p>
     </section>
   </main>
