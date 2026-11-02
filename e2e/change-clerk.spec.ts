@@ -86,6 +86,13 @@ test("other workstations see a changed clerk; exiting while connected asks first
     const boOnA = a!.getByTestId("status-bar").getByRole("listitem").filter({ hasText: "Bo" });
     await expect(boOnA.getByLabel("connected", { exact: true })).toBeVisible();
 
+    await b!.getByRole("button", { name: "Change clerk" }).click();
+    await expect(b!.getByRole("dialog", { name: "Change clerk" })).toBeVisible();
+    await a!.getByRole("button", { name: "Summary" }).click();
+    await a!.getByRole("button", { name: "Close session" }).click();
+    await a!.getByRole("button", { name: "Yes, close session" }).click();
+    await expect(b!.getByRole("dialog", { name: "Change clerk" })).toBeHidden();
+
     await a!.getByRole("button", { name: "Exit session" }).click();
     const confirm = a!.getByRole("alertdialog", { name: "Exit session" });
     await expect(confirm).toContainText("This workstation will disconnect from the others.");
