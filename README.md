@@ -127,8 +127,8 @@ to the title on the start screen and on the Summary.
       file onto the code box).
    4. The new PC then shows a reply code. Give it to the first PC the same way, the other way round.
 
-   Codes expire after 15 minutes and work once. A saved code file is temporary and works once, so
-   delete it after pairing. If one expires, click **Try again** for a new one.
+   Codes expire after 15 minutes and work once. If a code expires, click **Try again** for a new
+   one. A saved code file is temporary, so delete it after pairing.
 
 3. **Scan.** Scan the patron's card, then each item. There is no need to click anything first. The
    bar at the top shows totals and a green or red dot for each desk PC.

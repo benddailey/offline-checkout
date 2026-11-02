@@ -284,14 +284,23 @@ function leave(): void {
   session.screen = backTo;
 }
 
+/** A code file dropped just outside the code box must not open in the tab and end the pairing. */
+function blockFileDrop(e: DragEvent) {
+  if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+}
+
 onMounted(() => {
   document.addEventListener("keydown", onKeydown, true);
+  window.addEventListener("dragover", blockFileDrop);
+  window.addEventListener("drop", blockFileDrop);
   if (props.mode === "invite") void startInvite();
   else startJoin();
 });
 
 onUnmounted(() => {
   document.removeEventListener("keydown", onKeydown, true);
+  window.removeEventListener("dragover", blockFileDrop);
+  window.removeEventListener("drop", blockFileDrop);
   alive = false;
   dropInvite();
   dropPending();

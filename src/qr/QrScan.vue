@@ -87,10 +87,24 @@ const picker = useTemplateRef<HTMLInputElement>("picker");
 const fileError = ref("");
 const dragging = ref(false);
 
+/** A code file is a few hundred bytes; anything much bigger is the wrong file. */
+const MAX_FILE_BYTES = 64 * 1024;
+
 async function loadFile(file: File | undefined) {
   if (!file) return;
   fileError.value = "";
-  const code = codeFromFile(await file.text());
+  if (file.size > MAX_FILE_BYTES) {
+    fileError.value = `${file.name} is too big to be a pairing code file. Pick the file saved on the other workstation.`;
+    return;
+  }
+  let text: string;
+  try {
+    text = await file.text();
+  } catch {
+    fileError.value = `Could not read ${file.name}. Check that the file is still there, or save the code again on the other workstation.`;
+    return;
+  }
+  const code = codeFromFile(text);
   if (code) emitText(code);
   else
     fileError.value = `${file.name} has no pairing code in it. Pick the file saved on the other workstation.`;
@@ -102,9 +116,20 @@ async function onPicked() {
   if (input) input.value = "";
 }
 
+/** Only file drags are ours; dragged text still drops into the scanner field or paste box. */
+const draggingFile = (e: DragEvent) => !!props.files && !!e.dataTransfer?.types.includes("Files");
+
+function onDragOver(e: DragEvent) {
+  if (!draggingFile(e)) return;
+  e.preventDefault();
+  dragging.value = true;
+}
+
 function onDrop(e: DragEvent) {
   dragging.value = false;
-  if (props.files) void loadFile(e.dataTransfer?.files[0]);
+  if (!draggingFile(e)) return;
+  e.preventDefault();
+  void loadFile(e.dataTransfer?.files[0]);
 }
 </script>
 
@@ -112,9 +137,9 @@ function onDrop(e: DragEvent) {
   <div
     class="flex flex-col gap-3 rounded"
     :class="{ 'ring-4 ring-blue-400': dragging }"
-    @dragover.prevent="dragging = !!files"
+    @dragover="onDragOver"
     @dragleave="dragging = false"
-    @drop.prevent="onDrop"
+    @drop="onDrop"
   >
     <div class="relative h-72 w-full overflow-hidden rounded bg-slate-900">
       <QrCamera :paused="paused" @detect="onDetect" @error="cameraError = true" />
