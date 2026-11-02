@@ -13,8 +13,18 @@ describe("blocksFromState", () => {
       mk("b", 5, { type: "item-scanned", visitId: "b:4", item: "I2" }),
       mk("b", 6, { type: "item-scanned", visitId: "b:4", item: "I3" }),
     ]);
-    expect(blocksFromState(s)).toEqual([
-      { patron: "P1", items: ["I1", "I2", "I3"], clerks: ["A", "B"], firstAt: 1000 },
+    const [b] = blocksFromState(s);
+    expect(blocksFromState(s)).toHaveLength(1);
+    expect(b).toMatchObject({
+      patron: "P1",
+      clerks: ["A", "B"],
+      firstAt: 1000,
+      firstVisit: { employee: "A", workstation: "" },
+    });
+    expect(b.items.map((i) => [i.barcode, i.id])).toEqual([
+      ["I1", "a:2"],
+      ["I2", "a:3"],
+      ["I3", "b:6"],
     ]);
   });
   test("drops voided items and fully voided patrons; sorts by firstAt", () => {
@@ -28,7 +38,7 @@ describe("blocksFromState", () => {
       mk("a", 7, { type: "voided", target: "a:5" }),
       mk("a", 8, { type: "patron-started", patron: "P2" }),
     ]);
-    expect(blocksFromState(s).map((b) => [b.patron, b.items])).toEqual([
+    expect(blocksFromState(s).map((b) => [b.patron, b.items.map((i) => i.barcode)])).toEqual([
       ["P3", ["I6"]],
       ["P2", []],
     ]);

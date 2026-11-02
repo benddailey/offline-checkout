@@ -1,14 +1,18 @@
 import { test, expect, describe } from "vite-plus/test";
+import type { ItemState } from "../log/types";
 import type { Block } from "./blocks";
 import { barcodeWidth, GEOMETRY as g, layout, type Placed } from "./layout";
 
 const num = (n: number, len = 14) => String(n).padStart(len, "0");
+const item = (barcode: string) => ({ barcode }) as ItemState;
 const blk = (n: number, items: number, len = 14): Block => ({
   patron: num(n, len),
-  items: Array.from({ length: items }, (_, i) => num(n * 1000 + i, len)),
+  items: Array.from({ length: items }, (_, i) => item(num(n * 1000 + i, len))),
   clerks: ["A", "B"],
   firstAt: n,
+  firstVisit: { employee: "A", workstation: "" },
 });
+const codes = (b: Block) => b.items.map((i) => i.barcode);
 const barcodes = (els: Placed[]) =>
   els.filter((e): e is Extract<Placed, { kind: "barcode" }> => e.kind === "barcode");
 
@@ -18,7 +22,7 @@ describe("layout", () => {
   test("14-digit barcodes give 4 columns; a 20-char one gives 2", () => {
     const blocks = Array.from({ length: 20 }, (_, i) => blk(i + 1, 3));
     expect(layout(blocks, ["x"]).columns).toBe(4);
-    blocks[4].items[1] = "A".repeat(20);
+    blocks[4].items[1] = item("A".repeat(20));
     expect(layout(blocks, ["x"]).columns).toBe(2);
   });
   test("everything stays inside the content area, its column and its box", () => {
@@ -67,7 +71,7 @@ describe("layout", () => {
     for (const b of blocks) {
       const cols = new Set(
         barcodes(r.elements)
-          .filter((e) => e.text === b.patron || b.items.includes(e.text))
+          .filter((e) => e.text === b.patron || codes(b).includes(e.text))
           .map((e) => `${e.page}/${colOf(e.x)}`),
       );
       expect(cols.size).toBe(1);
@@ -80,8 +84,10 @@ describe("layout", () => {
     expect(patrons.length).toBeGreaterThanOrEqual(2);
     expect(patrons[0].continued).toBeUndefined();
     expect(patrons.slice(1).every((p) => p.continued === true)).toBe(true);
-    const items = barcodes(r.elements).filter((e) => e.role === "item" && b.items.includes(e.text));
-    expect(items.map((i) => i.text).sort()).toEqual([...b.items].sort());
+    const items = barcodes(r.elements).filter(
+      (e) => e.role === "item" && codes(b).includes(e.text),
+    );
+    expect(items.map((i) => i.text).sort()).toEqual(codes(b).sort());
     expect(r.elements.filter((e) => e.kind === "box").length).toBe(patrons.length + 1);
   });
   test("zero blocks: one page, summary only", () => {
