@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { test, expect } from "@playwright/test";
+import { test, expect, type Browser, type Page } from "@playwright/test";
 import { launchChromium } from "./helpers/app";
 
 const probeUrl = pathToFileURL(resolve(process.cwd(), "dist-probe", "probe.html")).href;
@@ -41,6 +41,54 @@ test("probe: IndexedDB passes and two pages connect over pasted codes", async ()
     const summary = await host.locator("#results-text").inputValue();
     expect(summary).toContain("IndexedDB: PASS");
     expect(summary).toMatch(/WebRTC \(host\): PASS - round trip \d+ ms/);
+  } finally {
+    await browser.close();
+  }
+});
+
+// Holds "Preparing the code..." for a second so a click lands before the offer is ready.
+async function slowHostPage(browser: Browser): Promise<Page> {
+  const page = await (await browser.newContext()).newPage();
+  await page.addInitScript(() => {
+    const proto = RTCPeerConnection.prototype;
+    const set = Object.getOwnPropertyDescriptor(proto, "setLocalDescription")!.value as (
+      this: RTCPeerConnection,
+      d?: RTCLocalSessionDescriptionInit,
+    ) => Promise<void>;
+    proto.setLocalDescription = async function (d?: RTCLocalSessionDescriptionInit) {
+      await set.call(this, d);
+      await new Promise((r) => setTimeout(r, 1_000));
+    };
+  });
+  await page.goto(probeUrl);
+  return page;
+}
+
+test("probe: Start over while the Host code is being prepared leaves the test not run", async () => {
+  const browser = await launchChromium();
+  try {
+    const page = await slowHostPage(browser);
+    await page.getByRole("button", { name: "I am PC A (Host)" }).click();
+    await page.getByRole("button", { name: "Start over" }).click();
+    await page.waitForTimeout(2_500);
+    await expect(page.getByTestId("rtc-status")).toHaveText("NOT RUN");
+    await expect(page.getByTestId("rtc-detail")).toHaveCount(0);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("probe: pressing Host twice shows one working code", async () => {
+  const browser = await launchChromium();
+  try {
+    const page = await slowHostPage(browser);
+    const hostButton = page.getByRole("button", { name: "I am PC A (Host)" });
+    await hostButton.click();
+    await hostButton.click();
+    await expect(page.getByTestId("rtc-offer").locator("textarea")).toHaveValue(/^OC2:/);
+    await page.waitForTimeout(1_500);
+    await expect(page.getByTestId("rtc-status")).toHaveText("RUNNING...");
+    await expect(page.getByTestId("rtc-detail")).toHaveCount(0);
   } finally {
     await browser.close();
   }

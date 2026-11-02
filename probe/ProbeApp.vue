@@ -99,6 +99,7 @@ const rtc = reactive({
 const scanner = ref<InstanceType<typeof QrScan> | null>(null);
 let pc: RTCPeerConnection | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
+let attempt = 0;
 
 function describeError(e: unknown): string {
   if (e instanceof Error)
@@ -107,6 +108,7 @@ function describeError(e: unknown): string {
 }
 
 function resetRtc() {
+  attempt++;
   clearTimeout(timer);
   pc?.close();
   pc = null;
@@ -146,18 +148,20 @@ function armTimeout(ms: number) {
 
 function watchConnection(conn: RTCPeerConnection) {
   conn.onconnectionstatechange = () => {
-    if (conn.connectionState === "failed") {
+    if (conn === pc && conn.connectionState === "failed") {
       failRtc("The connection failed. This is usually Windows Firewall blocking the PCs.");
     }
   };
 }
 
-function wireChannel(dc: RTCDataChannel, role: Role) {
+function wireChannel(dc: RTCDataChannel, role: Role, mine: number) {
   dc.onopen = () => {
+    if (mine !== attempt) return;
     rtc.step = "Connected. Testing speed...";
     if (role === "host") dc.send(`ping:${performance.now()}`);
   };
   dc.onmessage = (e) => {
+    if (mine !== attempt) return;
     const data = String(e.data);
     if (role === "guest" && data.startsWith("ping:")) {
       dc.send(`pong:${data.slice(5)}`);
@@ -179,16 +183,19 @@ function wireChannel(dc: RTCDataChannel, role: Role) {
 
 async function startHost() {
   resetRtc();
+  const mine = attempt;
   rtc.role = "host";
   rtc.status = "running";
   rtc.step = "Preparing the code...";
   try {
-    pc = new RTCPeerConnection({ iceServers: [] });
-    watchConnection(pc);
-    wireChannel(pc.createDataChannel("probe"), "host");
-    await pc.setLocalDescription(await pc.createOffer());
-    await waitForGathering(pc);
-    const sdp = pc.localDescription!.sdp;
+    const conn = new RTCPeerConnection({ iceServers: [] });
+    pc = conn;
+    watchConnection(conn);
+    wireChannel(conn.createDataChannel("probe"), "host", mine);
+    await conn.setLocalDescription(await conn.createOffer());
+    await waitForGathering(conn);
+    if (mine !== attempt) return;
+    const sdp = conn.localDescription!.sdp;
     rtc.candidates = candidateSummary(sdp);
     rtc.offerText = encodePayload({
       kind: "offer",
@@ -201,6 +208,7 @@ async function startHost() {
     rtc.step =
       "Step 2: on PC B choose Guest and scan or paste this code. Then scan or paste PC B's reply below.";
   } catch (e) {
+    if (mine !== attempt) return;
     failRtc(`Could not create the connection code. ${describeError(e)}`);
   }
 }
@@ -212,12 +220,15 @@ async function onAnswer(text: string) {
     rtc.detailIsError = false;
     return;
   }
+  const mine = attempt;
   try {
     const answer = decodePayload(text, "answer");
     await pc.setRemoteDescription({ type: "answer", sdp: rebuildSdp(answer.sdp, "answer") });
+    if (mine !== attempt) return;
     rtc.step = "Connecting...";
     armTimeout(CONNECT_TIMEOUT_MS);
   } catch (e) {
+    if (mine !== attempt) return;
     rtc.detail = e instanceof PairingError ? e.message : describeError(e);
     rtc.detailIsError = true;
     scanner.value?.reset();
@@ -233,15 +244,18 @@ function startGuest() {
 
 async function onOffer(text: string) {
   if (rtc.role !== "guest" || pc) return;
+  const mine = attempt;
+  let conn: RTCPeerConnection | undefined;
   try {
     const offer = decodePayload(text, "offer");
-    const conn = new RTCPeerConnection({ iceServers: [] });
+    conn = new RTCPeerConnection({ iceServers: [] });
     pc = conn;
     watchConnection(conn);
-    conn.ondatachannel = (e) => wireChannel(e.channel, "guest");
+    conn.ondatachannel = (e) => wireChannel(e.channel, "guest", mine);
     await conn.setRemoteDescription({ type: "offer", sdp: rebuildSdp(offer.sdp, "offer") });
     await conn.setLocalDescription(await conn.createAnswer());
     await waitForGathering(conn);
+    if (mine !== attempt) return;
     const sdp = conn.localDescription!.sdp;
     rtc.candidates = candidateSummary(sdp);
     rtc.answerText = encodePayload({
@@ -255,7 +269,8 @@ async function onOffer(text: string) {
     rtc.step = "Step 3: show this reply to PC A (scan it or copy and paste it). Then wait here.";
     armTimeout(GUEST_WAIT_MS);
   } catch (e) {
-    pc?.close();
+    conn?.close();
+    if (mine !== attempt) return;
     pc = null;
     rtc.detail = e instanceof PairingError ? e.message : describeError(e);
     rtc.detailIsError = true;
