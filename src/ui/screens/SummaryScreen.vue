@@ -5,7 +5,7 @@ import MessageBanner from "../components/MessageBanner.vue";
 import ScanInput from "../components/ScanInput.vue";
 import SessionClosedBanner from "../components/SessionClosedBanner.vue";
 import SlideToConfirm from "../components/SlideToConfirm.vue";
-import { exportLines } from "../exports";
+import { evergreenStale, exportLines } from "../exports";
 import { trapTab } from "../focus-trap";
 import { useSession } from "../session";
 import { summaryPatrons } from "../summary";
@@ -63,7 +63,10 @@ const exportSummary = computed(() =>
     new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
   ),
 );
-const evergreenExported = computed(() => session.state.exports.some((e) => e.kind === "xacts"));
+const evergreenStaleNow = computed(() => evergreenStale(session.state));
+const evergreenExported = computed(
+  () => session.state.exports.some((e) => e.kind === "xacts") && !evergreenStaleNow.value,
+);
 
 const inProgress = computed(() =>
   session.othersInProgress.map((v) => `${v.patron} (${v.employee || "Unnamed"})`),
@@ -221,6 +224,14 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
         <p v-else-if="!hasItems" id="generate-hint" class="text-lg text-slate-600">
           Scan at least one item to download for Evergreen
         </p>
+        <p
+          v-if="evergreenStaleNow"
+          data-testid="evergreen-stale"
+          class="text-lg font-semibold text-red-800"
+        >
+          Items were added after the last Evergreen download. The new file contains every checkout
+          in the session, so upload only one of them unless the earlier one was never uploaded.
+        </p>
         <h2 class="mt-2 text-2xl font-bold">Scanner card</h2>
         <div class="flex flex-wrap gap-3">
           <button type="button" :class="secondary" @click="session.printScannerCard('receipt')">
@@ -305,7 +316,9 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
         </h2>
         <div id="confirm-text" class="flex flex-col gap-3 text-2xl">
           <p v-if="confirming === 'close'">
-            Close this session for all workstations? Scanning will stop everywhere.
+            Close this session for all workstations? Scanning will stop everywhere. This can't be
+            undone. Stopping for the day? Use <strong>Exit session</strong> instead, and resume
+            tomorrow.
           </p>
           <p v-if="confirming === 'close' && inProgress.length" data-testid="in-progress">
             Patron in progress: {{ inProgress.join(", ") }}. Their visits will stay open.

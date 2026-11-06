@@ -165,7 +165,35 @@ to the title on the start screen and on the Summary.
    **Upload** and **Process**. Evergreen sets each due date from the library's loan rules, counting
    from the time the item was scanned, and lists any problems under **Exceptions**. Upload each
    file once: the second upload would check every item out again.
-6. **Deleting a closed session.** When every export you need is done, click **Delete session** on
+
+   **Close session** can't be undone. To stop for the day, use **Exit session** instead and resume
+   tomorrow.
+
+6. **Combining sessions.** An outage can span several sessions, for example when Friday's session is
+   closed expecting a fix and Saturday gets a new one. To upload everything to Evergreen once, open
+   the session that should hold it all, scroll to **Add to this session** on the Summary, and add the
+   others. It can be open or closed, and stays as it was. The session then holds every checkout in
+   time order, and every export covers all of it.
+   - **Prefer another session on this PC.** It copies the real record, so use a file only for a
+     session that was on another PC, or has been deleted. The sessions on this PC are listed under
+     **Add to this session**. Anything scanned in a source session after you add it needs adding
+     again, which adds only what is new.
+   - **Files.** Click **Choose files**, or drag files onto the box. A file dropped anywhere else is
+     blocked, so nothing opens by mistake. Prefer the Excel or Evergreen file over the CSV: Excel can
+     damage barcodes in a CSV, and the app refuses a CSV saved by Excel. A PDF can't be added, because
+     it has no scan times. Only files this app made can be added. An Evergreen file has no clerk
+     names, so those checkouts show no clerk.
+   - **Check the preview.** Every source is shown in a preview, with its patrons and items, before
+     anything changes. Enter **Your name**; it is required. Click **Add to session** to confirm.
+     Adding the same source twice adds nothing new.
+   - **An addition can't be undone.** After a wrong addition, start a new session and add the right
+     sources to that instead. The sources are never changed, and you can delete the wrong session.
+   - **Export after the last scan or void.** An export made earlier does not include later changes.
+   - **Avoid uploading twice.** If you download for Evergreen and then add more, the Summary warns
+     that items were added after the last Evergreen download. The new file contains every checkout in
+     the session, so upload only one of them unless the earlier one was never uploaded. Deleting the
+     session also asks you to download the Evergreen file again.
+7. **Deleting a closed session.** When every export you need is done, click **Delete session** on
    the Summary of a closed session. It lists each export (PDF, CSV, Excel, Evergreen) with the time,
    clerk and desk PC that downloaded it, or says none was downloaded. If the Evergreen file was never
    downloaded, download it first unless the checkouts are already in Evergreen. Drag the slider all

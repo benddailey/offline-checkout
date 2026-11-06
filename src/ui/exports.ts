@@ -1,4 +1,4 @@
-import type { ExportKind, ExportState } from "../log/types";
+import type { ExportKind, ExportState, SessionState } from "../log/types";
 
 export const EXPORT_NOUNS: Record<ExportKind, string> = {
   pdf: "PDF",
@@ -26,4 +26,10 @@ export function exportLines(
       text: `${noun}: downloaded ${time(latest.at)} by ${latest.employee}${where}`,
     };
   });
+}
+
+/** There is an Evergreen download, and an import came after the latest one. */
+export function evergreenStale(s: Pick<SessionState, "exports" | "imports">): boolean {
+  const last = s.exports.filter((e) => e.kind === "xacts").reduce((m, e) => Math.max(m, e.at), -1);
+  return last >= 0 && s.imports.some((i) => i.at > last);
 }

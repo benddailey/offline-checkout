@@ -566,3 +566,43 @@ test("an open preview follows the log to nothing new when a peer adds the same f
     await Promise.all(contexts.map((ctx) => ctx.close()));
   }
 });
+
+test("an import after the Evergreen download warns, until the next download", async ({ page }) => {
+  const stale = page.getByTestId("evergreen-stale");
+  await fridayThen(page, "Saturday");
+  await scan(page, "P3", "I3", "OC-END");
+  await toSummary(page);
+  await save(page, "Download for Evergreen", "first.jsonl");
+  await expect(stale).toBeHidden();
+
+  await chooseSession(page, "Friday");
+  await confirmAdd(page, "Cleo");
+  await expect(stale).toHaveText(
+    "Items were added after the last Evergreen download. The new file contains every checkout in the session, so upload only one of them unless the earlier one was never uploaded.",
+  );
+
+  await closeSession(page);
+  await page.getByRole("button", { name: "Delete session" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText("Download the Evergreen file first");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+
+  await save(page, "Download for Evergreen", "second.jsonl");
+  await expect(stale).toBeHidden();
+  await page.getByRole("button", { name: "Delete session" }).click();
+  await expect(dialog).not.toContainText("Download the Evergreen file first");
+});
+
+test("the Close dialog points to Exit session", async ({ page }) => {
+  await stubPrint(page);
+  await openApp(page);
+  await startSession(page, "Friday", "Ann");
+  await scan(page, "P1", "I1", "OC-END");
+  await toSummary(page);
+  await page.getByRole("button", { name: "Close session" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText(
+    "This can't be undone. Stopping for the day? Use Exit session instead, and resume tomorrow.",
+  );
+  await expect(dialog.locator("strong")).toHaveText("Exit session");
+});
