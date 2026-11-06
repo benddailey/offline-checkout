@@ -8,7 +8,7 @@ import {
   progressText,
 } from "../pairing/chunks";
 import { codeFromFile } from "../pairing/file";
-import { tool } from "../ui/classes";
+import { tool, toolPrimary } from "../ui/classes";
 import QrCamera from "./QrCamera.vue";
 
 /** `files` adds Load code from file and drag-and-drop of a saved pairing file. */
@@ -143,6 +143,12 @@ function onDrop(e: DragEvent) {
     @drop="onDrop"
   >
     <div class="relative h-52 w-full overflow-hidden rounded bg-slate-900">
+      <p
+        class="absolute inset-0 flex items-center justify-center text-xl text-slate-300"
+        data-testid="camera-status"
+      >
+        {{ cameraError ? "No camera" : "Starting camera…" }}
+      </p>
       <QrCamera :paused="paused" @detect="onDetect" @error="cameraError = true" />
     </div>
     <p v-if="cameraError" role="alert" class="rounded bg-amber-100 p-2 text-base text-amber-900">
@@ -189,7 +195,11 @@ function onDrop(e: DragEvent) {
       />
     </label>
     <div class="flex flex-wrap gap-3">
-      <button type="button" :class="[tool, 'flex-1 whitespace-nowrap']" @click="usePasted">
+      <button
+        type="button"
+        :class="[pasted.trim() ? toolPrimary : tool, 'flex-1 whitespace-nowrap']"
+        @click="usePasted"
+      >
         Use pasted code
       </button>
       <template v-if="files">

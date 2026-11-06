@@ -400,7 +400,7 @@ const step = "text-2xl font-bold text-slate-900";
 
     <form
       v-else-if="phase === 'name'"
-      class="flex max-w-xl flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
+      class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
       @submit.prevent="submitName"
     >
       <h2 :class="step">Who is working at this workstation?</h2>
@@ -426,7 +426,7 @@ const step = "text-2xl font-bold text-slate-900";
 
     <section
       v-else-if="phase === 'answer'"
-      class="flex max-w-xl flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
+      class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
     >
       <h2 :class="step">
         On {{ offer?.employee || "the other" }}'s workstation, scan this reply code

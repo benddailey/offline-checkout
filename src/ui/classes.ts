@@ -20,6 +20,7 @@ export const danger = `${large} ${red}`;
 export const dangerOutline = `${large} ${redOutline}`;
 export const success = `${large} ${green}`;
 export const tool = `${small} ${white}`;
+export const toolPrimary = `${small} ${blue}`;
 export const toolOn = `${small} border-blue-700 bg-blue-50 text-slate-900 hover:bg-blue-100`;
 export const toolDanger = `${small} ${redOutline}`;
 /** Repeats on every scanned row, so it stays quiet until pointed at. */

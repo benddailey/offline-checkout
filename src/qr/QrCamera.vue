@@ -87,5 +87,5 @@ async function decode(v: HTMLVideoElement) {
 </script>
 
 <template>
-  <video ref="video" class="h-full w-full object-cover" autoplay muted playsinline />
+  <video ref="video" class="relative h-full w-full object-cover" autoplay muted playsinline />
 </template>

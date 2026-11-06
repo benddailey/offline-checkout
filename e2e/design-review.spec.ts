@@ -504,3 +504,71 @@ test.describe("status bar", () => {
     }
   });
 });
+
+test.describe("pairing screens", () => {
+  test("the camera says what it is doing before there is a picture", async ({ page }) => {
+    await ready(page);
+    await page.addInitScript(() => {
+      navigator.mediaDevices.getUserMedia = () => new Promise(() => {});
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Join session" }).first().click();
+    await expect(page.getByTestId("camera-status")).toHaveText("Starting camera…");
+    await expect(page.getByTestId("camera-status")).toBeVisible();
+  });
+
+  test("the camera says so when it can't start", async ({ page }) => {
+    await page.addInitScript(() => {
+      navigator.mediaDevices.getUserMedia = () => Promise.reject(new Error("denied"));
+    });
+    await page.setViewportSize(WINDOW);
+    await openApp(page);
+    await page.getByRole("button", { name: "Join session" }).click();
+    await expect(page.getByTestId("camera-status")).toHaveText("No camera");
+  });
+
+  test("Use pasted code becomes the main action once there is a code", async ({ page }) => {
+    await page.setViewportSize(WINDOW);
+    await openApp(page);
+    await page.getByRole("button", { name: "Join session" }).click();
+    const use = page.getByRole("button", { name: "Use pasted code" });
+    await expect(use).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await page.getByLabel("Pasted code").fill("OC3:something");
+    await expect(use).not.toHaveCSS("background-color", "rgb(255, 255, 255)");
+  });
+
+  test("the card keeps its width through every step of joining", async ({ browser }) => {
+    test.setTimeout(60_000);
+    const contexts = await Promise.all([1, 2].map(() => browser.newContext({ viewport: WINDOW })));
+    try {
+      const [a, b] = await Promise.all(contexts.map((c) => c.newPage()));
+      await ready(a!);
+      await stubPrint(b!);
+      await openApp(b!, "Desk 2");
+      await a!.getByRole("button", { name: "Add workstation" }).click();
+      const offer = a!.getByLabel("Join code", { exact: true });
+      await expect(offer).not.toHaveValue("", { timeout: 15_000 });
+
+      const card = b!.locator("main").locator("section, form").first();
+      const width = async () => (await card.boundingBox())!.width;
+      await b!.getByRole("button", { name: "Join session" }).click();
+      await b!.getByLabel("Pasted code").waitFor();
+      const first = await width();
+      await b!.getByLabel("Pasted code").fill(await offer.inputValue());
+      await b!.getByRole("button", { name: "Use pasted code" }).click();
+      await b!.getByRole("button", { name: "Join", exact: true }).waitFor();
+      expect(await width()).toBe(first);
+      await b!.getByRole("button", { name: "Join", exact: true }).click();
+      await b!.getByLabel("Clerk name").fill("Ben");
+      expect(await width()).toBe(first);
+      await b!.getByRole("button", { name: "Continue" }).click();
+      await expect(b!.getByLabel("Reply code", { exact: true })).not.toHaveValue("", {
+        timeout: 15_000,
+      });
+      expect(await width()).toBe(first);
+      await expect(b!.getByRole("button", { name: "Save to file" })).toBeInViewport({ ratio: 1 });
+    } finally {
+      await Promise.all(contexts.map((c) => c.close()));
+    }
+  });
+});
