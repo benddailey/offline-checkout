@@ -171,12 +171,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5">
+  <section class="flex flex-col gap-4 rounded-xl border-2 border-line-2 bg-surface p-5">
     <h2 class="text-xl font-bold">Add to this session</h2>
 
     <div class="flex flex-col items-start gap-2" data-testid="other-sessions">
-      <h3 class="text-lg font-bold text-slate-700">Add another session</h3>
-      <p v-if="others.length === 0" class="text-lg text-slate-600">No other sessions on this PC.</p>
+      <h3 class="text-lg font-bold text-ink-3">Add another session</h3>
+      <p v-if="others.length === 0" class="text-lg text-ink-4">No other sessions on this PC.</p>
       <ul v-else class="flex w-full flex-col gap-2">
         <li v-for="s in others" :key="s.sessionId">
           <button
@@ -187,7 +187,7 @@ onUnmounted(() => {
             @click="chooseSession(s)"
           >
             {{ s.name }}
-            <span class="font-normal text-slate-600">
+            <span class="font-normal text-ink-4">
               · Started {{ dateTime(s.createdAt) }} ·
               {{ s.closedAt === undefined ? "open" : "closed" }}
             </span>
@@ -197,9 +197,9 @@ onUnmounted(() => {
     </div>
 
     <div class="flex flex-col items-start gap-2">
-      <h3 class="text-lg font-bold text-slate-700">Add exported files</h3>
+      <h3 class="text-lg font-bold text-ink-3">Add exported files</h3>
       <div
-        class="flex w-full flex-wrap items-center gap-4 rounded-lg border-2 border-dashed border-slate-500 bg-slate-50 p-4"
+        class="flex w-full flex-wrap items-center gap-4 rounded-lg border-2 border-dashed border-line-4 bg-page p-4"
         data-testid="add-drop-zone"
         @drop="onDrop"
       >
@@ -219,7 +219,7 @@ onUnmounted(() => {
     </div>
 
     <div v-if="imports.length" class="flex flex-col gap-2">
-      <h3 class="text-lg font-bold text-slate-700">Added to this session</h3>
+      <h3 class="text-lg font-bold text-ink-3">Added to this session</h3>
       <ul class="text-lg" data-testid="added-list">
         <li v-for="(line, i) in imports" :key="i">{{ line }}</li>
       </ul>
@@ -237,7 +237,7 @@ onUnmounted(() => {
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-title"
-        :class="[dialogBox, 'w-full max-w-3xl border-blue-700']"
+        :class="[dialogBox, 'w-full max-w-3xl border-accent']"
       >
         <h2 id="add-title" class="text-3xl font-extrabold">Add to this session</h2>
 
@@ -250,7 +250,7 @@ onUnmounted(() => {
 
         <template v-if="rejected.length">
           <ul
-            class="flex flex-col gap-2 rounded-lg border-l-8 border-red-700 bg-red-100 p-3 text-xl text-red-900"
+            class="flex flex-col gap-2 rounded-lg border-l-8 border-danger-line bg-danger-soft p-3 text-xl text-danger-ink"
             data-testid="add-rejected"
           >
             <li v-for="(r, i) in rejected" :key="i">
@@ -266,7 +266,7 @@ onUnmounted(() => {
 
         <ul
           v-if="warnings.length"
-          class="flex flex-col gap-2 rounded-lg border-l-8 border-amber-600 bg-amber-100 p-3 text-xl text-amber-950"
+          class="flex flex-col gap-2 rounded-lg border-l-8 border-warn-line bg-warn-soft p-3 text-xl text-warn-ink"
           data-testid="add-warnings"
         >
           <li v-for="w in warnings" :key="w">{{ w }}</li>
@@ -285,11 +285,7 @@ onUnmounted(() => {
           />
         </label>
 
-        <p
-          v-if="ready && clampName(clerk) === ''"
-          id="add-name-hint"
-          class="text-lg text-slate-600"
-        >
+        <p v-if="ready && clampName(clerk) === ''" id="add-name-hint" class="text-lg text-ink-4">
           Enter your name to add these.
         </p>
         <div v-if="ready" class="flex flex-wrap gap-3">

@@ -4,6 +4,7 @@ import { MAX_NAME } from "../../log/limits";
 import type { SessionSummary } from "../../store/db";
 import logoUrl from "../../../icons/icon-round.svg";
 import StartSessionForm from "../components/StartSessionForm.vue";
+import ThemeButton from "../components/ThemeButton.vue";
 import WorkstationNameForm from "../components/WorkstationNameForm.vue";
 import { field, primary, secondary, secondaryOn, tool } from "../classes";
 import { useSession } from "../session";
@@ -112,14 +113,15 @@ async function resume(id: string, form: HTMLFormElement) {
   <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
     <div class="flex flex-wrap items-center gap-4">
       <img :src="logoUrl" alt="" class="size-16" data-testid="app-logo" />
-      <h1 class="text-4xl font-extrabold text-slate-900">Offline Checkout</h1>
-      <span class="text-lg text-slate-600" data-testid="app-version">Version {{ version }}</span>
+      <h1 class="text-4xl font-extrabold text-ink">Offline Checkout</h1>
+      <span class="text-lg text-ink-4" data-testid="app-version">Version {{ version }}</span>
+      <ThemeButton class="ml-auto" />
     </div>
 
     <div
       v-if="session.notice"
       role="status"
-      class="flex flex-wrap items-center gap-4 rounded-lg border-l-8 border-blue-700 bg-blue-50 p-4 text-2xl font-semibold text-blue-900"
+      class="flex flex-wrap items-center gap-4 rounded-lg border-l-8 border-accent bg-accent-soft p-4 text-2xl font-semibold text-accent-ink"
       data-testid="notice"
     >
       <span>{{ session.notice }}</span>
@@ -137,11 +139,11 @@ async function resume(id: string, form: HTMLFormElement) {
     />
     <p
       v-else-if="named"
-      class="flex flex-wrap items-center gap-3 text-lg text-slate-700"
+      class="flex flex-wrap items-center gap-3 text-lg text-ink-3"
       data-testid="workstation"
     >
       <span
-        >Workstation: <b class="text-slate-900">{{ session.workstationName }}</b></span
+        >Workstation: <b class="text-ink">{{ session.workstationName }}</b></span
       >
       <button type="button" :class="tool" @click="renaming = true">Rename</button>
     </p>
@@ -150,11 +152,11 @@ async function resume(id: string, form: HTMLFormElement) {
       <StartSessionForm />
 
       <section
-        class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
+        class="flex flex-col gap-4 rounded-xl border-2 border-line-2 bg-surface p-5"
         aria-labelledby="join-title"
       >
         <h2 id="join-title" class="text-2xl font-bold">Join session</h2>
-        <p class="text-lg text-slate-700">
+        <p class="text-lg text-ink-3">
           Join a session already running on another workstation by scanning its pairing code.
         </p>
         <button type="button" :class="[secondary, 'mt-auto']" @click="session.screen = 'pair-join'">
@@ -165,11 +167,11 @@ async function resume(id: string, form: HTMLFormElement) {
 
     <template v-for="g in groups" :key="g.id">
       <section
-        class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
+        class="flex flex-col gap-3 rounded-xl border-2 border-line-2 bg-surface p-5"
         :aria-labelledby="`${g.id}-title`"
       >
         <h2 :id="`${g.id}-title`" class="text-2xl font-bold">{{ g.title }}</h2>
-        <p v-if="g.items.length === 0" class="text-lg text-slate-600">
+        <p v-if="g.items.length === 0" class="text-lg text-ink-4">
           No sessions are stored on this workstation.
         </p>
         <ul v-else class="flex flex-col gap-2" data-testid="resume-list">
@@ -188,20 +190,20 @@ async function resume(id: string, form: HTMLFormElement) {
                 {{ s.name }}
                 <span
                   v-if="s.closedAt !== undefined && !recentOpen"
-                  class="rounded border-2 border-slate-500 bg-slate-100 px-2 text-base font-semibold text-slate-700"
+                  class="rounded border-2 border-line-4 bg-raised px-2 text-base font-semibold text-ink-3"
                   data-testid="session-closed"
                 >
                   Closed
                 </span>
               </span>
-              <span class="flex flex-col text-lg font-normal text-slate-600">
+              <span class="flex flex-col text-lg font-normal text-ink-4">
                 <span>{{ s.employee }} · Started {{ dateTime(s.createdAt) }}</span>
                 <span v-if="s.closedAt !== undefined"> Closed {{ dateTime(s.closedAt) }} </span>
               </span>
             </button>
             <form
               v-if="expanded === s.sessionId"
-              class="flex flex-col gap-2 rounded-lg border-2 border-blue-700 bg-blue-50 p-4"
+              class="flex flex-col gap-2 rounded-lg border-2 border-accent bg-accent-soft p-4"
               :aria-label="`Resume ${s.name}`"
               data-testid="resume-form"
               @submit.prevent="resume(s.sessionId, $event.target as HTMLFormElement)"
@@ -225,7 +227,7 @@ async function resume(id: string, form: HTMLFormElement) {
               <p
                 v-if="resumeClerkError"
                 id="resume-clerk-error"
-                class="text-lg font-semibold text-red-700"
+                class="text-lg font-semibold text-danger-text"
               >
                 Enter your name to resume.
               </p>
@@ -254,19 +256,19 @@ async function resume(id: string, form: HTMLFormElement) {
 
     <section
       v-if="named && others.length > 0"
-      class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
+      class="flex flex-col gap-3 rounded-xl border-2 border-line-2 bg-surface p-5"
       aria-labelledby="others-title"
     >
       <h2 id="others-title" class="text-2xl font-bold">Other workstations</h2>
-      <p class="text-lg text-slate-600">Last activity synced to this workstation.</p>
+      <p class="text-lg text-ink-4">Last activity synced to this workstation.</p>
       <ul class="flex flex-col gap-2" data-testid="other-workstations">
         <li
           v-for="w in others"
           :key="w.deviceId"
-          class="flex flex-wrap items-baseline justify-between gap-x-4 rounded-lg border-2 border-slate-200 px-4 py-2 text-xl"
+          class="flex flex-wrap items-baseline justify-between gap-x-4 rounded-lg border-2 border-line-1 px-4 py-2 text-xl"
         >
-          <b class="text-slate-900">{{ w.name }}</b>
-          <span class="text-lg text-slate-600">{{ w.sessionName }} · {{ dateTime(w.lastAt) }}</span>
+          <b class="text-ink">{{ w.name }}</b>
+          <span class="text-lg text-ink-4">{{ w.sessionName }} · {{ dateTime(w.lastAt) }}</span>
         </li>
       </ul>
     </section>

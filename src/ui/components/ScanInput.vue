@@ -87,7 +87,7 @@ onBeforeUnmount(() => {
 
 <template>
   <label class="block">
-    <span class="mb-1 block font-semibold text-slate-700" :class="quiet ? 'text-base' : 'text-lg'">
+    <span class="mb-1 block font-semibold text-ink-3" :class="quiet ? 'text-base' : 'text-lg'">
       Scanner input
     </span>
     <input
@@ -96,11 +96,11 @@ onBeforeUnmount(() => {
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
-      class="block w-full rounded-lg bg-white px-4 font-mono text-slate-900 focus:outline-none"
+      class="block w-full rounded-lg bg-surface px-4 font-mono text-ink focus:outline-none"
       :class="
         quiet
-          ? 'min-h-11 border-2 border-slate-400 text-xl focus:border-slate-500 focus:ring-2 focus:ring-slate-300'
-          : 'min-h-14 border-4 border-blue-600 text-2xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300'
+          ? 'min-h-11 border-2 border-line-3 text-xl focus:border-line-4 focus:ring-2 focus:ring-line-2'
+          : 'min-h-14 border-4 border-accent-2 text-2xl focus:border-accent focus:ring-4 focus:ring-accent-ring'
       "
       data-testid="scan-input"
       @keydown.enter.prevent="onEnter"

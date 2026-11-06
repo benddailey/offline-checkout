@@ -14,9 +14,9 @@ onMounted(reveal);
 watch(() => props.message, reveal, { flush: "post" });
 
 const toneClass = {
-  info: "border-blue-700 bg-blue-50 text-blue-900",
-  warn: "border-amber-600 bg-amber-100 text-amber-950",
-  error: "border-red-700 bg-red-100 text-red-900",
+  info: "border-accent bg-accent-soft text-accent-ink",
+  warn: "border-warn-line bg-warn-soft text-warn-ink",
+  error: "border-danger-line bg-danger-soft text-danger-ink",
 } as const;
 </script>
 

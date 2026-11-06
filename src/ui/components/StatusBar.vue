@@ -13,6 +13,7 @@ import {
   toolOn,
 } from "../classes";
 import { useSession } from "../session";
+import ThemeButton from "./ThemeButton.vue";
 
 const session = useSession();
 
@@ -82,13 +83,13 @@ function trapTab(e: KeyboardEvent): void {
 
 <template>
   <header
-    class="flex flex-col gap-2 border-b-2 border-slate-300 bg-slate-100 px-4 py-2"
+    class="flex flex-col gap-2 border-b-2 border-line-2 bg-raised px-4 py-2"
     data-testid="status-bar"
   >
     <div class="flex flex-wrap items-center gap-x-6 gap-y-1">
-      <div class="text-lg font-bold text-slate-900">
+      <div class="text-lg font-bold text-ink">
         {{ session.meta?.name }}
-        <span class="text-lg font-semibold text-slate-800" data-testid="clerk">
+        <span class="text-lg font-semibold text-ink-2" data-testid="clerk">
           · {{ session.meta?.employee }}
         </span>
       </div>
@@ -97,20 +98,20 @@ function trapTab(e: KeyboardEvent): void {
           <span
             role="img"
             class="inline-block size-4 rounded-full"
-            :class="p.connected ? 'bg-green-600' : 'bg-red-600'"
+            :class="p.connected ? 'bg-online' : 'bg-offline'"
             :aria-label="p.connected ? 'connected' : 'disconnected'"
           ></span>
           {{ p.employee }}
           <template v-if="session.workstationNames.get(p.deviceId)">
             ({{ session.workstationNames.get(p.deviceId)?.workstation }})
           </template>
-          <span v-if="!p.connected" class="font-semibold text-red-800">not connected</span>
+          <span v-if="!p.connected" class="font-semibold text-danger-text-2">not connected</span>
         </li>
       </ul>
-      <p v-if="session.disconnected" class="text-lg font-semibold text-red-700">
+      <p v-if="session.disconnected" class="text-lg font-semibold text-danger-text">
         Disconnected — re-pair with any workstation
       </p>
-      <p class="ml-auto text-xl font-bold text-slate-900" data-testid="totals">
+      <p class="ml-auto text-xl font-bold text-ink" data-testid="totals">
         Patrons {{ session.state.totals.patrons }} · Items {{ session.state.totals.items }}
       </p>
     </div>
@@ -164,11 +165,12 @@ function trapTab(e: KeyboardEvent): void {
         >
           Exit session
         </button>
+        <ThemeButton />
       </div>
       <p
         v-if="session.lockedPatron"
         id="finish-patron"
-        class="ml-auto text-lg font-semibold text-slate-700"
+        class="ml-auto text-lg font-semibold text-ink-3"
         data-testid="finish-patron"
       >
         Finish patron {{ session.lockedPatron }} first: End patron or Void patron
@@ -188,7 +190,7 @@ function trapTab(e: KeyboardEvent): void {
         role="dialog"
         aria-modal="true"
         aria-labelledby="clerk-title"
-        :class="[dialogBox, 'w-full max-w-xl border-blue-700']"
+        :class="[dialogBox, 'w-full max-w-xl border-accent']"
         @submit.prevent="saveClerk"
       >
         <h2 id="clerk-title" class="text-3xl font-extrabold">Change clerk</h2>
@@ -206,7 +208,7 @@ function trapTab(e: KeyboardEvent): void {
             aria-describedby="change-clerk-error"
           />
         </label>
-        <p v-if="clerkError" id="change-clerk-error" class="text-lg font-semibold text-red-700">
+        <p v-if="clerkError" id="change-clerk-error" class="text-lg font-semibold text-danger-text">
           Enter your name.
         </p>
         <div class="flex flex-wrap gap-3">
@@ -221,7 +223,7 @@ function trapTab(e: KeyboardEvent): void {
         aria-modal="true"
         aria-labelledby="exit-title"
         aria-describedby="exit-text"
-        :class="[dialogBox, 'max-w-xl border-red-700']"
+        :class="[dialogBox, 'max-w-xl border-danger-line']"
       >
         <h2 id="exit-title" class="text-3xl font-extrabold">Exit session</h2>
         <p id="exit-text" class="text-xl">

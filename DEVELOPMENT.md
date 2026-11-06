@@ -19,6 +19,14 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
   Tailwind CSS 4. Buttons and text fields take their classes from `src/ui/classes.ts`. Each variant
   is complete: a second colour or size class beside one loses or wins by CSS order, not class order,
   so add a variant instead. Printed receipts use their own CSS in `src/print/`, sized in mm and pt.
+- **Themes:** screens use colour tokens from `src/style.css` (`bg-surface`, `text-ink`), never
+  Tailwind's palette; `src/ui/theme.test.ts` fails on a raw palette class. The `@theme` block is
+  Light. To add a theme, add a `[data-theme="<id>"]` block overriding the tokens that differ, and
+  an entry in `THEMES` (`src/ui/theme.ts`). Leave `code`, `camera` and `camera-ink` alone: QR codes
+  need their white margin to scan. Set `color-scheme` to match, and check that text keeps at least
+  4.5:1 contrast. The choice is per browser profile, in `localStorage` so it applies before the
+  app mounts, and isn't synced. The chooser is a button because `ScanInput` leaves focus on a
+  `<select>`, so a scan would go into it. The field probe imports the same CSS but stays Light.
 - **Toolchain:** Vite+ (`vp`, the `vite-plus` package):
   - `vp build` and `vp dev` (Vite);
   - `vp test` (Vitest, imported from `vite-plus/test`);

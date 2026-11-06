@@ -137,21 +137,21 @@ function onDrop(e: DragEvent) {
 <template>
   <div
     class="flex flex-col gap-3 rounded"
-    :class="{ 'ring-4 ring-blue-400': dragging }"
+    :class="{ 'ring-4 ring-accent-ring-2': dragging }"
     @dragover="onDragOver"
     @dragleave="dragging = false"
     @drop="onDrop"
   >
-    <div class="relative h-52 w-full overflow-hidden rounded bg-slate-900">
+    <div class="relative h-52 w-full overflow-hidden rounded bg-camera">
       <p
-        class="absolute inset-0 flex items-center justify-center text-xl text-slate-300"
+        class="absolute inset-0 flex items-center justify-center text-xl text-camera-ink"
         data-testid="camera-status"
       >
         {{ cameraError ? "No camera" : "Starting camera…" }}
       </p>
       <QrCamera :paused="paused" @detect="onDetect" @error="cameraError = true" />
     </div>
-    <p v-if="cameraError" role="alert" class="rounded bg-amber-100 p-2 text-base text-amber-900">
+    <p v-if="cameraError" role="alert" class="rounded bg-warn-soft p-2 text-base text-warn-ink-2">
       Camera unavailable. Click Allow on the camera prompt in the address bar, or paste the code
       below.
     </p>
@@ -163,18 +163,18 @@ function onDrop(e: DragEvent) {
         autocomplete="off"
         spellcheck="false"
         placeholder="Click here, then scan the barcodes"
-        class="min-h-12 w-full rounded border-2 border-slate-500 p-2 font-mono text-base font-normal focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none"
+        class="min-h-12 w-full rounded border-2 border-line-4 p-2 font-mono text-base font-normal focus:border-accent focus:ring-4 focus:ring-accent-ring focus:outline-none"
         @keydown="onScannerKey"
       />
     </label>
-    <p v-if="progress" role="status" data-testid="chunk-progress" class="text-base text-slate-800">
+    <p v-if="progress" role="status" data-testid="chunk-progress" class="text-base text-ink-2">
       {{ progress }}
     </p>
     <p
       v-if="chunkError"
       role="alert"
       data-testid="chunk-error"
-      class="rounded bg-red-100 p-2 text-base font-semibold text-red-900"
+      class="rounded bg-danger-soft p-2 text-base font-semibold text-danger-ink"
     >
       {{ chunkError }}
     </p>
@@ -191,7 +191,7 @@ function onDrop(e: DragEvent) {
       <textarea
         v-model="pasted"
         rows="2"
-        class="w-full rounded border-2 border-slate-500 p-2 font-mono text-xs"
+        class="w-full rounded border-2 border-line-4 p-2 font-mono text-xs"
       />
     </label>
     <div class="flex flex-wrap gap-3">
@@ -224,7 +224,7 @@ function onDrop(e: DragEvent) {
     <p
       v-if="fileError"
       role="alert"
-      class="rounded bg-red-100 p-2 text-base font-semibold text-red-900"
+      class="rounded bg-danger-soft p-2 text-base font-semibold text-danger-ink"
     >
       {{ fileError }}
     </p>

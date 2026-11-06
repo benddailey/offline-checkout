@@ -19,7 +19,7 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", onBeforeUnload)
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="min-h-screen bg-page text-ink">
     <StatusBar v-if="session.screen === 'scan' || session.screen === 'summary'" />
     <LaunchScreen v-if="session.screen === 'launch'" />
     <ScanScreen v-else-if="session.screen === 'scan'" />

@@ -10,7 +10,7 @@ onMounted(() => banner.value?.scrollIntoView({ block: "nearest" }));
   <div
     ref="banner"
     role="status"
-    class="rounded-lg border-4 border-red-700 bg-red-100 p-4 text-center text-3xl font-extrabold text-red-900"
+    class="rounded-lg border-4 border-danger-line bg-danger-soft p-4 text-center text-3xl font-extrabold text-danger-ink"
   >
     Session closed
   </div>

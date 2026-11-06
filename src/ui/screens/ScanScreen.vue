@@ -70,7 +70,7 @@ function printCard(format: "receipt" | "letter") {
 
     <div
       v-if="session.offerScannerCard"
-      class="flex flex-wrap items-center gap-4 rounded-lg border-2 border-slate-400 bg-slate-50 p-3"
+      class="flex flex-wrap items-center gap-4 rounded-lg border-2 border-line-3 bg-page p-3"
     >
       <p class="text-lg">
         Print the scanner card with the <b>End patron</b> and <b>Void last item</b> barcodes?
@@ -92,24 +92,24 @@ function printCard(format: "receipt" | "letter") {
 
     <section
       v-if="!session.currentVisit && session.closed"
-      class="flex min-h-64 flex-col items-center justify-center gap-2 rounded-xl border-2 border-slate-300 bg-slate-100 p-4 text-center"
+      class="flex min-h-64 flex-col items-center justify-center gap-2 rounded-xl border-2 border-line-2 bg-raised p-4 text-center"
     >
-      <p class="text-3xl font-bold text-slate-700">Scanning has stopped</p>
-      <p class="text-xl text-slate-600">Exports are on the Summary.</p>
+      <p class="text-3xl font-bold text-ink-3">Scanning has stopped</p>
+      <p class="text-xl text-ink-4">Exports are on the Summary.</p>
     </section>
 
     <section
       v-else-if="!session.currentVisit"
-      class="flex min-h-64 items-center justify-center rounded-xl border-4 border-dashed border-slate-400"
+      class="flex min-h-64 items-center justify-center rounded-xl border-4 border-dashed border-line-3"
     >
-      <p class="text-5xl font-extrabold text-slate-700">Scan patron card</p>
+      <p class="text-5xl font-extrabold text-ink-3">Scan patron card</p>
     </section>
 
     <section v-else class="flex flex-col gap-4">
       <div class="flex flex-wrap items-end gap-4">
         <div>
-          <p class="text-lg text-slate-600">Patron</p>
-          <p class="font-mono text-5xl font-extrabold text-slate-900" data-testid="patron">
+          <p class="text-lg text-ink-4">Patron</p>
+          <p class="font-mono text-5xl font-extrabold text-ink" data-testid="patron">
             {{ session.currentVisit.patron }}
           </p>
         </div>
@@ -133,10 +133,8 @@ function printCard(format: "receipt" | "letter") {
         </div>
       </div>
 
-      <p v-if="session.currentVisit.items.length === 0" class="text-2xl text-slate-600">
-        Scan items…
-      </p>
-      <ol v-else class="divide-y-2 divide-slate-200 rounded-lg border-2 border-slate-300 bg-white">
+      <p v-if="session.currentVisit.items.length === 0" class="text-2xl text-ink-4">Scan items…</p>
+      <ol v-else class="divide-y-2 divide-line-1 rounded-lg border-2 border-line-2 bg-surface">
         <li
           v-for="item in newestFirst"
           :key="item.id"
@@ -145,11 +143,11 @@ function printCard(format: "receipt" | "letter") {
         >
           <span
             class="font-mono text-2xl"
-            :class="item.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
+            :class="item.voided ? 'text-ink-5 line-through' : 'text-ink'"
           >
             {{ item.barcode }}
           </span>
-          <span v-if="item.voided" class="text-lg text-slate-500">voided</span>
+          <span v-if="item.voided" class="text-lg text-ink-5">voided</span>
           <button
             v-else
             type="button"
@@ -177,7 +175,7 @@ function printCard(format: "receipt" | "letter") {
         aria-modal="true"
         aria-labelledby="void-title"
         aria-describedby="void-text"
-        :class="[dialogBox, 'max-w-xl border-red-700']"
+        :class="[dialogBox, 'max-w-xl border-danger-line']"
       >
         <h2 id="void-title" class="text-3xl font-extrabold">Void patron</h2>
         <p id="void-text" class="text-xl">
