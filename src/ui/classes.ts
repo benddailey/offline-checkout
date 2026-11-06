@@ -32,4 +32,4 @@ export const dialogText =
   "flex min-h-24 flex-col gap-3 overflow-y-auto text-2xl focus-visible:outline-2 focus-visible:outline-blue-700";
 
 export const field =
-  "block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none";
+  "block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none aria-invalid:border-red-700 aria-invalid:focus:border-red-700 aria-invalid:focus:ring-red-300";

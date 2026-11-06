@@ -19,6 +19,7 @@ onMounted(() => {
 
 async function start() {
   clerkError.value = clerk.value.trim() === "";
+  if (clerkError.value) clerkInput.value?.focus();
   if (clerkError.value || busy.value) return;
   busy.value = true;
   try {

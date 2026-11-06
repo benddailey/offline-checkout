@@ -11,10 +11,12 @@ const session = useSession();
 const name = ref(props.initial ?? "");
 const nameError = ref(false);
 const busy = ref(false);
+const nameInput = ref<HTMLInputElement | null>(null);
 const vFocus = { mounted: (el: HTMLInputElement) => (el.focus(), el.select()) };
 
 async function save() {
   nameError.value = name.value.trim() === "";
+  if (nameError.value) nameInput.value?.focus();
   if (nameError.value || busy.value) return;
   busy.value = true;
   try {
@@ -43,6 +45,7 @@ async function save() {
       <label class="flex min-w-64 flex-1 flex-col gap-1 text-lg font-semibold">
         Workstation name
         <input
+          ref="nameInput"
           v-focus
           v-model="name"
           :class="field"

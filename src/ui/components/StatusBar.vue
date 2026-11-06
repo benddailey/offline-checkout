@@ -42,6 +42,7 @@ async function changeClerk(): Promise<void> {
 
 async function saveClerk(): Promise<void> {
   clerkError.value = clerk.value.trim() === "";
+  if (clerkError.value) clerkInput.value?.focus();
   if (clerkError.value || saving.value) return;
   saving.value = true;
   try {

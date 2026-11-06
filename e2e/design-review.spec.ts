@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { openApp, startSession } from "./helpers/app";
+import { appUrl, openApp, startSession } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { stubPrint } from "./helpers/print";
 
@@ -296,6 +296,74 @@ test.describe("pairing", () => {
       await expect(banner).toHaveText("No patron in progress");
       await a!.waitForTimeout(9_000);
       await expect(banner).toHaveText("No patron in progress");
+    } finally {
+      await Promise.all(contexts.map((c) => c.close()));
+    }
+  });
+});
+
+/** The field shows the error's colour, holds focus and names the error for screen readers. */
+async function expectFieldError(field: Locator): Promise<void> {
+  await expect(field).toBeFocused();
+  await expect(field).toHaveAttribute("aria-invalid", "true");
+  const colours = await field.evaluate((el) => {
+    const error = document.getElementById(el.getAttribute("aria-describedby")!)!;
+    return { border: getComputedStyle(el).borderTopColor, error: getComputedStyle(error).color };
+  });
+  expect(colours.border).toBe(colours.error);
+}
+
+test.describe("form errors", () => {
+  test("a missing name marks the field and moves focus to it", async ({ page }) => {
+    await page.setViewportSize(WINDOW);
+    await stubPrint(page);
+    await page.goto(appUrl());
+    const naming = page.getByTestId("workstation-form");
+    await naming.getByRole("button", { name: "Save" }).click();
+    await expectFieldError(naming.getByLabel("Workstation name"));
+    await naming.getByLabel("Workstation name").fill("Desk 1");
+    await naming.getByRole("button", { name: "Save" }).click();
+
+    const start = page.getByTestId("start-form");
+    await start.getByRole("button", { name: "Start session" }).click();
+    await expectFieldError(start.getByLabel("Clerk name"));
+    await start.getByLabel("Clerk name").fill("Ann");
+    await start.getByRole("button", { name: "Start session" }).click();
+    await page.getByRole("button", { name: "Not now" }).click();
+
+    await page.getByRole("button", { name: "Change clerk" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Change clerk" }).click();
+    await expectFieldError(dialog.getByLabel("Clerk name"));
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+
+    await page.getByRole("button", { name: "Exit session" }).click();
+    const resume = page.getByTestId("resume-form");
+    await resume.getByRole("button", { name: "Resume session" }).click();
+    await expectFieldError(resume.getByLabel("Clerk name"));
+  });
+
+  test("joining focuses the clerk field and marks it when empty", async ({ browser }) => {
+    test.setTimeout(60_000);
+    const contexts = await Promise.all([1, 2].map(() => browser.newContext()));
+    try {
+      const [a, b] = await Promise.all(contexts.map((c) => c.newPage()));
+      await stubPrint(a!);
+      await stubPrint(b!);
+      await openApp(a!, "Desk 1");
+      await openApp(b!, "Desk 2");
+      await startSession(a!, "Outage", "Ann");
+      await a!.getByRole("button", { name: "Add workstation" }).click();
+      const offer = a!.getByLabel("Join code", { exact: true });
+      await expect(offer).not.toHaveValue("", { timeout: 15_000 });
+      await b!.getByRole("button", { name: "Join session" }).click();
+      await b!.getByLabel("Pasted code").fill(await offer.inputValue());
+      await b!.getByRole("button", { name: "Use pasted code" }).click();
+      await b!.getByRole("button", { name: "Join", exact: true }).click();
+      const clerk = b!.getByLabel("Clerk name");
+      await expect(clerk).toBeFocused();
+      await b!.getByRole("button", { name: "Continue" }).click();
+      await expectFieldError(clerk);
     } finally {
       await Promise.all(contexts.map((c) => c.close()));
     }

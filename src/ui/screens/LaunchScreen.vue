@@ -94,8 +94,9 @@ async function pick(s: SessionSummary) {
   expand(expanded.value === s.sessionId ? null : s.sessionId);
 }
 
-async function resume(id: string) {
+async function resume(id: string, form: HTMLFormElement) {
   resumeClerkError.value = resumeClerk.value.trim() === "";
+  if (resumeClerkError.value) form.querySelector("input")?.focus();
   if (resumeClerkError.value || busy.value) return;
   busy.value = true;
   try {
@@ -204,7 +205,7 @@ async function resume(id: string) {
               class="flex flex-col gap-2 rounded-lg border-2 border-blue-700 bg-blue-50 p-4"
               :aria-label="`Resume ${s.name}`"
               data-testid="resume-form"
-              @submit.prevent="resume(s.sessionId)"
+              @submit.prevent="resume(s.sessionId, $event.target as HTMLFormElement)"
             >
               <div class="flex flex-wrap items-end gap-3">
                 <label class="flex min-w-64 flex-1 flex-col gap-1 text-lg font-semibold">

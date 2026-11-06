@@ -166,9 +166,13 @@ function onOffer(text: string): void {
   }
 }
 
+const clerkInput = useTemplateRef<HTMLInputElement>("clerkInput");
+const vFocus = { mounted: (el: HTMLElement) => el.focus() };
+
 async function submitName(): Promise<void> {
   const name = clerk.value.trim();
   clerkError.value = name === "";
+  if (clerkError.value) clerkInput.value?.focus();
   if (clerkError.value || phase.value !== "name") return;
   phase.value = "working";
   status.value = "Preparing the reply code…";
@@ -403,6 +407,8 @@ const step = "text-2xl font-bold text-slate-900";
       <label class="flex flex-col gap-1 text-lg font-semibold">
         Clerk name
         <input
+          ref="clerkInput"
+          v-focus
           v-model="clerk"
           :class="field"
           type="text"
