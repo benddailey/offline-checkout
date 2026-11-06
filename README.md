@@ -182,7 +182,8 @@ to the title on the start screen and on the Summary.
      blocked, so nothing opens by mistake. Prefer the Excel or Evergreen file over the CSV: Excel can
      damage barcodes in a CSV, and the app refuses a CSV saved by Excel. A PDF can't be added, because
      it has no scan times. Only files this app made can be added. An Evergreen file has no clerk
-     names, so those checkouts show no clerk.
+     names, so those checkouts are listed under a clerk named **Imported** in **By clerk**, in the
+     Clerk column of the CSV and Excel files and in the PDF.
    - **Check the preview.** Every source is shown in a preview, with its patrons and items, before
      anything changes. Enter **Your name**; it is required. Click **Add to session** to confirm.
      Adding the same source twice adds nothing new.
