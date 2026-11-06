@@ -83,6 +83,7 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     await scan(b!, "P3", "I4");
     await expect(b!.getByTestId("item")).toHaveCount(1);
     await b!.getByRole("button", { name: "Void patron" }).click();
+    await b!.getByRole("button", { name: "Yes, void patron" }).click();
     await expect(b!.getByText("Scan patron card")).toBeVisible();
 
     // A ends P1 with the scanner card's code.
@@ -113,7 +114,7 @@ test("two workstations scan, close the session and export a PDF whose barcodes d
     await expect(b!.getByText("Session closed", { exact: true })).toBeVisible({ timeout: 5_000 });
     await scan(b!, "P9");
     await expect(b!.getByTestId("message")).toHaveText("Session closed");
-    await expect(b!.getByText("Scan patron card")).toBeVisible();
+    await expect(b!.getByText("Scanning has stopped")).toBeVisible();
     await expect(b!.getByTestId("totals")).toHaveText("Patrons 2 · Items 3");
 
     // B's summary shows the whole session and still exports the PDF.

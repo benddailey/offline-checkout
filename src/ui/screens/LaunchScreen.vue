@@ -5,7 +5,9 @@ import type { SessionSummary } from "../../store/db";
 import logoUrl from "../../../icons/icon-round.svg";
 import StartSessionForm from "../components/StartSessionForm.vue";
 import WorkstationNameForm from "../components/WorkstationNameForm.vue";
+import { field, primary, secondary, secondaryOn, tool } from "../classes";
 import { useSession } from "../session";
+import { dateTime } from "../when";
 import { otherWorkstations, type OtherWorkstation } from "../workstations";
 
 /** An open session with no records for this long is not expanded, nor are its workstations listed. */
@@ -93,8 +95,9 @@ async function pick(s: SessionSummary) {
   expand(expanded.value === s.sessionId ? null : s.sessionId);
 }
 
-async function resume(id: string) {
+async function resume(id: string, form: HTMLFormElement) {
   resumeClerkError.value = resumeClerk.value.trim() === "";
+  if (resumeClerkError.value) form.querySelector("input")?.focus();
   if (resumeClerkError.value || busy.value) return;
   busy.value = true;
   try {
@@ -103,13 +106,6 @@ async function resume(id: string) {
     busy.value = false;
   }
 }
-
-const field =
-  "block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none";
-const primary =
-  "min-h-12 rounded-lg border-2 border-blue-800 bg-blue-700 px-6 text-xl font-semibold text-white hover:bg-blue-800 disabled:opacity-50";
-const secondary =
-  "min-h-12 rounded-lg border-2 border-slate-700 bg-white px-6 text-xl font-semibold text-slate-900 hover:bg-slate-100 disabled:opacity-50";
 </script>
 
 <template>
@@ -147,9 +143,7 @@ const secondary =
       <span
         >Workstation: <b class="text-slate-900">{{ session.workstationName }}</b></span
       >
-      <button type="button" :class="[secondary, 'min-h-10 px-4 text-lg']" @click="renaming = true">
-        Rename
-      </button>
+      <button type="button" :class="tool" @click="renaming = true">Rename</button>
     </p>
 
     <div v-if="named && !recentOpen" class="grid gap-6 md:grid-cols-2">
@@ -163,7 +157,7 @@ const secondary =
         <p class="text-lg text-slate-700">
           Join a session already running on another workstation by scanning its pairing code.
         </p>
-        <button type="button" :class="secondary" @click="session.screen = 'pair-join'">
+        <button type="button" :class="[secondary, 'mt-auto']" @click="session.screen = 'pair-join'">
           Join session
         </button>
       </section>
@@ -183,9 +177,8 @@ const secondary =
             <button
               type="button"
               :class="[
-                secondary,
+                expanded === s.sessionId ? secondaryOn : secondary,
                 'flex w-full flex-wrap items-center justify-between gap-x-4 py-2 text-left',
-                expanded === s.sessionId ? 'border-blue-700 bg-blue-50' : '',
               ]"
               :disabled="busy"
               :aria-expanded="s.closedAt === undefined ? expanded === s.sessionId : undefined"
@@ -202,10 +195,8 @@ const secondary =
                 </span>
               </span>
               <span class="flex flex-col text-lg font-normal text-slate-600">
-                <span>{{ s.employee }} · Started {{ new Date(s.createdAt).toLocaleString() }}</span>
-                <span v-if="s.closedAt !== undefined">
-                  Closed {{ new Date(s.closedAt).toLocaleString() }}
-                </span>
+                <span>{{ s.employee }} · Started {{ dateTime(s.createdAt) }}</span>
+                <span v-if="s.closedAt !== undefined"> Closed {{ dateTime(s.closedAt) }} </span>
               </span>
             </button>
             <form
@@ -213,7 +204,7 @@ const secondary =
               class="flex flex-col gap-2 rounded-lg border-2 border-blue-700 bg-blue-50 p-4"
               :aria-label="`Resume ${s.name}`"
               data-testid="resume-form"
-              @submit.prevent="resume(s.sessionId)"
+              @submit.prevent="resume(s.sessionId, $event.target as HTMLFormElement)"
             >
               <div class="flex flex-wrap items-end gap-3">
                 <label class="flex min-w-64 flex-1 flex-col gap-1 text-lg font-semibold">
@@ -247,7 +238,7 @@ const secondary =
         <div class="flex flex-wrap gap-4">
           <button
             type="button"
-            :class="[secondary, showStart ? 'border-blue-700 bg-blue-50' : '']"
+            :class="showStart ? secondaryOn : secondary"
             :aria-expanded="showStart"
             @click="toggleStart"
           >
@@ -275,9 +266,7 @@ const secondary =
           class="flex flex-wrap items-baseline justify-between gap-x-4 rounded-lg border-2 border-slate-200 px-4 py-2 text-xl"
         >
           <b class="text-slate-900">{{ w.name }}</b>
-          <span class="text-lg text-slate-600"
-            >{{ w.sessionName }} · {{ new Date(w.lastAt).toLocaleString() }}</span
-          >
+          <span class="text-lg text-slate-600">{{ w.sessionName }} · {{ dateTime(w.lastAt) }}</span>
         </li>
       </ul>
     </section>

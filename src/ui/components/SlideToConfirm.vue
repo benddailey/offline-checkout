@@ -80,7 +80,7 @@ function onBlur() {
       aria-valuemax="100"
       :aria-valuenow="Math.round(value)"
       :aria-valuetext="`${props.label}, ${Math.round(value)}%`"
-      class="absolute inset-y-0 flex min-h-12 w-16 cursor-grab touch-none items-center justify-center rounded-md border-2 border-red-800 bg-red-700 text-xl font-semibold text-white focus:outline-2 focus:outline-offset-2 focus:outline-red-900"
+      class="absolute inset-y-0 flex w-16 cursor-grab touch-none items-center justify-center rounded-md border-2 border-red-800 bg-red-700 text-xl font-semibold text-white focus:outline-2 focus:outline-offset-2 focus:outline-red-900"
       :class="{ 'cursor-grabbing': dragging, 'transition-[left] duration-150': !dragging }"
       :style="{ left: `calc(${value / 100} * (100% - 4rem))` }"
       @pointerdown="onPointerDown"
@@ -90,7 +90,18 @@ function onBlur() {
       @keydown="onKeydown"
       @blur="onBlur"
     >
-      <span aria-hidden="true">&rarr;</span>
+      <svg
+        aria-hidden="true"
+        class="size-6"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M4 12h16M14 6l6 6-6 6" />
+      </svg>
     </div>
   </div>
 </template>

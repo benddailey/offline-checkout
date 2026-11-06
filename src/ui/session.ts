@@ -99,6 +99,7 @@ export function setSessionDeps(deps: SessionDeps): void {
 }
 
 /** How long deleteSession waits for connected workstations to confirm. */
+const BRIEF_MESSAGE_MS = 8_000;
 export const DELETE_REPLY_MS = 3_000;
 /** How long a deleted workstation keeps its mesh open for its `deleted` reply to get out. */
 export const DELETED_LINGER_MS = 1_000;
@@ -189,6 +190,17 @@ export const useSession = defineStore("session", () => {
         .sort((a, b) => a.employee.localeCompare(b.employee) || (a.deviceId < b.deviceId ? -1 : 1));
     },
   );
+  /** Each device's workstation name, from its latest record that has one. */
+  const workstationNames = computed(() => {
+    const latest = new Map<string, LogRecord>();
+    if (peers.value.length === 0) return latest;
+    for (const r of records.value) {
+      if (r.workstation === undefined || r.imported) continue;
+      const prev = latest.get(r.deviceId);
+      if (!prev || r.seq > prev.seq) latest.set(r.deviceId, r);
+    }
+    return latest;
+  });
   const currentVisit = computed<VisitState | null>(() => {
     const id = currentVisitId.value;
     if (id === null) return null;
@@ -657,6 +669,15 @@ export const useSession = defineStore("session", () => {
         : null;
   }
 
+  /** For news that goes stale, such as a connection the status bar then tracks by itself. */
+  function showBriefly(m: Message): void {
+    message.value = m;
+    const shown = message.value;
+    setTimeout(() => {
+      if (message.value === shown) message.value = null;
+    }, BRIEF_MESSAGE_MS);
+  }
+
   function voidRecord(id: RecordId): Promise<void> {
     return enqueue(async () => {
       if (closed.value) {
@@ -989,12 +1010,14 @@ export const useSession = defineStore("session", () => {
     othersInProgress,
     closed,
     notConnected,
+    workstationNames,
     startSession,
     leaveSession,
     resumeSession,
     changeClerk,
     toolbarDialog,
     scan,
+    showBriefly,
     voidRecord,
     endPatron,
     voidPatron,

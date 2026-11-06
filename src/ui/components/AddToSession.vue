@@ -13,9 +13,11 @@ import type { ImportSource } from "../../import/plan";
 import type { FileRejection, FileSource } from "../../import/rows";
 import { MAX_NAME, clampName } from "../../log/limits";
 import type { SessionSummary } from "../../store/db";
+import { dialogBox, dialogOverlay, field, primary, secondary } from "../classes";
 import { trapTab } from "../focus-trap";
 import { importLine, previewWarnings, sourceHeading, sourceLine } from "../import-preview";
 import { useSession } from "../session";
+import { dateTime } from "../when";
 
 const session = useSession();
 
@@ -166,16 +168,11 @@ onUnmounted(() => {
   window.removeEventListener("drop", blockFileDrop);
   session.toolbarDialog = false;
 });
-
-const button =
-  "min-h-12 rounded-lg border-2 px-5 text-xl font-semibold disabled:cursor-not-allowed disabled:opacity-40";
-const primary = `${button} border-blue-800 bg-blue-700 text-white hover:bg-blue-800 disabled:hover:bg-blue-700`;
-const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-slate-100 disabled:hover:bg-white`;
 </script>
 
 <template>
   <section class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5">
-    <h2 class="text-2xl font-bold">Add to this session</h2>
+    <h2 class="text-xl font-bold">Add to this session</h2>
 
     <div class="flex flex-col items-start gap-2" data-testid="other-sessions">
       <h3 class="text-lg font-bold text-slate-700">Add another session</h3>
@@ -191,7 +188,7 @@ const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-s
           >
             {{ s.name }}
             <span class="font-normal text-slate-600">
-              · Started {{ new Date(s.createdAt).toLocaleString() }} ·
+              · Started {{ dateTime(s.createdAt) }} ·
               {{ s.closedAt === undefined ? "open" : "closed" }}
             </span>
           </button>
@@ -230,7 +227,7 @@ const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-s
 
     <div
       v-if="sources"
-      class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6 outline-none"
+      :class="dialogOverlay"
       tabindex="-1"
       @keydown.esc="dismiss"
       @keydown.tab="trapTab(dialog, $event)"
@@ -240,7 +237,7 @@ const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-s
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-title"
-        class="flex max-h-[90vh] w-full max-w-3xl flex-col gap-4 overflow-y-auto rounded-xl border-4 border-blue-700 bg-white p-6"
+        :class="[dialogBox, 'w-full max-w-3xl border-blue-700']"
       >
         <h2 id="add-title" class="text-3xl font-extrabold">Add to this session</h2>
 
@@ -263,7 +260,7 @@ const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-s
           <p v-if="ready" class="text-xl font-semibold">The other files can still be added.</p>
         </template>
 
-        <p v-if="nothingNew" class="text-2xl font-semibold" data-testid="add-nothing-new">
+        <p v-if="nothingNew" class="text-xl font-semibold" data-testid="add-nothing-new">
           Nothing new to add. Everything here is already in this session.
         </p>
 
@@ -280,7 +277,7 @@ const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-s
           <input
             ref="nameInput"
             v-model="clerk"
-            class="block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none"
+            :class="field"
             type="text"
             autocomplete="off"
             aria-required="true"
@@ -288,11 +285,19 @@ const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-s
           />
         </label>
 
+        <p
+          v-if="ready && clampName(clerk) === ''"
+          id="add-name-hint"
+          class="text-lg text-slate-600"
+        >
+          Enter your name to add these.
+        </p>
         <div v-if="ready" class="flex flex-wrap gap-3">
           <button
             type="button"
             :class="primary"
             :disabled="clampName(clerk) === '' || adding"
+            :aria-describedby="clampName(clerk) === '' ? 'add-name-hint' : undefined"
             @click="add"
           >
             Add to session

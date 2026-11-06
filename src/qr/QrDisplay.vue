@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { ref, useTemplateRef, watchEffect } from "vue";
 import { pairingFileText, saveTextFile, type CodeLabel } from "../pairing/file";
 import { printErrorText, printPairingCode } from "../print/pairing-receipt";
+import { secondary } from "../ui/classes";
 
 const props = defineProps<{
   text: string;
@@ -16,6 +17,7 @@ const props = defineProps<{
 const dataUrl = ref("");
 const copied = ref(false);
 const area = useTemplateRef<HTMLTextAreaElement>("area");
+const textBox = useTemplateRef<HTMLDetailsElement>("textBox");
 
 watchEffect(async (onCleanup) => {
   let stale = false;
@@ -32,6 +34,8 @@ async function copy() {
   try {
     await navigator.clipboard.writeText(props.text);
   } catch {
+    // select() does nothing inside a closed <details>.
+    if (textBox.value) textBox.value.open = true;
     area.value?.select();
     document.execCommand("copy");
   }
@@ -77,38 +81,17 @@ function print() {
       v-if="dataUrl"
       :src="dataUrl"
       :alt="`QR code: ${label}`"
-      class="aspect-square w-full max-w-[min(60vh,420px)] bg-white [image-rendering:pixelated]"
+      class="aspect-square w-full max-w-[min(50vh,420px)] bg-white [image-rendering:pixelated]"
     />
-    <label class="flex w-full flex-col gap-1 text-base font-semibold">
-      {{ label }}
-      <textarea
-        ref="area"
-        readonly
-        rows="4"
-        :value="text"
-        class="w-full rounded border-2 border-slate-500 p-2 font-mono text-xs break-all"
-        @focus="area?.select()"
-      />
-    </label>
     <div class="flex flex-wrap justify-center gap-3">
-      <button
-        type="button"
-        class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
-        @click="copy"
-      >
+      <button type="button" :class="secondary" @click="copy">
         {{ copied ? "Copied" : "Copy" }}
       </button>
-      <button
-        type="button"
-        class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
-        @click="print"
-      >
-        Print code
-      </button>
+      <button type="button" :class="secondary" @click="print">Print code</button>
       <button
         v-if="fileName"
         type="button"
-        class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
+        :class="secondary"
         title="Save the code as a temporary file on a shared network drive or flash drive, then load it on the other workstation. Delete the file after pairing."
         @click="save"
       >
@@ -118,5 +101,19 @@ function print() {
     <p v-if="printError" role="alert" class="rounded bg-amber-100 p-2 text-base text-amber-900">
       {{ printError }}
     </p>
+    <details ref="textBox" class="w-full text-base">
+      <summary class="cursor-pointer font-semibold text-slate-700">Show the code as text</summary>
+      <label class="mt-2 flex flex-col gap-1 font-semibold">
+        {{ label }}
+        <textarea
+          ref="area"
+          readonly
+          rows="4"
+          :value="text"
+          class="w-full rounded border-2 border-slate-500 p-2 font-mono text-xs break-all"
+          @focus="area?.select()"
+        />
+      </label>
+    </details>
   </div>
 </template>

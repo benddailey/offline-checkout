@@ -2,10 +2,11 @@
 import { onBeforeUnmount, onMounted, useTemplateRef, watch } from "vue";
 
 /**
+ * `quiet`: on a screen where scanning isn't the main job; it works the same but draws less attention.
  * `paused`: a modal dialog owns focus. Scanner keystrokes outside text fields are dropped (so a
  * scan's Enter never presses a dialog button) and focus is not taken back until it closes.
  */
-const props = defineProps<{ paused?: boolean }>();
+const props = defineProps<{ paused?: boolean; quiet?: boolean }>();
 const emit = defineEmits<{ scan: [value: string] }>();
 const input = useTemplateRef<HTMLInputElement>("input");
 
@@ -86,14 +87,21 @@ onBeforeUnmount(() => {
 
 <template>
   <label class="block">
-    <span class="mb-1 block text-lg font-semibold text-slate-700">Scanner input</span>
+    <span class="mb-1 block font-semibold text-slate-700" :class="quiet ? 'text-base' : 'text-lg'">
+      Scanner input
+    </span>
     <input
       ref="input"
       type="text"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
-      class="block min-h-14 w-full rounded-lg border-4 border-blue-600 bg-white px-4 font-mono text-2xl text-slate-900 focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none"
+      class="block w-full rounded-lg bg-white px-4 font-mono text-slate-900 focus:outline-none"
+      :class="
+        quiet
+          ? 'min-h-11 border-2 border-slate-400 text-xl focus:border-slate-500 focus:ring-2 focus:ring-slate-300'
+          : 'min-h-14 border-4 border-blue-600 text-2xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300'
+      "
       data-testid="scan-input"
       @keydown.enter.prevent="onEnter"
       @blur="refocusSoon"
