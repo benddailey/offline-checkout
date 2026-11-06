@@ -28,6 +28,7 @@ function fakeDb() {
   const logs = new Map<string, LogRecord[]>();
   const locks = new Set<string>();
   let failAppends = false;
+  let failImport = false;
   let failSetEmployee = false;
   let failMeta = false;
   const closes = new Map<string, number>();
@@ -85,6 +86,28 @@ function fakeDb() {
         );
         log.push(...fresh);
         return fresh;
+      },
+      async importRecords(records, audits) {
+        if (failImport) throw new Error("QuotaExceededError");
+        const fresh = records.filter(
+          (r) =>
+            r.sessionId === sessionId &&
+            r.deviceId !== meta.deviceId &&
+            !log.some((l) => recordId(l) === recordId(r)),
+        );
+        const written = audits.map(
+          (a) =>
+            ({
+              sessionId,
+              deviceId: meta.deviceId,
+              seq: meta.nextSeq++,
+              employee: a.employee,
+              at: clock(meta.nextSeq),
+              ...a.body,
+            }) as LogRecord,
+        );
+        log.push(...fresh, ...written);
+        return [...fresh, ...written];
       },
       all: async () => [...log],
       since: async (theirs: VersionVector) => missingFor(log, theirs),
@@ -198,6 +221,9 @@ function fakeDb() {
     },
     failAppends(v: boolean) {
       failAppends = v;
+    },
+    failImport(v: boolean) {
+      failImport = v;
     },
     failPrint(v: boolean) {
       failPrint = v;
