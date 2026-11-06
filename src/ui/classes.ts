@@ -21,6 +21,8 @@ export const dangerOutline = `${large} ${redOutline}`;
 export const success = `${large} ${green}`;
 export const tool = `${small} ${white}`;
 export const toolDanger = `${small} ${redOutline}`;
+/** Repeats on every scanned row, so it stays quiet until pointed at. */
+export const rowVoid = `${base} min-h-9 border-slate-400 bg-white px-3 text-base text-slate-700 hover:border-red-700 hover:bg-red-50 hover:text-red-800 disabled:hover:border-slate-400 disabled:hover:bg-white disabled:hover:text-slate-700`;
 
 export const dialogOverlay =
   "fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6";

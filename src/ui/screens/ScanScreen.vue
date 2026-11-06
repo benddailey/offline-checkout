@@ -8,7 +8,7 @@ import {
   primary,
   secondary,
   success,
-  toolDanger,
+  rowVoid,
 } from "../classes";
 import MessageBanner from "../components/MessageBanner.vue";
 import ScanInput from "../components/ScanInput.vue";
@@ -58,7 +58,7 @@ function printCard(format: "receipt" | "letter") {
 </script>
 
 <template>
-  <main class="mx-auto flex w-full max-w-5xl flex-col gap-3 p-4">
+  <main class="mx-auto flex w-full max-w-5xl flex-col gap-3 px-6 py-4">
     <SessionClosedBanner v-if="session.closed" />
 
     <div
@@ -133,12 +133,12 @@ function printCard(format: "receipt" | "letter") {
         <li
           v-for="item in newestFirst"
           :key="item.id"
-          class="flex items-center gap-4 px-4 py-1"
+          class="flex min-h-11 items-center gap-4 px-4 py-1"
           data-testid="item"
         >
           <span
             class="font-mono text-2xl"
-            :class="item.voided ? 'text-slate-400 line-through' : 'text-slate-900'"
+            :class="item.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
           >
             {{ item.barcode }}
           </span>
@@ -146,7 +146,7 @@ function printCard(format: "receipt" | "letter") {
           <button
             v-else
             type="button"
-            :class="[toolDanger, 'ml-auto']"
+            :class="[rowVoid, 'ml-auto']"
             :disabled="session.closed"
             :aria-label="`Void ${item.barcode}`"
             @click="session.voidRecord(item.id)"

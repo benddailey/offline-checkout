@@ -396,3 +396,72 @@ test.describe("start page", () => {
     await expect(page.getByTestId("resume-list")).toContainText(/\d:\d\d/);
   });
 });
+
+/** WCAG contrast of an element's text against white. */
+async function contrastOnWhite(el: Locator): Promise<number> {
+  return el.evaluate((node) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    ctx.fillStyle = getComputedStyle(node).color;
+    ctx.fillRect(0, 0, 1, 1);
+    const channel = (v: number) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    const l = 0.2126 * channel(r!) + 0.7152 * channel(g!) + 0.0722 * channel(b!);
+    return 1.05 / (l + 0.05);
+  });
+}
+
+test.describe("scan rows", () => {
+  test("rows are compact and the same height, voided or not", async ({ page }) => {
+    await ready(page);
+    await scan(page, "P1", "I1", "I2", "I3");
+    await expect(page.getByTestId("item")).toHaveCount(3);
+    await page.getByRole("button", { name: "Void I2" }).click();
+    await expect(page.getByText("voided")).toBeVisible();
+    const heights = await page
+      .getByTestId("item")
+      .evaluateAll((rows) => rows.map((r) => r.clientHeight));
+    expect(new Set(heights).size).toBe(1);
+    expect(heights[0]).toBeLessThanOrEqual(44);
+  });
+
+  test("row Void buttons are quiet beside Void patron", async ({ page }) => {
+    await ready(page);
+    await scan(page, "P1", "I1");
+    const row = page.getByRole("button", { name: "Void I1" });
+    const patron = page.getByRole("button", { name: "Void patron" });
+    const colour = (el: Locator) => el.evaluate((n) => getComputedStyle(n).color);
+    expect(await colour(row)).not.toBe(await colour(patron));
+  });
+
+  test("voided text is readable on both screens", async ({ page }) => {
+    await ready(page);
+    await scan(page, "P1", "I1", "I2");
+    await page.getByRole("button", { name: "Void I2" }).click();
+    const onScan = page.getByTestId("item").filter({ hasText: "voided" }).locator("span").first();
+    await expect(onScan).toHaveClass(/line-through/);
+    expect(await contrastOnWhite(onScan)).toBeGreaterThanOrEqual(4.5);
+    await scan(page, "OC-END");
+    await page.getByRole("button", { name: "Summary" }).click();
+    const onSummary = page.getByTestId("summary-patron").locator(".line-through").first();
+    expect(await contrastOnWhite(onSummary)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+test("every screen's content starts at the same left edge", async ({ page }) => {
+  await ready(page);
+  const left = async (el: Locator) => (await el.boundingBox())!.x;
+  const onScan = await left(page.getByLabel("Scanner input"));
+  await page.getByRole("button", { name: "Summary" }).click();
+  await page.getByRole("heading", { name: "Session summary" }).waitFor();
+  expect(await left(page.getByLabel("Scanner input"))).toBe(onScan);
+  await page.getByRole("button", { name: "Add workstation" }).click();
+  expect(await left(page.getByRole("heading", { name: "Add workstation" }))).toBe(onScan);
+  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Exit session" }).click();
+  expect(await left(page.getByTestId("workstation"))).toBe(onScan);
+});

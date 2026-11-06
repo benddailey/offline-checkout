@@ -116,7 +116,7 @@ function onScan(code: string): void {
 </script>
 
 <template>
-  <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
+  <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-4">
     <SessionClosedBanner v-if="session.closed" />
 
     <div class="flex flex-wrap items-center gap-4">
@@ -262,7 +262,7 @@ function onScan(code: string): void {
           <div class="flex flex-wrap items-baseline gap-x-4">
             <span
               class="font-mono text-2xl font-bold"
-              :class="p.voided ? 'text-slate-400 line-through' : 'text-slate-900'"
+              :class="p.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
             >
               {{ p.patron }}
             </span>
@@ -276,7 +276,7 @@ function onScan(code: string): void {
               v-for="r in p.rows"
               :key="r.id"
               class="font-mono text-xl"
-              :class="r.voided ? 'text-slate-400 line-through' : 'text-slate-900'"
+              :class="r.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
             >
               {{ r.barcode }}
             </li>
