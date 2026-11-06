@@ -8,6 +8,7 @@ import {
   type NumberedRow,
 } from "./rows";
 import { parseXacts } from "./xacts";
+import { parseXlsx } from "./xlsx";
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -49,7 +50,6 @@ export function readImportFile(
 ): FileSource | FileRejection {
   const unknown = reject(name, "This isn't a file exported by Offline Checkout.");
   if (bytes.length > MAX_FILE_BYTES) return reject(name, "This file is over 50 MB.");
-  if (startsWith(bytes, [0x50, 0x4b, 0x03, 0x04])) return unknown;
   if (startsWith(bytes, [0x25, 0x50, 0x44, 0x46])) {
     return reject(
       name,
@@ -57,10 +57,14 @@ export function readImportFile(
     );
   }
   try {
-    const text = new TextDecoder().decode(bytes);
+    const zip = startsWith(bytes, [0x50, 0x4b, 0x03, 0x04]);
+    const text = zip ? "" : new TextDecoder().decode(bytes);
     let format: FileFormat;
     let rows: NumberedRow[];
-    if (text.startsWith("{")) {
+    if (zip) {
+      format = "xlsx";
+      rows = parseXlsx(bytes);
+    } else if (text.startsWith("{")) {
       format = "xacts";
       rows = parseXacts(text);
     } else if (isCsvHeader(text)) {
