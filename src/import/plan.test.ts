@@ -237,6 +237,15 @@ describe("files", () => {
     expect(alone.records.map((r) => r.at)).toEqual([NOW, NOW]);
   });
 
+  it("ignores a blank-item row's own later time", () => {
+    const p = plan([file("a.csv", [row("P1", "I1", 2000), row("P2", "", 8000)])]);
+    const blank = p.records.filter((r) => r.seq > 3);
+    expect(blank.map((r) => [r.type, r.at])).toEqual([
+      ["patron-started", 2000],
+      ["patron-ended", 2000],
+    ]);
+  });
+
   it("clamps long clerk, workstation and file names", () => {
     const long = "x".repeat(MAX_NAME + 50);
     const p = plan([

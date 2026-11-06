@@ -166,7 +166,7 @@ function planFile(
       continue;
     }
     const rows = visits.get(row.patron) ?? [];
-    rows.push({ row, at: row.scannedAt ?? earliest });
+    rows.push({ row, at: row.item === "" ? earliest : (row.scannedAt ?? earliest) });
     visits.set(row.patron, rows);
   }
   if (visits.size === 0) return { records: [], alreadyHere, voidedHere };
