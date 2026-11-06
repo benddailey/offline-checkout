@@ -1,7 +1,17 @@
 <script setup lang="ts">
+import { onMounted, useTemplateRef, watch } from "vue";
 import type { Message } from "../session";
 
-defineProps<{ message: Message }>();
+const props = defineProps<{ message: Message }>();
+const banner = useTemplateRef<HTMLElement>("banner");
+
+/** A new message may be the only sign that something failed, so it never appears off screen. */
+function reveal(): void {
+  banner.value?.scrollIntoView({ block: "nearest" });
+}
+
+onMounted(reveal);
+watch(() => props.message, reveal, { flush: "post" });
 
 const toneClass = {
   info: "border-blue-700 bg-blue-50 text-blue-900",
@@ -12,6 +22,7 @@ const toneClass = {
 
 <template>
   <div
+    ref="banner"
     role="alert"
     class="rounded-lg border-l-8 p-3 text-2xl font-semibold"
     :class="toneClass[message.tone]"

@@ -368,6 +368,66 @@ test("a slow click on a session below the fold lands, and the result shows at th
   await expect(page.getByTestId("message")).toBeInViewport();
 });
 
+/** Scroll so `name` sits at the top of the window, with the banners' place above it off screen. */
+async function scrollToButton(page: Page, name: string): Promise<void> {
+  await page.getByRole("button", { name }).evaluate((el) => {
+    window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 10);
+  });
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(300);
+}
+
+test("an export failure on a scrolled Summary shows its banner, every time", async ({ page }) => {
+  await stubPrint(page);
+  await openApp(page);
+  await startSession(page, "Saturday", "Bob");
+  await scan(page, "P1", "I1", "OC-END");
+  await expect(page.getByTestId("totals")).toHaveText("Patrons 1 · Items 1");
+  await toSummary(page);
+  await page.evaluate(() => {
+    URL.createObjectURL = () => {
+      throw new Error("no memory");
+    };
+  });
+
+  const banner = page.getByTestId("message");
+  for (let i = 0; i < 2; i++) {
+    await scrollToButton(page, "Download for Evergreen");
+    await page.getByRole("button", { name: "Download for Evergreen" }).click();
+    await expect(banner).toHaveText("Could not create the Evergreen file");
+    await expect(banner).toBeInViewport();
+  }
+});
+
+test("closing a scrolled Summary shows the Session closed banner", async ({ page }) => {
+  await stubPrint(page);
+  await openApp(page);
+  await startSession(page, "Saturday", "Bob");
+  await toSummary(page);
+  await scrollToButton(page, "Close session");
+  await page.getByRole("button", { name: "Close session" }).click();
+  await page.getByRole("button", { name: "Yes, close session" }).click();
+  await expect(page.getByText("Session closed", { exact: true })).toBeInViewport();
+});
+
+test("a message on a scrolled scan screen comes into view", async ({ page }) => {
+  await stubPrint(page);
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await openApp(page);
+  await startSession(page, "Saturday", "Bob");
+  await scan(page, "P1", ...Array.from({ length: 12 }, (_, i) => `I${i + 1}`));
+  await expect(page.getByTestId("item")).toHaveCount(12);
+
+  // Only the scan's Enter is left to arrive, so typing doesn't scroll the input back into view.
+  await page.keyboard.type("I1");
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(300);
+  await page.keyboard.press("Enter");
+
+  const banner = page.getByTestId("message");
+  await expect(banner).toHaveText("Already on this patron — not added");
+  await expect(banner).toBeInViewport();
+});
+
 test("a session that can't be read gives an error and opens no preview", async ({ page }) => {
   await fridayThen(page, "Saturday");
   await toSummary(page);

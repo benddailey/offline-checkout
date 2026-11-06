@@ -61,11 +61,6 @@ async function reload(): Promise<void> {
   }
 }
 
-/** The banner is at the top of the Summary, and this card is below the fold. */
-function showBanner(): void {
-  window.scrollTo(0, 0);
-}
-
 function focusFirst(): void {
   (nameInput.value ?? closeButton.value)?.focus();
 }
@@ -107,7 +102,6 @@ async function chooseSession(summary: SessionSummary): Promise<void> {
       tone: "error",
       text: `Could not read that session (${summary.name}), so nothing was added. It may have been deleted.`,
     };
-    showBanner();
     void reload();
   } finally {
     loading.value = false;
@@ -150,10 +144,7 @@ async function add(): Promise<void> {
     const added = await session.addToSession(sources.value, clerk.value);
     if (!alive) return;
     // Not added, yet still something new: it failed, and the banner behind the dialog says why.
-    if (added || ready.value) {
-      closePreview();
-      showBanner();
-    }
+    if (added || ready.value) closePreview();
   } finally {
     adding.value = false;
   }
