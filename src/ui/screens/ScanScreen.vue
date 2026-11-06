@@ -133,7 +133,7 @@ function printCard(format: "receipt" | "letter") {
         <li
           v-for="item in newestFirst"
           :key="item.id"
-          class="flex min-h-11 items-center gap-4 px-4 py-1"
+          class="flex min-h-11.5 items-center gap-4 px-4 py-1"
           data-testid="item"
         >
           <span

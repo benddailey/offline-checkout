@@ -424,9 +424,9 @@ test.describe("scan rows", () => {
     await expect(page.getByText("voided")).toBeVisible();
     const heights = await page
       .getByTestId("item")
-      .evaluateAll((rows) => rows.map((r) => r.clientHeight));
+      .evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height));
     expect(new Set(heights).size).toBe(1);
-    expect(heights[0]).toBeLessThanOrEqual(44);
+    expect(heights[0]).toBeLessThanOrEqual(46);
   });
 
   test("row Void buttons are quiet beside Void patron", async ({ page }) => {
