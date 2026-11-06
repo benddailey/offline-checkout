@@ -9,6 +9,7 @@ const RECORD_ID = /^[0-9a-z]{10}:[1-9][0-9]*$/;
 
 const isStr = (v: unknown): v is string => typeof v === "string";
 const isName = (v: unknown): v is string => isStr(v) && v.length <= MAX_NAME;
+const isCount = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0;
 const isRecordId = (v: unknown): v is string => isStr(v) && RECORD_ID.test(v);
 /** A barcode the PDF can print: BARCODE_TEXT, not a control code, not absurdly long. */
 const isBarcode = (v: unknown): v is string =>
@@ -33,7 +34,8 @@ export function isLogRecord(x: unknown): x is LogRecord {
     !Number.isInteger(r.seq) ||
     r.seq <= 0 ||
     typeof r.at !== "number" ||
-    !Number.isFinite(r.at)
+    !Number.isFinite(r.at) ||
+    (r.imported !== undefined && r.imported !== true)
   ) {
     return false;
   }
@@ -52,6 +54,15 @@ export function isLogRecord(x: unknown): x is LogRecord {
       return true;
     case "exported":
       return r.kind === "pdf" || r.kind === "csv" || r.kind === "xlsx" || r.kind === "xacts";
+    case "imported":
+      return (
+        (r.source === "session" || r.source === "file") &&
+        isName(r.name) &&
+        isCount(r.patrons) &&
+        isCount(r.items)
+      );
+    case "import-gap":
+      return true;
     default:
       return false;
   }

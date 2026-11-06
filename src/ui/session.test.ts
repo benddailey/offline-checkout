@@ -6,6 +6,8 @@ import { isLogRecord } from "../log/validate";
 import type { LogRecord, RecordBody, VersionVector } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
 import type { Mesh, MeshOptions, PeerInfo } from "../mesh/mesh";
+import type { FileSource } from "../import/rows";
+import { sessionSource } from "../import/session";
 import { encodePayload, type PairingPayload } from "../pairing/payload";
 import type { VisitReceipt } from "../print/receipt";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
@@ -28,6 +30,7 @@ function fakeDb() {
   const logs = new Map<string, LogRecord[]>();
   const locks = new Set<string>();
   let failAppends = false;
+  let failImport = false;
   let failSetEmployee = false;
   let failMeta = false;
   const closes = new Map<string, number>();
@@ -86,6 +89,28 @@ function fakeDb() {
         log.push(...fresh);
         return fresh;
       },
+      async importRecords(records, audits) {
+        if (failImport) throw new Error("QuotaExceededError");
+        const fresh = records.filter(
+          (r) =>
+            r.sessionId === sessionId &&
+            r.deviceId !== meta.deviceId &&
+            !log.some((l) => recordId(l) === recordId(r)),
+        );
+        const written = audits.map(
+          (a) =>
+            ({
+              sessionId,
+              deviceId: meta.deviceId,
+              seq: meta.nextSeq++,
+              employee: a.employee,
+              at: clock(meta.nextSeq),
+              ...a.body,
+            }) as LogRecord,
+        );
+        log.push(...fresh, ...written);
+        return [...fresh, ...written];
+      },
       all: async () => [...log],
       since: async (theirs: VersionVector) => missingFor(log, theirs),
       vector: async () => vectorOf(log),
@@ -126,6 +151,11 @@ function fakeDb() {
         employee: m.employee,
         createdAt: m.createdAt,
       }));
+    },
+    async readRecords(sessionId) {
+      const log = logs.get(sessionId);
+      if (!log) throw new Error(`Unknown session ${sessionId}`);
+      return [...log];
     },
     async acquireSessionLock(sessionId) {
       if (!lockAvailable || locks.has(sessionId)) return null;
@@ -198,6 +228,9 @@ function fakeDb() {
     },
     failAppends(v: boolean) {
       failAppends = v;
+    },
+    failImport(v: boolean) {
+      failImport = v;
     },
     failPrint(v: boolean) {
       failPrint = v;
@@ -1642,5 +1675,283 @@ describe("useSession deleteSession", () => {
     const { s, m } = await closedWithPeer();
     s.leaveSession();
     expect(m.listeners()).toBe(0);
+  });
+});
+
+const IMPORTED_DEVICE = "importedxx";
+
+function fileOf(name: string, pairs: [string, string][]): FileSource {
+  return {
+    kind: "file",
+    name,
+    format: "csv",
+    rows: pairs.map(([patron, item]) => ({
+      patron,
+      item,
+      scannedAt: 1_000_000,
+      clerk: "Ann",
+      workstation: "Desk 1",
+    })),
+  };
+}
+
+/** What a peer sends: P1 with I1, then a void of the item. */
+function peerScanAndVoid(sessionId: string): LogRecord[] {
+  const base = { sessionId, deviceId: PEER, employee: "Sam", at: 5000 };
+  return [
+    { ...base, seq: 1, type: "patron-started", patron: "P1" },
+    { ...base, seq: 2, type: "item-scanned", visitId: `${PEER}:1`, item: "I1" },
+    { ...base, seq: 3, type: "voided", target: `${PEER}:2` },
+  ];
+}
+
+describe("addToSession", () => {
+  it("stores, merges and reports", async () => {
+    const s = await started();
+    const ok = await s.addToSession(
+      [
+        fileOf("a.csv", [
+          ["P1", "I1"],
+          ["P1", "I2"],
+        ]),
+      ],
+      "Bob",
+    );
+    expect(ok).toBe(true);
+    expect(s.state.totals).toEqual({ patrons: 1, items: 2 });
+    expect(s.state.imports[0]!.employee).toBe("Bob");
+    expect(s.meta!.employee).toBe("Rae");
+    expect(s.message).toEqual({ tone: "info", text: "Added 1 patron and 2 items." });
+    expect(db.logs.get(s.meta!.sessionId)!.length).toBe(s.records.length);
+  });
+
+  it("works in a closed session, which stays closed", async () => {
+    const s = await started();
+    await s.scan(CONTROL_END);
+    await s.closeSession();
+    expect(s.closed).toBe(true);
+    expect(await s.addToSession([fileOf("a.csv", [["P1", "I1"]])], "Bob")).toBe(true);
+    expect(s.state.totals).toEqual({ patrons: 1, items: 1 });
+    expect(s.closed).toBe(true);
+  });
+
+  it("runs in the queue, after an earlier scan", async () => {
+    const s = await started();
+    const release = db.holdAppends();
+    const scan = s.scan("P0");
+    const add = s.addToSession([fileOf("a.csv", [["P1", "I1"]])], "Bob");
+    await tick();
+    expect(s.records).toHaveLength(1);
+    release();
+    await Promise.all([scan, add]);
+    expect(s.state.totals).toEqual({ patrons: 2, items: 1 });
+    const order = s.records.map((r) => r.type);
+    expect(order.indexOf("patron-started")).toBeLessThan(order.indexOf("imported"));
+  });
+
+  it("plans again when confirmed", async () => {
+    const s = await started();
+    const sources = [fileOf("a.csv", [["P1", "I1"]])];
+    expect(s.previewImport(sources).sources[0]!.adds).toEqual({ patrons: 1, items: 1 });
+    db.meshes[0]!.deliver(PEER, { t: "recs", records: peerScanAndVoid(s.meta!.sessionId) });
+    await tick();
+    const before = s.records.length;
+    expect(await s.addToSession(sources, "Bob")).toBe(false);
+    expect(s.records).toHaveLength(before);
+    expect(s.state.totals).toEqual({ patrons: 1, items: 0 });
+  });
+
+  it("applies a void added later in the source", async () => {
+    const s = await started();
+    const sessionId = s.meta!.sessionId;
+    const base = { sessionId: "srcsession1", deviceId: "srcdevice1", employee: "Ann", at: 4000 };
+    const started1: LogRecord = { ...base, seq: 1, type: "patron-started", patron: "P1" };
+    const item: LogRecord = {
+      ...base,
+      seq: 2,
+      type: "item-scanned",
+      visitId: "srcdevice1:1",
+      item: "I1",
+    };
+    const item2: LogRecord = {
+      ...base,
+      seq: 3,
+      type: "item-scanned",
+      visitId: "srcdevice1:1",
+      item: "I2",
+    };
+    const voided: LogRecord = { ...base, seq: 4, type: "voided", target: "srcdevice1:2" };
+    const info = { sessionId: "srcsession1", name: "Friday" };
+    const first = await sessionSource(info, [started1, item, item2], sessionId);
+    expect(await s.addToSession([first], "Bob")).toBe(true);
+    expect(s.state.totals).toEqual({ patrons: 1, items: 2 });
+
+    const later = await sessionSource(info, [started1, item, item2, voided], sessionId);
+    expect(s.previewImport([later]).sources[0]!.voidedBySource).toBe(1);
+    expect(await s.addToSession([later], "Bob")).toBe(true);
+    expect(s.state.totals).toEqual({ patrons: 1, items: 1 });
+    expect(s.message).toEqual({
+      tone: "info",
+      text: "Nothing added, but 1 item voided in the source.",
+    });
+  });
+
+  it("says how many items a void-only add removed", async () => {
+    const s = await started();
+    const sessionId = s.meta!.sessionId;
+    const base = { sessionId: "srcsession1", deviceId: "srcdevice1", employee: "Ann", at: 4000 };
+    const raw: LogRecord[] = [
+      { ...base, seq: 1, type: "patron-started", patron: "P1" },
+      { ...base, seq: 2, type: "item-scanned", visitId: "srcdevice1:1", item: "I1" },
+      { ...base, seq: 3, type: "item-scanned", visitId: "srcdevice1:1", item: "I2" },
+      { ...base, seq: 4, type: "item-scanned", visitId: "srcdevice1:1", item: "I3" },
+    ];
+    const info = { sessionId: "srcsession1", name: "Friday" };
+    await s.addToSession([await sessionSource(info, raw, sessionId)], "Bob");
+    const voids: LogRecord[] = [2, 3, 4].map((t, i) => ({
+      ...base,
+      seq: 5 + i,
+      type: "voided",
+      target: `srcdevice1:${t}`,
+    }));
+    expect(
+      await s.addToSession([await sessionSource(info, [...raw, ...voids], sessionId)], "Bob"),
+    ).toBe(true);
+    expect(s.state.totals.items).toBe(0);
+    expect(s.message).toEqual({
+      tone: "info",
+      text: "Nothing added, but 3 items voided in the source.",
+    });
+  });
+
+  it("needs a clerk", async () => {
+    const s = await started();
+    const before = db.logs.get(s.meta!.sessionId)!.length;
+    expect(await s.addToSession([fileOf("a.csv", [["P1", "I1"]])], "   ")).toBe(false);
+    expect(db.logs.get(s.meta!.sessionId)).toHaveLength(before);
+    expect(s.state.totals).toEqual({ patrons: 0, items: 0 });
+  });
+
+  it("a failed save shows an error, isn't fatal, and scanning continues", async () => {
+    const s = await started();
+    db.failImport(true);
+    expect(await s.addToSession([fileOf("a.csv", [["P1", "I1"]])], "Bob")).toBe(false);
+    expect(s.message).toEqual({
+      tone: "error",
+      text: "Could not add to this session, so nothing was changed. (QuotaExceededError)",
+    });
+    expect(s.fatal).toBeNull();
+    expect(s.records).toHaveLength(1);
+    await s.scan("P2");
+    expect(s.state.totals.patrons).toBe(1);
+  });
+
+  it("refuses to store an invalid record, and changes nothing", async () => {
+    const s = await started();
+    const before = db.logs.get(s.meta!.sessionId)!.length;
+    const bad = fileOf("a.csv", [["P1", "I1"]]);
+    bad.rows[0]!.scannedAt = NaN;
+    expect(await s.addToSession([bad], "Bob")).toBe(false);
+    expect(s.message).toEqual({
+      tone: "error",
+      text: "Could not add to this session, so nothing was changed. (a record was not valid)",
+    });
+    expect(s.fatal).toBeNull();
+    expect(db.logs.get(s.meta!.sessionId)).toHaveLength(before);
+    expect(s.records).toHaveLength(before);
+  });
+
+  it("doesn't add to a session that was switched", async () => {
+    const s = await started();
+    const first = s.meta!.sessionId;
+    const release = db.holdAppends();
+    const scan = s.scan("P0");
+    const add = s.addToSession([fileOf("a.csv", [["P1", "I1"]])], "Bob");
+    const switching = s.startSession("Second", "Rae");
+    release();
+    const [, ok] = await Promise.all([scan, add, switching]);
+    expect(ok).toBe(false);
+    expect(s.records.map((r) => r.type)).toEqual(["session-created"]);
+    expect(db.logs.get(first)!.some((r) => r.type === "imported")).toBe(false);
+  });
+});
+
+describe("imported devices are not workstations", () => {
+  async function seed() {
+    const s = await started();
+    const sessionId = s.meta!.sessionId;
+    db.meshes[0]!.deliver(PEER, {
+      t: "recs",
+      records: [
+        {
+          sessionId,
+          deviceId: IMPORTED_DEVICE,
+          seq: 1,
+          employee: "Ann",
+          workstation: "Desk 1",
+          at: 5000,
+          imported: true,
+          type: "patron-started",
+          patron: "P7",
+        },
+      ],
+    });
+    await tick();
+    expect(s.records.some((r) => r.deviceId === IMPORTED_DEVICE)).toBe(true);
+    return s;
+  }
+
+  it("knownDevices leaves them out", async () => {
+    const s = await seed();
+    expect(s.knownDevices().has(IMPORTED_DEVICE)).toBe(false);
+    expect(s.knownDevices().has(DEVICE)).toBe(true);
+  });
+
+  it("notConnected leaves them out", async () => {
+    const s = await seed();
+    expect(s.notConnected).toEqual([]);
+  });
+
+  it("disconnected stays false on a solo PC", async () => {
+    const s = await seed();
+    expect(s.disconnected).toBe(false);
+  });
+
+  it("othersInProgress leaves out an unfinished imported visit", async () => {
+    const s = await seed();
+    expect(s.othersInProgress).toEqual([]);
+  });
+
+  it("real peers still count", async () => {
+    const s = await seed();
+    db.meshes[0]!.deliver(PEER, {
+      t: "recs",
+      records: [remoteRecord(s.meta!.sessionId)],
+    });
+    await tick();
+    expect(s.knownDevices().has(PEER)).toBe(true);
+    expect(s.notConnected.map((d) => d.deviceId)).toEqual([PEER]);
+    expect(s.disconnected).toBe(true);
+    expect(s.othersInProgress).toEqual([{ employee: "Sam", patron: "P9" }]);
+  });
+});
+
+describe("other sessions", () => {
+  it("otherSessions leaves out the current session", async () => {
+    const s = await started();
+    await s.startSession("Second", "Rae");
+    const list = await s.otherSessions();
+    expect(list.map((x) => x.name)).toEqual(["2026-10-10"]);
+  });
+
+  it("loadSessionSource reads another session for this one", async () => {
+    const s = await started();
+    await s.scan("P1");
+    await s.startSession("Second", "Rae");
+    const [other] = await s.otherSessions();
+    const source = await s.loadSessionSource(other!);
+    expect(source.kind).toBe("session");
+    expect(source.name).toBe("2026-10-10");
+    expect(source.records.every((r) => r.sessionId === s.meta!.sessionId)).toBe(true);
   });
 });

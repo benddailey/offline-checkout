@@ -20,7 +20,8 @@ function refocusSoon() {
     const active = document.activeElement;
     // Never take focus from another text field the clerk is typing into.
     if (active && active !== el && active.matches("input, textarea, select")) return;
-    el.focus();
+    // Scrolling here would move a button further down the page out from under a mouse press.
+    el.focus({ preventScroll: true });
   }, 0);
 }
 

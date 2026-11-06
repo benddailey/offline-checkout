@@ -43,6 +43,33 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
   so it cannot show which are online.
   Each PDF, CSV, Excel or Evergreen download appends an `exported` record (`kind`), which syncs like
   any other record and lets the delete dialog show who exported what. The reducer lists them in order.
+- **Adding to a session** (`src/import/`, design in
+  `docs/superpowers/specs/2026-11-06-session-import-design.md`). Records copied in from another
+  session or a file carry the envelope flag `imported: true` (`isLogRecord` accepts only `true` or
+  absent). Two record types go with it: `imported` (`source`, `name`, `patrons`, `items`; one per
+  source that added something, reduced into `SessionState.imports`) and `import-gap`, a placeholder
+  that `reduce` ignores. `VisitState.imported` marks visits that came in.
+  - Adding a session rewrites each record, because the same PC has the same `deviceId` in both
+    sessions and `(deviceId, seq)` would collide. `deviceId`, `visitId` and `target` become
+    `mergedDeviceId(sourceSessionId, deviceId)`-derived ids, so adding twice stores nothing new.
+    `seq`, `at`, `employee` and `workstation` are kept.
+  - `session-created`, `session-closed`, `exported` and `imported` records become `import-gap`, since
+    copied as they are they would rename or close the session. They can't be left out: `vectorOf`
+    stops at the first missing `seq`, and a gap would make peers resend that device's later records
+    every 10 seconds for the life of the session.
+  - A `deviceId` that carries `imported` isn't a PC. Leave it out of `knownDevices`, `notConnected`,
+    `disconnected`, `othersInProgress` and the `readLog` workstations (spec section 5).
+  - Excel files are read with a small hand-written XML scanner (`src/import/xml.ts`), not
+    `DOMParser`. Unit tests run in Vitest's `node` environment, which has no `DOMParser`, so they
+    exercise the code that ships, with no new dependency. It also keeps memory flat on large sheets.
+  - `evergreenStale` (`src/ui/exports.ts`) is true when an `imported` record is later than the latest
+    Evergreen download. The Summary then shows `evergreen-stale` and the delete dialog asks for a new
+    download.
+  - `MessageBanner` and `SessionClosedBanner` scroll themselves into view, because `ScanInput`
+    refocuses with `preventScroll` and a banner shown while the page is scrolled down would be missed.
+  - No pairing change, so the prefix stays `OC3:`. A release before this one rejects the new records,
+    so its peers keep getting them resent every 10 seconds. All desks must run the same version, as
+    already required.
 - **Barcodes and QR:**
   - `jsbarcode` makes Code 128 for receipts and the PDF;
   - `qrcode` draws QR codes;

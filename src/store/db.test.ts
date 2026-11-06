@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import type { LogRecord } from "../log/types";
+import type { ImportedBody, LogRecord } from "../log/types";
 import {
   acquireSessionLock,
   createSession,
@@ -10,6 +10,7 @@ import {
   getWorkstationName,
   listSessions,
   openSessionStore,
+  readRecords,
   requestPersistence,
   setWorkstationName,
 } from "./db";
@@ -231,6 +232,120 @@ describe("index", () => {
     const list = Object.fromEntries((await listSessions()).map((s) => [s.name, s]));
     expect(list.Open!.workstations).toEqual([{ deviceId: "x", name: "Front desk", lastAt: 4000 }]);
     expect(list.Done!.workstations).toBeUndefined();
+  });
+});
+
+const importedBody: ImportedBody = {
+  type: "imported",
+  source: "file",
+  name: "a.csv",
+  patrons: 1,
+  items: 0,
+};
+
+describe("importRecords", () => {
+  it("stores new records, skips existing keys and other sessions", async () => {
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
+    await s.put([remote(s.sessionId, "x", 1)]);
+    const stored = await s.importRecords(
+      [
+        remote(s.sessionId, "x", 1),
+        remote(s.sessionId, "x", 2),
+        remote("other", "x", 3),
+        remote(s.sessionId, "x", 2),
+      ],
+      [],
+    );
+    expect(stored.map((r) => r.seq)).toEqual([2]);
+    expect((await s.all()).map((r) => `${r.deviceId}:${r.seq}`).sort()).toEqual(["x:1", "x:2"]);
+  });
+
+  it("writes audits through nextSeq under the given clerk", async () => {
+    await setWorkstationName("Desk 1");
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
+    const before = await s.meta();
+    const stored = await s.importRecords(
+      [{ ...remote(s.sessionId, "x", 1), imported: true }],
+      [{ employee: "Bob", body: importedBody }],
+    );
+    expect(stored).toHaveLength(2);
+    const audit = stored.find((r) => r.type === "imported")!;
+    expect(audit).toEqual({
+      sessionId: s.sessionId,
+      deviceId: before.deviceId,
+      seq: before.nextSeq,
+      employee: "Bob",
+      workstation: "Desk 1",
+      at: audit.at,
+      ...importedBody,
+    });
+    const after = await s.meta();
+    expect(after.nextSeq).toBe(before.nextSeq + 1);
+    expect(after.employee).toBe("Ann");
+  });
+
+  it("skips this machine's deviceId, as put does", async () => {
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
+    const own = (await s.meta()).deviceId;
+    expect(await s.importRecords([remote(s.sessionId, own, 7)], [])).toEqual([]);
+    expect(await s.all()).toEqual([]);
+  });
+
+  it("rolls back completely on failure", async () => {
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: true });
+    const before = await s.all();
+    const nextSeqBefore = (await s.meta()).nextSeq;
+    const good = remote(s.sessionId, "x", 1);
+    const bad = { ...good, seq: Number.NaN };
+    await expect(
+      s.importRecords([good, bad], [{ employee: "Bob", body: importedBody }]),
+    ).rejects.toThrow();
+    expect(await s.all()).toEqual(before);
+    expect((await s.meta()).nextSeq).toBe(nextSeqBefore);
+  });
+
+  it("adding the same records twice stores nothing the second time", async () => {
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: false });
+    const records = [remote(s.sessionId, "x", 1), remote(s.sessionId, "x", 2)];
+    expect(await s.importRecords(records, [])).toHaveLength(2);
+    expect(await s.importRecords(records, [])).toEqual([]);
+    expect(await s.all()).toHaveLength(2);
+  });
+});
+
+describe("readRecords", () => {
+  it("reads a session another tab holds the lock on", async () => {
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: true });
+    const release = await acquireSessionLock(s.sessionId);
+    expect(release).not.toBeNull();
+    expect(await readRecords(s.sessionId)).toEqual(await s.all());
+    release!();
+  });
+
+  it("rejects a deleted session and doesn't re-create it", async () => {
+    const s = await createSession({ name: "Fair", employee: "Ann", withCreatedRecord: true });
+    s.close();
+    const id = s.sessionId;
+    await deleteSession(id);
+    await expect(readRecords(id)).rejects.toThrow("Unknown session");
+    expect((await indexedDB.databases()).map((d) => d.name)).not.toContain(`oc-session-${id}`);
+  });
+});
+
+describe("listSessions and imported records", () => {
+  it("leaves imported devices out of workstations", async () => {
+    const s = await createSession({ name: "Open", employee: "Ann", withCreatedRecord: true });
+    await s.put([{ ...remote(s.sessionId, "x", 1), workstation: "Real", at: 3000 }]);
+    await s.importRecords(
+      [
+        { ...remote(s.sessionId, "x", 2), workstation: "Made up", at: 4000, imported: true },
+        { ...remote(s.sessionId, "m", 1), workstation: "Only imported", at: 5000, imported: true },
+      ],
+      [],
+    );
+    s.close();
+    const list = await listSessions();
+    expect(list[0]!.workstations).toEqual([{ deviceId: "x", name: "Real", lastAt: 3000 }]);
   });
 });
 

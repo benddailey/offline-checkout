@@ -3,8 +3,13 @@ import { computed, nextTick, ref, shallowRef } from "vue";
 import { CONTROL, normalizeScan, validateBarcode } from "../log/barcode";
 import { MAX_NAME, clampName } from "../log/limits";
 import { checkItem } from "../log/duplicates";
-import { recordId } from "../log/ids";
+import { planImport, type ImportPlan, type ImportSource } from "../import/plan";
+import { readImportFiles } from "../import/read";
+import type { FileRejection, FileSource } from "../import/rows";
+import { sessionSource, type SessionSource } from "../import/session";
+import { randomId, recordId } from "../log/ids";
 import { reduce } from "../log/reduce";
+import { isLogRecord } from "../log/validate";
 import type {
   ExportKind,
   ItemState,
@@ -36,6 +41,7 @@ export interface SessionDeps {
   createSession: typeof db.createSession;
   openSessionStore: typeof db.openSessionStore;
   listSessions: typeof db.listSessions;
+  readRecords: typeof db.readRecords;
   deleteSession: typeof db.deleteSession;
   acquireSessionLock: typeof db.acquireSessionLock;
   requestPersistence: typeof db.requestPersistence;
@@ -65,6 +71,7 @@ export function createSessionStoreDeps(overrides: Partial<SessionDeps> = {}): Se
     createSession: db.createSession,
     openSessionStore: db.openSessionStore,
     listSessions: db.listSessions,
+    readRecords: db.readRecords,
     deleteSession: db.deleteSession,
     acquireSessionLock: db.acquireSessionLock,
     requestPersistence: db.requestPersistence,
@@ -150,7 +157,7 @@ export const useSession = defineStore("session", () => {
   const disconnected = computed(() => {
     if (!isolated.value || !meta.value) return false;
     const own = meta.value.deviceId;
-    return hadPeer.value || records.value.some((r) => r.deviceId !== own);
+    return hadPeer.value || records.value.some((r) => r.deviceId !== own && !r.imported);
   });
   const closed = computed(() => state.value.closed);
   /**
@@ -163,7 +170,7 @@ export const useSession = defineStore("session", () => {
       const connected = new Set(peers.value.filter((p) => p.connected).map((p) => p.deviceId));
       const latest = new Map<string, LogRecord>();
       for (const r of records.value) {
-        if (r.deviceId === own || connected.has(r.deviceId)) continue;
+        if (r.deviceId === own || r.imported || connected.has(r.deviceId)) continue;
         const prev = latest.get(r.deviceId);
         if (!prev || r.seq > prev.seq) latest.set(r.deviceId, r);
       }
@@ -201,7 +208,7 @@ export const useSession = defineStore("session", () => {
   const othersInProgress = computed<{ employee: string; patron: string }[]>(() => {
     const own = meta.value?.deviceId;
     return state.value.visits
-      .filter((v) => v.deviceId !== own && !v.ended && !v.voided)
+      .filter((v) => v.deviceId !== own && !v.imported && !v.ended && !v.voided)
       .map((v) => ({ employee: v.employee, patron: v.patron }));
   });
 
@@ -517,7 +524,7 @@ export const useSession = defineStore("session", () => {
   }
 
   function knownDevices(): Set<string> {
-    return new Set(records.value.map((r) => r.deviceId));
+    return new Set(records.value.filter((r) => !r.imported).map((r) => r.deviceId));
   }
 
   /** Append one record; it joins `records` only once committed. */
@@ -882,6 +889,67 @@ export const useSession = defineStore("session", () => {
     return deps.listSessions();
   }
 
+  async function otherSessions(): Promise<SessionSummary[]> {
+    const all = await deps.listSessions();
+    return all.filter((x) => x.sessionId !== meta.value?.sessionId);
+  }
+
+  async function loadSessionSource(summary: SessionSummary): Promise<SessionSource> {
+    const target = meta.value?.sessionId;
+    if (!target) throw new Error("No session is open");
+    return sessionSource(summary, await deps.readRecords(summary.sessionId), target);
+  }
+
+  function readFiles(files: File[]): Promise<(FileSource | FileRejection)[]> {
+    return readImportFiles(files, deps.now().getTime());
+  }
+
+  function planFor(sources: ImportSource[]): ImportPlan {
+    return planImport(sources, records.value, {
+      sessionId: meta.value?.sessionId ?? "",
+      newDeviceId: () => randomId(),
+      now: deps.now().getTime(),
+    });
+  }
+
+  function previewImport(sources: ImportSource[]): ImportPlan {
+    return planFor(sources);
+  }
+
+  /** Stores what the sources add as imported records; false if there was nothing new or it failed. */
+  async function addToSession(sources: ImportSource[], employee: string): Promise<boolean> {
+    const clerk = clampName(employee);
+    if (!clerk) return false;
+    let added = false;
+    await enqueue(async () => {
+      const target = store;
+      if (!target) return;
+      // The log may have changed since the preview, so plan again against what is here now.
+      const plan = planFor(sources);
+      if (!plan.anythingNew) return;
+      try {
+        if (!plan.records.every(isLogRecord)) throw new Error("a record was not valid");
+        const written = await target.importRecords(
+          plan.records,
+          plan.audits.map((body) => ({ employee: clerk, body })),
+        );
+        if (store !== target) return;
+        merge(written);
+        message.value = addedMessage(plan);
+        added = true;
+      } catch (err) {
+        console.error("session: could not add to the session", err);
+        if (store !== target) return;
+        const reason = err instanceof Error ? err.message : String(err);
+        message.value = {
+          tone: "error",
+          text: `Could not add to this session, so nothing was changed. (${reason})`,
+        };
+      }
+    });
+    return added;
+  }
+
   async function loadWorkstationName(): Promise<void> {
     workstationName.value = (await deps.getWorkstationName()) ?? null;
   }
@@ -943,11 +1011,44 @@ export const useSession = defineStore("session", () => {
     joinSession,
     knownDevices,
     listSessions,
+    otherSessions,
+    loadSessionSource,
+    readFiles,
+    previewImport,
+    addToSession,
     workstationName,
     loadWorkstationName,
     nameWorkstation,
   };
 });
+
+function count(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
+}
+
+function addedMessage(plan: ImportPlan): Message {
+  let patrons = 0;
+  let items = 0;
+  let voided = 0;
+  for (const p of plan.sources) {
+    patrons += p.adds.patrons;
+    items += p.adds.items;
+    voided += p.voidedBySource;
+  }
+  if (patrons === 0 && items === 0) {
+    return {
+      tone: "info",
+      text:
+        voided > 0
+          ? `Nothing added, but ${count(voided, "item")} voided in the source.`
+          : "Nothing added.",
+    };
+  }
+  return {
+    tone: "info",
+    text: `Added ${count(patrons, "patron")} and ${count(items, "item")}.`,
+  };
+}
 
 function seqOf(id: RecordId): number {
   return Number(id.slice(id.lastIndexOf(":") + 1));

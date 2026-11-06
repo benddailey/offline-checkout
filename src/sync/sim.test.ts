@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { rewriteSession } from "../import/session";
 import { dev, mk, SID } from "../log/helpers.test-util";
 import { reduce } from "../log/reduce";
 import type { LogRecord } from "../log/types";
@@ -184,4 +185,42 @@ describe("three-peer simulation", () => {
       for (const e of engines.values()) e.stop();
     });
   }
+
+  it("a peer takes a rewritten device once, with no repeat sends", async () => {
+    const [a, b, x] = [dev("a"), dev("b"), dev("x")];
+    const net = new FakeMeshNetwork(mulberry32(7), [a, b]);
+    const storeA = memStore();
+    const storeB = memStore();
+    const source: LogRecord[] = [
+      mk(x, 1, { type: "session-created", name: "S" }),
+      mk(x, 2, { type: "patron-started", patron: "P1" }),
+      mk(x, 3, { type: "item-scanned", visitId: `${x}:2`, item: "I1" }),
+      mk(x, 4, { type: "session-closed" }),
+      mk(x, 5, { type: "voided", target: `${x}:3` }),
+    ];
+    const rewritten = await rewriteSession(source, "ses0000002", SID);
+    const merged = rewritten[0]!.deviceId;
+    await storeA.put(rewritten);
+
+    const meshA = net.meshFor(a);
+    const send = vi.spyOn(meshA, "send");
+    const engines = [
+      new SyncEngine({ mesh: meshA, store: storeA, onRecords: () => {} }),
+      new SyncEngine({ mesh: net.meshFor(b), store: storeB, onRecords: () => {} }),
+    ];
+    for (const e of engines) e.start();
+    net.setLink(a, b, true);
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(sorted(storeB.records)).toEqual(sorted(storeA.records));
+    expect(reduce(storeB.records.values())).toEqual(reduce(storeA.records.values()));
+    expect((await storeB.vector())[merged]).toBe(source.length);
+
+    send.mockClear();
+    await vi.advanceTimersByTimeAsync(30_000);
+    const recs = send.mock.calls.filter(([, m]) => (m as { t?: string }).t === "recs");
+    expect(recs).toEqual([]);
+
+    for (const e of engines) e.stop();
+  });
 });

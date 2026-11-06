@@ -1,7 +1,41 @@
 import { test, expect, describe } from "vite-plus/test";
 import { reduce } from "./reduce";
 import type { LogRecord } from "./types";
-import { mk, SID } from "./helpers.test-util";
+import { dev, mk, SID } from "./helpers.test-util";
+
+describe("reduce imports", () => {
+  test("collects imports and ignores gaps", () => {
+    const s = reduce([
+      mk(dev("a"), 1, { type: "import-gap" }),
+      mk(dev("a"), 2, {
+        type: "imported",
+        source: "session",
+        name: "Friday",
+        patrons: 1,
+        items: 2,
+      }),
+    ]);
+    expect(s.imports).toEqual([
+      {
+        source: "session",
+        name: "Friday",
+        patrons: 1,
+        items: 2,
+        at: 2000,
+        employee: "AAAAAAAAAA",
+        workstation: "",
+      },
+    ]);
+    expect(s.visits).toEqual([]);
+    expect(s.name).toBeNull();
+    expect(s.closed).toBe(false);
+  });
+  test("marks visits from imported records", () => {
+    const started = mk(dev("a"), 1, { type: "patron-started", patron: "P1" });
+    expect(reduce([started]).visits[0]!.imported).toBe(false);
+    expect(reduce([{ ...started, imported: true }]).visits[0]!.imported).toBe(true);
+  });
+});
 
 describe("reduce", () => {
   test("visit with two items", () => {

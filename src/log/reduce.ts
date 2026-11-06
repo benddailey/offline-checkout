@@ -1,6 +1,7 @@
 import { recordId } from "./ids";
 import type {
   ExportState,
+  ImportState,
   ItemState,
   LogRecord,
   RecordId,
@@ -37,6 +38,7 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
   let closed = false;
   const visits = new Map<RecordId, VisitState>();
   const exports: ExportState[] = [];
+  const imports: ImportState[] = [];
 
   for (const r of sorted) {
     sessionId ??= r.sessionId;
@@ -55,6 +57,19 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
           workstation: r.workstation ?? "",
         });
         break;
+      case "imported":
+        imports.push({
+          source: r.source,
+          name: r.name,
+          patrons: r.patrons,
+          items: r.items,
+          at: r.at,
+          employee: r.employee,
+          workstation: r.workstation ?? "",
+        });
+        break;
+      case "import-gap":
+        break;
       case "voided":
         voidedTargets.add(r.target);
         break;
@@ -72,6 +87,7 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
           at: r.at,
           ended: false,
           voided: false,
+          imported: r.imported === true,
           items: [],
         });
         break;
@@ -153,5 +169,6 @@ export function reduce(records: Iterable<LogRecord>): SessionState {
     perClerk: byName(perClerk),
     perWorkstation: byName(perWorkstation),
     exports,
+    imports,
   };
 }

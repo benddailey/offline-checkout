@@ -1,6 +1,6 @@
 import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from "idb";
 import { randomId, recordId } from "../log/ids";
-import type { LogRecord, RecordBody, RecordId, VersionVector } from "../log/types";
+import type { ImportedBody, LogRecord, RecordBody, RecordId, VersionVector } from "../log/types";
 import { missingFor, vectorOf } from "../log/vector";
 
 export interface SessionMeta {
@@ -33,6 +33,11 @@ export interface SeenWorkstation {
   lastAt: number;
 }
 
+export interface ImportAudit {
+  employee: string;
+  body: ImportedBody;
+}
+
 export interface SessionStore {
   readonly sessionId: string;
   meta(): Promise<SessionMeta>;
@@ -41,6 +46,11 @@ export interface SessionStore {
   append(body: RecordBody): Promise<LogRecord>;
   /** Ignores existing keys, foreign sessionId and this machine's deviceId; returns newly stored records. */
   put(records: LogRecord[]): Promise<LogRecord[]>;
+  /**
+   * All or nothing: filters as put does, then writes one audit per entry through nextSeq under the
+   * entry's employee. Returns the newly stored records plus the audits.
+   */
+  importRecords(records: LogRecord[], audits: ImportAudit[]): Promise<LogRecord[]>;
   all(): Promise<LogRecord[]>;
   since(theirs: VersionVector): Promise<LogRecord[]>;
   vector(): Promise<VersionVector>;
@@ -202,6 +212,50 @@ function makeStore(sessionId: string, db: IDBPDatabase<SessionSchema>): SessionS
       await Promise.all([...stored.map((r) => store.add(r)), tx.done]);
       return stored;
     },
+    async importRecords(records, audits) {
+      const tx = db.transaction(["records", "meta"], "readwrite", STRICT);
+      try {
+        const store = tx.objectStore("records");
+        const m = await tx.objectStore("meta").get(META_KEY);
+        if (!m) throw new Error(`Session ${sessionId} has no metadata`);
+        const candidates = new Map<RecordId, LogRecord>();
+        for (const r of records) {
+          if (r.sessionId !== sessionId || r.deviceId === m.deviceId) continue;
+          if (!candidates.has(recordId(r))) candidates.set(recordId(r), r);
+        }
+        const fresh = [...candidates.values()];
+        // async callbacks: a bad key throws synchronously, which would orphan the requests already queued.
+        const found = await Promise.all(fresh.map(async (r) => store.getKey([r.deviceId, r.seq])));
+        const stored = fresh.filter((_, i) => found[i] === undefined);
+        const written = audits.map(
+          (a, i) =>
+            ({
+              sessionId,
+              deviceId: m.deviceId,
+              seq: m.nextSeq + i,
+              employee: a.employee,
+              ...(m.workstation === undefined ? {} : { workstation: m.workstation }),
+              at: Date.now(),
+              ...a.body,
+            }) as LogRecord,
+        );
+        await Promise.all([
+          ...stored.map(async (r) => store.add(r)),
+          ...written.map(async (r) => store.add(r)),
+          tx.objectStore("meta").put({ ...m, nextSeq: m.nextSeq + audits.length }, META_KEY),
+        ]);
+        await tx.done;
+        return [...stored, ...written];
+      } catch (e) {
+        try {
+          tx.abort();
+        } catch {
+          // already finished or aborted
+        }
+        tx.done.catch(() => {});
+        throw e;
+      }
+    },
     all: () => db.getAll("records"),
     async since(theirs) {
       return missingFor(await db.getAll("records"), theirs);
@@ -266,6 +320,22 @@ export async function openSessionStore(sessionId: string): Promise<SessionStore>
   return makeStore(sessionId, db);
 }
 
+/** Reads a session's records without taking its lock or changing it. */
+export async function readRecords(sessionId: string): Promise<LogRecord[]> {
+  const index = await openIndex();
+  try {
+    if (!(await index.get("sessions", sessionId))) throw new Error(`Unknown session ${sessionId}`);
+  } finally {
+    index.close();
+  }
+  const db = await openSessionDb(sessionId);
+  try {
+    return await db.getAll("records");
+  } finally {
+    db.close();
+  }
+}
+
 async function readLog(
   sessionId: string,
 ): Promise<{ closedAt?: number; lastAt?: number; workstations: SeenWorkstation[] }> {
@@ -280,6 +350,8 @@ async function readLog(
         closedAt = r.at;
       }
       if (lastAt === undefined || r.at > lastAt) lastAt = r.at;
+      // A made-up imported device is not a workstation anyone can see.
+      if (r.imported) continue;
       // By seq, not by clock: a PC's clock can go back.
       const prev = latest.get(r.deviceId);
       if (r.deviceId !== own && (!prev || r.seq > prev.seq)) latest.set(r.deviceId, r);
