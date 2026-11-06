@@ -132,7 +132,7 @@ to the title on the start screen and on the Summary.
 
 3. **Scan.** Scan the patron's card, then each item. There is no need to click anything first. The
    newest item is at the top of the list. The bar at the top shows totals and a green or red dot for
-   each desk PC.
+   each desk PC, with **not connected** beside any that dropped.
    - **End the patron**: scan **OC-END** on the scanner card, or click **End patron**. Their receipt
      prints, with the patron barcode and one barcode per item. Keep the receipt at the desk (don't
      give it to the patron): it is what gets scanned into the library system later.

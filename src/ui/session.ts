@@ -190,6 +190,17 @@ export const useSession = defineStore("session", () => {
         .sort((a, b) => a.employee.localeCompare(b.employee) || (a.deviceId < b.deviceId ? -1 : 1));
     },
   );
+  /** Each device's workstation name, from its latest record that has one. */
+  const workstationNames = computed(() => {
+    const latest = new Map<string, LogRecord>();
+    if (peers.value.length === 0) return latest;
+    for (const r of records.value) {
+      if (r.workstation === undefined || r.imported) continue;
+      const prev = latest.get(r.deviceId);
+      if (!prev || r.seq > prev.seq) latest.set(r.deviceId, r);
+    }
+    return latest;
+  });
   const currentVisit = computed<VisitState | null>(() => {
     const id = currentVisitId.value;
     if (id === null) return null;
@@ -999,6 +1010,7 @@ export const useSession = defineStore("session", () => {
     othersInProgress,
     closed,
     notConnected,
+    workstationNames,
     startSession,
     leaveSession,
     resumeSession,

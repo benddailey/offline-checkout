@@ -10,6 +10,7 @@ import {
   secondary,
   tool,
   toolDanger,
+  toolOn,
 } from "../classes";
 import { useSession } from "../session";
 
@@ -85,18 +86,25 @@ function trapTab(e: KeyboardEvent): void {
     data-testid="status-bar"
   >
     <div class="flex flex-wrap items-center gap-x-6 gap-y-1">
-      <div class="font-bold text-slate-900">
+      <div class="text-lg font-bold text-slate-900">
         {{ session.meta?.name }}
-        <span class="font-normal text-slate-600">· {{ session.meta?.employee }}</span>
+        <span class="text-lg font-semibold text-slate-800" data-testid="clerk">
+          · {{ session.meta?.employee }}
+        </span>
       </div>
       <ul class="flex flex-wrap items-center gap-4" aria-label="Workstations">
         <li v-for="p in session.peers" :key="p.deviceId" class="flex items-center gap-2 text-lg">
           <span
+            role="img"
             class="inline-block size-4 rounded-full"
             :class="p.connected ? 'bg-green-600' : 'bg-red-600'"
             :aria-label="p.connected ? 'connected' : 'disconnected'"
           ></span>
           {{ p.employee }}
+          <template v-if="session.workstationNames.get(p.deviceId)">
+            ({{ session.workstationNames.get(p.deviceId)?.workstation }})
+          </template>
+          <span v-if="!p.connected" class="font-semibold text-red-800">not connected</span>
         </li>
       </ul>
       <p v-if="session.disconnected" class="text-lg font-semibold text-red-700">
@@ -129,9 +137,10 @@ function trapTab(e: KeyboardEvent): void {
         </button>
         <button
           type="button"
-          :class="tool"
+          :class="session.screen === 'summary' ? toolOn : tool"
           :disabled="session.lockedPatron !== null"
           :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
+          :aria-current="session.screen === 'summary' ? 'page' : undefined"
           @click="session.screen = 'summary'"
         >
           Summary

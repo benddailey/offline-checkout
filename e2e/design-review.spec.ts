@@ -465,3 +465,42 @@ test("every screen's content starts at the same left edge", async ({ page }) => 
   await page.getByRole("button", { name: "Exit session" }).click();
   expect(await left(page.getByTestId("workstation"))).toBe(onScan);
 });
+
+test.describe("status bar", () => {
+  test("the current clerk is easy to read and Summary shows it is open", async ({ page }) => {
+    await ready(page);
+    await expect(page.getByTestId("clerk")).toHaveCSS("font-size", "18px");
+    const summary = page.getByRole("button", { name: "Summary" });
+    await expect(summary).not.toHaveAttribute("aria-current");
+    await expect(summary).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await summary.click();
+    await expect(summary).toHaveAttribute("aria-current", "page");
+    await expect(summary).not.toHaveCSS("background-color", "rgb(255, 255, 255)");
+  });
+
+  test("other desks show their workstation, and say in words when they drop", async ({
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+    const contexts = await Promise.all([1, 2].map(() => browser.newContext()));
+    try {
+      const [a, b] = await Promise.all(contexts.map((c) => c.newPage()));
+      await stubPrint(a!);
+      await stubPrint(b!);
+      await openApp(a!, "Desk 1");
+      await openApp(b!, "Desk 2");
+      await startSession(a!, "Outage", "Ann");
+      await pairViaPaste(a!, b!, "Ben");
+      await scan(b!, "P1", "OC-END");
+
+      const desks = a!.getByRole("list", { name: "Workstations" });
+      await expect(desks).toContainText("Ben (Desk 2)", { timeout: 10_000 });
+      await expect(desks).not.toContainText("not connected");
+      await b!.close();
+      await expect(desks).toContainText("not connected", { timeout: 60_000 });
+      await expect(desks.getByRole("img", { name: "disconnected" })).toBeVisible();
+    } finally {
+      await Promise.all(contexts.map((c) => c.close()));
+    }
+  });
+});
