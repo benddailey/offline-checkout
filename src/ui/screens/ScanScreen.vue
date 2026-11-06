@@ -172,7 +172,7 @@ function printCard(format: "receipt" | "letter") {
         :class="[dialogBox, 'max-w-xl border-red-700']"
       >
         <h2 id="void-title" class="text-3xl font-extrabold">Void patron</h2>
-        <p id="void-text" class="text-2xl">
+        <p id="void-text" class="text-xl">
           Void patron {{ session.currentVisit.patron }} and their {{ activeItems }}
           {{ activeItems === 1 ? "item" : "items" }}? No receipt prints, and this can't be undone.
         </p>

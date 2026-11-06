@@ -33,7 +33,7 @@ export const dialogBox =
   "flex max-h-full flex-col gap-5 overflow-y-auto rounded-xl border-4 bg-white p-6";
 /** For long dialog text: it scrolls first, so the title and the controls stay on screen. */
 export const dialogText =
-  "flex min-h-24 flex-col gap-3 overflow-y-auto text-2xl focus-visible:outline-2 focus-visible:outline-blue-700";
+  "flex min-h-24 flex-col gap-3 overflow-y-auto text-xl focus-visible:outline-2 focus-visible:outline-blue-700";
 
 export const field =
   "block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none aria-invalid:border-red-700 aria-invalid:focus:border-red-700 aria-invalid:focus:ring-red-300";

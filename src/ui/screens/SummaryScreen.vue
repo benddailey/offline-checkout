@@ -320,6 +320,9 @@ function onScan(code: string): void {
             Patron in progress: {{ inProgress.join(", ") }}. Their visits will stay open.
           </p>
           <template v-if="confirming === 'delete'">
+            <p v-if="!evergreenExported" class="font-semibold text-red-800">
+              Download the Evergreen file first if these checkouts are not in Evergreen yet.
+            </p>
             <p>
               This removes the session from this workstation and from all connected workstations. It
               cannot be undone.
@@ -327,9 +330,6 @@ function onScan(code: string): void {
             <ul data-testid="export-lines">
               <li v-for="l in exportSummary" :key="l.kind">{{ l.text }}</li>
             </ul>
-            <p v-if="!evergreenExported" class="font-semibold text-red-800">
-              Download the Evergreen file first if these checkouts are not in Evergreen yet.
-            </p>
             <p v-if="missingNames.length">
               Not connected: {{ missingNames.join(", ") }}.
               {{ missingNames.length === 1 ? "It keeps its copy." : "They keep their copies." }}

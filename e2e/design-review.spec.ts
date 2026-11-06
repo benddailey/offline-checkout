@@ -572,3 +572,55 @@ test.describe("pairing screens", () => {
     }
   });
 });
+
+test.describe("dialog text", () => {
+  test("body text matches the page instead of towering over it", async ({ page }) => {
+    await ready(page);
+    await scan(page, "P1", "I1");
+    await page.getByRole("button", { name: "Void patron" }).click();
+    await expect(page.locator("#void-text")).toHaveCSS("font-size", "20px");
+    await page.keyboard.press("Escape");
+    await scan(page, "OC-END");
+    await page.getByRole("button", { name: "Change clerk" }).click();
+    await expect(page.getByRole("dialog").locator("p").first()).toHaveCSS("font-size", "20px");
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Summary" }).click();
+    await page.getByRole("button", { name: "Close session" }).click();
+    await expect(page.locator("#confirm-text")).toHaveCSS("font-size", "20px");
+  });
+
+  test("the Evergreen warning is the first thing in a short delete dialog", async ({ page }) => {
+    await ready(page);
+    await closeSession(page);
+    await page.getByRole("button", { name: "Delete session" }).click();
+    await page.setViewportSize({ width: 1366, height: 420 });
+    const warning = page.getByRole("alertdialog").getByText("Download the Evergreen file first");
+    await expect(warning).toBeInViewport({ ratio: 1 });
+  });
+
+  test("Add to session says why its button is disabled", async ({ page }) => {
+    await page.setViewportSize(WINDOW);
+    await stubPrint(page);
+    await openApp(page);
+    await startSession(page, "Friday", "Ann");
+    await page.getByRole("button", { name: "Not now" }).click();
+    await scan(page, "P1", "I1", "OC-END");
+    await page.getByRole("button", { name: "Exit session" }).click();
+    await page.getByRole("button", { name: "Start new session" }).click();
+    await startSession(page, "Saturday", "Ann");
+    await page.getByRole("button", { name: "Summary" }).click();
+    await page
+      .getByTestId("other-sessions")
+      .getByRole("button", { name: /Friday/ })
+      .click();
+    const dialog = page.getByRole("dialog");
+    const add = dialog.getByRole("button", { name: "Add to session" });
+    await expect(add).toBeDisabled();
+    const hint = dialog.getByText("Enter your name to add these.");
+    await expect(hint).toBeVisible();
+    await expect(add).toHaveAttribute("aria-describedby", /.+/);
+    await dialog.getByLabel("Your name").fill("Ann");
+    await expect(add).toBeEnabled();
+    await expect(hint).toHaveCount(0);
+  });
+});

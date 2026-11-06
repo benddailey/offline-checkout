@@ -260,7 +260,7 @@ onUnmounted(() => {
           <p v-if="ready" class="text-xl font-semibold">The other files can still be added.</p>
         </template>
 
-        <p v-if="nothingNew" class="text-2xl font-semibold" data-testid="add-nothing-new">
+        <p v-if="nothingNew" class="text-xl font-semibold" data-testid="add-nothing-new">
           Nothing new to add. Everything here is already in this session.
         </p>
 
@@ -290,6 +290,7 @@ onUnmounted(() => {
             type="button"
             :class="primary"
             :disabled="clampName(clerk) === '' || adding"
+            :aria-describedby="clampName(clerk) === '' ? 'add-name-hint' : undefined"
             @click="add"
           >
             Add to session
@@ -298,6 +299,13 @@ onUnmounted(() => {
             Cancel
           </button>
         </div>
+        <p
+          v-if="ready && clampName(clerk) === ''"
+          id="add-name-hint"
+          class="text-lg text-slate-600"
+        >
+          Enter your name to add these.
+        </p>
         <div v-else>
           <button ref="closeButton" type="button" :class="secondary" @click="closePreview">
             Close

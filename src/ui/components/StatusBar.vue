@@ -186,7 +186,7 @@ function trapTab(e: KeyboardEvent): void {
         @submit.prevent="saveClerk"
       >
         <h2 id="clerk-title" class="text-3xl font-extrabold">Change clerk</h2>
-        <p class="text-2xl">Scans from now on are recorded under the new name.</p>
+        <p class="text-xl">Scans from now on are recorded under the new name.</p>
         <label class="flex flex-col gap-1 text-lg font-semibold">
           Clerk name
           <input
@@ -218,7 +218,7 @@ function trapTab(e: KeyboardEvent): void {
         :class="[dialogBox, 'max-w-xl border-red-700']"
       >
         <h2 id="exit-title" class="text-3xl font-extrabold">Exit session</h2>
-        <p id="exit-text" class="text-2xl">
+        <p id="exit-text" class="text-xl">
           This workstation will disconnect from the others. To scan here again, resume the session
           and re-pair with any workstation.
         </p>
