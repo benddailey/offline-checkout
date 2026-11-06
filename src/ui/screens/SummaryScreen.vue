@@ -285,7 +285,7 @@ function onScan(code: string): void {
             </button>
           </div>
           <template v-if="!session.closed">
-            <h2 class="mt-1 text-xl font-bold">End the session</h2>
+            <h2 class="mt-1 text-xl font-bold">Close session</h2>
             <button type="button" :class="danger" @click="ask('close')">Close session</button>
           </template>
           <template v-else>
