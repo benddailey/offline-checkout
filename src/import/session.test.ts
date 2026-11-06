@@ -80,7 +80,7 @@ describe("rewriteSession", () => {
   it("doesn't close or rename the target", async () => {
     const out = await rewriteSession(source(), SRC, TARGET);
     for (const i of [0, 9, 10]) expect(out[i]!.type).toBe("import-gap");
-    const imported = mk(a, 1, {
+    const imported = mk(a, 20, {
       type: "imported",
       source: "file",
       name: "f",
