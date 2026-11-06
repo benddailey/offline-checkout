@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { MAX_NAME } from "../../log/limits";
+import { field, primary, secondary } from "../classes";
 import { useSession } from "../session";
 
 const props = defineProps<{ initial?: string; cancellable?: boolean }>();
@@ -22,13 +23,6 @@ async function save() {
     busy.value = false;
   }
 }
-
-const field =
-  "block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none";
-const primary =
-  "min-h-12 rounded-lg border-2 border-blue-800 bg-blue-700 px-6 text-xl font-semibold text-white hover:bg-blue-800 disabled:opacity-50";
-const secondary =
-  "min-h-12 rounded-lg border-2 border-slate-700 bg-white px-6 text-xl font-semibold text-slate-900 hover:bg-slate-100";
 </script>
 
 <template>

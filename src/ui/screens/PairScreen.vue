@@ -8,6 +8,7 @@ import { pairingFileName } from "../../pairing/file";
 import { CODE_TTL_MS, PairingError, type PairingPayload } from "../../pairing/payload";
 import QrDisplay from "../../qr/QrDisplay.vue";
 import QrScan from "../../qr/QrScan.vue";
+import { field, primary, secondary } from "../classes";
 import MessageBanner from "../components/MessageBanner.vue";
 import { createScanCapture, type KeyLike } from "../scan-capture";
 import { useSession, type Message } from "../session";
@@ -122,10 +123,10 @@ async function onAnswer(text: string): Promise<void> {
     if (!alive) return;
     clearInterval(ticker);
     invite.value = null;
-    session.message = {
+    session.showBriefly({
       tone: "info",
       text: `Connected to ${peer.employee || "the new workstation"}`,
-    };
+    });
     session.screen = "scan";
   } catch (err) {
     dropInvite();
@@ -313,12 +314,6 @@ const title =
       ? "Re-pair this workstation"
       : "Join session";
 
-const field =
-  "block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none";
-const primary =
-  "min-h-12 rounded-lg border-2 border-blue-800 bg-blue-700 px-6 text-xl font-semibold text-white hover:bg-blue-800";
-const secondary =
-  "min-h-12 rounded-lg border-2 border-slate-700 bg-white px-6 text-xl font-semibold text-slate-900 hover:bg-slate-100";
 const step = "text-2xl font-bold text-slate-900";
 </script>
 
@@ -326,6 +321,13 @@ const step = "text-2xl font-bold text-slate-900";
   <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
     <div class="flex flex-wrap items-center gap-4">
       <h1 class="text-3xl font-extrabold text-slate-900">{{ title }}</h1>
+      <p
+        v-if="mode === 'invite' && invite && phase !== 'error' && phase !== 'working'"
+        class="text-lg text-slate-700"
+        data-testid="countdown"
+      >
+        Expires in <span class="font-mono font-bold">{{ countdown }}</span>
+      </p>
       <button v-if="!adopting" type="button" :class="[secondary, 'ml-auto']" @click="leave">
         Back
       </button>
@@ -360,9 +362,6 @@ const step = "text-2xl font-bold text-slate-900";
           :expires-at="invite.expiresAt"
           :file-name="inviteFile"
         />
-        <p class="text-lg text-slate-700" data-testid="countdown">
-          Expires in <span class="font-mono font-bold">{{ countdown }}</span>
-        </p>
       </section>
       <section class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5">
         <h2 :class="step">2. Scan the reply code shown on the new workstation</h2>

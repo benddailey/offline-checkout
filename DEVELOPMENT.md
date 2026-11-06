@@ -16,7 +16,9 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
 ## Stack
 
 - **Language and UI:** TypeScript, Vue 3 (`<script setup>` single-file components), Pinia for state,
-  Tailwind CSS 4.
+  Tailwind CSS 4. Buttons and text fields take their classes from `src/ui/classes.ts`. Each variant
+  is complete: a second colour or size class beside one loses or wins by CSS order, not class order,
+  so add a variant instead. Printed receipts use their own CSS in `src/print/`, sized in mm and pt.
 - **Toolchain:** Vite+ (`vp`, the `vite-plus` package):
   - `vp build` and `vp dev` (Vite);
   - `vp test` (Vitest, imported from `vite-plus/test`);

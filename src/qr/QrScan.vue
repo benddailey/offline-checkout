@@ -8,6 +8,7 @@ import {
   progressText,
 } from "../pairing/chunks";
 import { codeFromFile } from "../pairing/file";
+import { tool } from "../ui/classes";
 import QrCamera from "./QrCamera.vue";
 
 /** `files` adds Load code from file and drag-and-drop of a saved pairing file. */
@@ -141,7 +142,7 @@ function onDrop(e: DragEvent) {
     @dragleave="dragging = false"
     @drop="onDrop"
   >
-    <div class="relative h-72 w-full overflow-hidden rounded bg-slate-900">
+    <div class="relative h-52 w-full overflow-hidden rounded bg-slate-900">
       <QrCamera :paused="paused" @detect="onDetect" @error="cameraError = true" />
     </div>
     <p v-if="cameraError" role="alert" class="rounded bg-amber-100 p-2 text-base text-amber-900">
@@ -174,7 +175,7 @@ function onDrop(e: DragEvent) {
     <button
       v-if="collector.parts.size > 0"
       type="button"
-      class="min-h-12 self-start rounded-lg border-2 border-slate-700 bg-white px-6 text-lg font-semibold text-slate-900 hover:bg-slate-100"
+      :class="[tool, 'self-start']"
       @click="startOver"
     >
       Start over
@@ -183,41 +184,39 @@ function onDrop(e: DragEvent) {
       Pasted code
       <textarea
         v-model="pasted"
-        rows="4"
+        rows="2"
         class="w-full rounded border-2 border-slate-500 p-2 font-mono text-xs"
       />
     </label>
-    <button
-      type="button"
-      class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
-      @click="usePasted"
-    >
-      Use pasted code
-    </button>
-    <template v-if="files">
-      <input
-        ref="picker"
-        type="file"
-        accept=".txt,text/plain"
-        class="hidden"
-        data-testid="code-file"
-        @change="onPicked"
-      />
-      <button
-        type="button"
-        class="min-h-12 rounded-lg bg-slate-800 px-6 text-lg font-semibold text-white hover:bg-slate-700"
-        title="Open the temporary code file saved on the other workstation, from a shared network drive or flash drive. You can also drag the file here. Delete the file after pairing."
-        @click="picker?.click()"
-      >
-        Load code from file
+    <div class="flex flex-wrap gap-3">
+      <button type="button" :class="[tool, 'flex-1 whitespace-nowrap']" @click="usePasted">
+        Use pasted code
       </button>
-      <p
-        v-if="fileError"
-        role="alert"
-        class="rounded bg-red-100 p-2 text-base font-semibold text-red-900"
-      >
-        {{ fileError }}
-      </p>
-    </template>
+      <template v-if="files">
+        <input
+          ref="picker"
+          type="file"
+          accept=".txt,text/plain"
+          class="hidden"
+          data-testid="code-file"
+          @change="onPicked"
+        />
+        <button
+          type="button"
+          :class="[tool, 'flex-1 whitespace-nowrap']"
+          title="Open the temporary code file saved on the other workstation, from a shared network drive or flash drive. You can also drag the file here. Delete the file after pairing."
+          @click="picker?.click()"
+        >
+          Load code from file
+        </button>
+      </template>
+    </div>
+    <p
+      v-if="fileError"
+      role="alert"
+      class="rounded bg-red-100 p-2 text-base font-semibold text-red-900"
+    >
+      {{ fileError }}
+    </p>
   </div>
 </template>

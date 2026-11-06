@@ -5,6 +5,7 @@ import type { SessionSummary } from "../../store/db";
 import logoUrl from "../../../icons/icon-round.svg";
 import StartSessionForm from "../components/StartSessionForm.vue";
 import WorkstationNameForm from "../components/WorkstationNameForm.vue";
+import { field, primary, secondary, secondaryOn, tool } from "../classes";
 import { useSession } from "../session";
 import { otherWorkstations, type OtherWorkstation } from "../workstations";
 
@@ -103,13 +104,6 @@ async function resume(id: string) {
     busy.value = false;
   }
 }
-
-const field =
-  "block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none";
-const primary =
-  "min-h-12 rounded-lg border-2 border-blue-800 bg-blue-700 px-6 text-xl font-semibold text-white hover:bg-blue-800 disabled:opacity-50";
-const secondary =
-  "min-h-12 rounded-lg border-2 border-slate-700 bg-white px-6 text-xl font-semibold text-slate-900 hover:bg-slate-100 disabled:opacity-50";
 </script>
 
 <template>
@@ -147,9 +141,7 @@ const secondary =
       <span
         >Workstation: <b class="text-slate-900">{{ session.workstationName }}</b></span
       >
-      <button type="button" :class="[secondary, 'min-h-10 px-4 text-lg']" @click="renaming = true">
-        Rename
-      </button>
+      <button type="button" :class="tool" @click="renaming = true">Rename</button>
     </p>
 
     <div v-if="named && !recentOpen" class="grid gap-6 md:grid-cols-2">
@@ -183,9 +175,8 @@ const secondary =
             <button
               type="button"
               :class="[
-                secondary,
+                expanded === s.sessionId ? secondaryOn : secondary,
                 'flex w-full flex-wrap items-center justify-between gap-x-4 py-2 text-left',
-                expanded === s.sessionId ? 'border-blue-700 bg-blue-50' : '',
               ]"
               :disabled="busy"
               :aria-expanded="s.closedAt === undefined ? expanded === s.sessionId : undefined"
@@ -247,7 +238,7 @@ const secondary =
         <div class="flex flex-wrap gap-4">
           <button
             type="button"
-            :class="[secondary, showStart ? 'border-blue-700 bg-blue-50' : '']"
+            :class="showStart ? secondaryOn : secondary"
             :aria-expanded="showStart"
             @click="toggleStart"
           >

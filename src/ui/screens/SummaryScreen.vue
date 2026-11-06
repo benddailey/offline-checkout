@@ -5,6 +5,7 @@ import MessageBanner from "../components/MessageBanner.vue";
 import ScanInput from "../components/ScanInput.vue";
 import SessionClosedBanner from "../components/SessionClosedBanner.vue";
 import SlideToConfirm from "../components/SlideToConfirm.vue";
+import { danger, primary, secondary } from "../classes";
 import { evergreenStale, exportLines } from "../exports";
 import { trapTab } from "../focus-trap";
 import { useSession } from "../session";
@@ -112,12 +113,6 @@ function onScan(code: string): void {
   session.screen = "scan";
   void session.scan(code);
 }
-
-const button =
-  "min-h-12 rounded-lg border-2 px-5 text-xl font-semibold disabled:cursor-not-allowed disabled:opacity-40";
-const primary = `${button} border-blue-800 bg-blue-700 text-white hover:bg-blue-800 disabled:hover:bg-blue-700`;
-const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-slate-100 disabled:hover:bg-white`;
-const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`;
 </script>
 
 <template>

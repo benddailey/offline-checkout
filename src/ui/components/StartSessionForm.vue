@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { MAX_NAME } from "../../log/limits";
+import { field, primary } from "../classes";
 import { useSession, ymd } from "../session";
 
 const props = defineProps<{ autofocus?: boolean }>();
@@ -26,11 +27,6 @@ async function start() {
     busy.value = false;
   }
 }
-
-const field =
-  "block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none";
-const primary =
-  "min-h-12 rounded-lg border-2 border-blue-800 bg-blue-700 px-6 text-xl font-semibold text-white hover:bg-blue-800 disabled:opacity-50";
 </script>
 
 <template>

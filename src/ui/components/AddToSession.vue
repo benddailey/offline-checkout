@@ -13,6 +13,7 @@ import type { ImportSource } from "../../import/plan";
 import type { FileRejection, FileSource } from "../../import/rows";
 import { MAX_NAME, clampName } from "../../log/limits";
 import type { SessionSummary } from "../../store/db";
+import { field, primary, secondary } from "../classes";
 import { trapTab } from "../focus-trap";
 import { importLine, previewWarnings, sourceHeading, sourceLine } from "../import-preview";
 import { useSession } from "../session";
@@ -166,11 +167,6 @@ onUnmounted(() => {
   window.removeEventListener("drop", blockFileDrop);
   session.toolbarDialog = false;
 });
-
-const button =
-  "min-h-12 rounded-lg border-2 px-5 text-xl font-semibold disabled:cursor-not-allowed disabled:opacity-40";
-const primary = `${button} border-blue-800 bg-blue-700 text-white hover:bg-blue-800 disabled:hover:bg-blue-700`;
-const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-slate-100 disabled:hover:bg-white`;
 </script>
 
 <template>
@@ -280,7 +276,7 @@ const secondary = `${button} border-slate-700 bg-white text-slate-900 hover:bg-s
           <input
             ref="nameInput"
             v-model="clerk"
-            class="block min-h-12 w-full rounded-lg border-2 border-slate-500 bg-white px-3 text-xl focus:border-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none"
+            :class="field"
             type="text"
             autocomplete="off"
             aria-required="true"
