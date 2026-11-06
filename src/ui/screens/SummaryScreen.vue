@@ -5,7 +5,16 @@ import MessageBanner from "../components/MessageBanner.vue";
 import ScanInput from "../components/ScanInput.vue";
 import SessionClosedBanner from "../components/SessionClosedBanner.vue";
 import SlideToConfirm from "../components/SlideToConfirm.vue";
-import { danger, dialogBox, dialogOverlay, dialogText, primary, secondary } from "../classes";
+import {
+  danger,
+  dialogBox,
+  dialogOverlay,
+  dialogText,
+  primary,
+  secondary,
+  tool,
+  toolPrimary,
+} from "../classes";
 import { evergreenStale, exportLines } from "../exports";
 import { trapTab, vScrollStop } from "../focus-trap";
 import { useSession } from "../session";
@@ -116,7 +125,7 @@ function onScan(code: string): void {
 </script>
 
 <template>
-  <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-4">
+  <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 px-6 py-4">
     <SessionClosedBanner v-if="session.closed" />
 
     <div class="flex flex-wrap items-center gap-4">
@@ -129,7 +138,7 @@ function onScan(code: string): void {
       </div>
     </div>
 
-    <ScanInput :paused="confirming !== null || session.toolbarDialog" @scan="onScan" />
+    <ScanInput quiet :paused="confirming !== null || session.toolbarDialog" @scan="onScan" />
 
     <MessageBanner v-if="session.message" :message="session.message" />
 
@@ -143,147 +152,151 @@ function onScan(code: string): void {
       </li>
     </ul>
 
-    <section class="grid gap-4 md:grid-cols-2">
-      <div class="rounded-xl border-2 border-slate-300 bg-white p-5">
-        <h2 class="mb-2 text-2xl font-bold">Totals</h2>
-        <p class="text-xl">
-          Patrons <b>{{ session.state.totals.patrons }}</b> · Items
-          <b>{{ session.state.totals.items }}</b>
-        </p>
-        <h3 class="mt-4 mb-1 text-lg font-bold text-slate-700">By clerk</h3>
-        <p v-if="clerks.length === 0" class="text-lg text-slate-600">Nothing scanned yet.</p>
-        <ul v-else class="text-lg" data-testid="per-clerk">
-          <li v-for="c in clerks" :key="c.name">
-            {{ c.name }}: {{ c.patrons }} {{ c.patrons === 1 ? "patron" : "patrons" }},
-            {{ c.items }}
-            {{ c.items === 1 ? "item" : "items" }}
-          </li>
-        </ul>
-        <template v-if="workstations.length">
-          <h3 class="mt-4 mb-1 text-lg font-bold text-slate-700">By workstation</h3>
-          <ul class="text-lg" data-testid="per-workstation">
-            <li v-for="w in workstations" :key="w.name">
-              {{ w.name }}: {{ w.patrons }} {{ w.patrons === 1 ? "patron" : "patrons" }},
-              {{ w.items }}
-              {{ w.items === 1 ? "item" : "items" }}
+    <div class="grid items-start gap-4 md:grid-cols-2">
+      <div class="flex min-w-0 flex-col gap-4">
+        <section class="rounded-xl border-2 border-slate-300 bg-white p-5">
+          <h2 class="mb-2 text-xl font-bold">Totals</h2>
+          <p class="text-xl">
+            Patrons <b>{{ session.state.totals.patrons }}</b> · Items
+            <b>{{ session.state.totals.items }}</b>
+          </p>
+          <h3 class="mt-4 mb-1 text-lg font-bold text-slate-700">By clerk</h3>
+          <p v-if="clerks.length === 0" class="text-lg text-slate-600">Nothing scanned yet.</p>
+          <ul v-else class="text-lg" data-testid="per-clerk">
+            <li v-for="c in clerks" :key="c.name">
+              {{ c.name }}: {{ c.patrons }} {{ c.patrons === 1 ? "patron" : "patrons" }},
+              {{ c.items }}
+              {{ c.items === 1 ? "item" : "items" }}
             </li>
           </ul>
-        </template>
-      </div>
+          <template v-if="workstations.length">
+            <h3 class="mt-4 mb-1 text-lg font-bold text-slate-700">By workstation</h3>
+            <ul class="text-lg" data-testid="per-workstation">
+              <li v-for="w in workstations" :key="w.name">
+                {{ w.name }}: {{ w.patrons }} {{ w.patrons === 1 ? "patron" : "patrons" }},
+                {{ w.items }}
+                {{ w.items === 1 ? "item" : "items" }}
+              </li>
+            </ul>
+          </template>
+        </section>
 
-      <div
-        class="flex flex-col items-start gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
-      >
-        <h2 class="text-2xl font-bold">Export</h2>
-        <button
-          type="button"
-          :class="primary"
-          :disabled="!canGenerate"
-          :aria-describedby="canGenerate ? undefined : 'generate-hint'"
-          @click="exportSession('pdf')"
-        >
-          Generate PDF
-        </button>
-        <div class="flex flex-wrap gap-3">
-          <button
-            type="button"
-            :class="secondary"
-            :disabled="!canGenerate"
-            :aria-describedby="canGenerate ? undefined : 'generate-hint'"
-            @click="exportSession('csv')"
-          >
-            Download CSV
-          </button>
-          <button
-            type="button"
-            :class="secondary"
-            :disabled="!canGenerate"
-            :aria-describedby="canGenerate ? undefined : 'generate-hint'"
-            @click="exportSession('xlsx')"
-          >
-            Download Excel
-          </button>
-          <button
-            type="button"
-            :class="secondary"
-            :disabled="!hasItems"
-            :aria-describedby="hasItems ? undefined : 'generate-hint'"
-            @click="exportSession('xacts')"
-          >
-            Download for Evergreen
-          </button>
-        </div>
-        <p v-if="!canGenerate" id="generate-hint" class="text-lg text-slate-600">
-          Scan at least one patron first
-        </p>
-        <p v-else-if="!hasItems" id="generate-hint" class="text-lg text-slate-600">
-          Scan at least one item to download for Evergreen
-        </p>
-        <p
-          v-if="evergreenStaleNow"
-          data-testid="evergreen-stale"
-          class="text-lg font-semibold text-red-800"
-        >
-          Items were added after the last Evergreen download. The new file contains every checkout
-          in the session, so upload only one of them unless the earlier one was never uploaded.
-        </p>
-        <h2 class="mt-2 text-2xl font-bold">Scanner card</h2>
-        <div class="flex flex-wrap gap-3">
-          <button type="button" :class="secondary" @click="session.printScannerCard('receipt')">
-            Receipt printer
-          </button>
-          <button type="button" :class="secondary" @click="session.printScannerCard('letter')">
-            Letter PDF
-          </button>
-        </div>
-        <template v-if="!session.closed">
-          <h2 class="mt-2 text-2xl font-bold">End the session</h2>
-          <button type="button" :class="danger" @click="ask('close')">Close session</button>
-        </template>
-        <template v-else>
-          <h2 class="mt-2 text-2xl font-bold">Delete session</h2>
-          <button type="button" :class="danger" @click="ask('delete')">Delete session</button>
-        </template>
-      </div>
-    </section>
-
-    <AddToSession />
-
-    <section class="flex flex-col gap-3">
-      <h2 class="text-2xl font-bold">Patrons</h2>
-      <p v-if="patrons.length === 0" class="text-lg text-slate-600">No patrons scanned yet.</p>
-      <ol v-else class="flex flex-col gap-3" data-testid="summary-patrons">
-        <li
-          v-for="p in patrons"
-          :key="p.patron"
-          class="rounded-lg border-2 border-slate-300 bg-white p-4"
-          data-testid="summary-patron"
-        >
-          <div class="flex flex-wrap items-baseline gap-x-4">
-            <span
-              class="font-mono text-2xl font-bold"
-              :class="p.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
-            >
-              {{ p.patron }}
-            </span>
-            <span v-if="p.voided" class="text-lg text-slate-500">voided</span>
-            <span v-else class="text-lg text-slate-600">
-              {{ p.items }} {{ p.items === 1 ? "item" : "items" }} · {{ p.clerks.join(", ") }}
-            </span>
-          </div>
-          <ul v-if="p.rows.length" class="mt-2 flex flex-wrap gap-x-6 gap-y-1 pl-4">
+        <section class="flex flex-col gap-3">
+          <h2 class="text-xl font-bold">Patrons</h2>
+          <p v-if="patrons.length === 0" class="text-lg text-slate-600">No patrons scanned yet.</p>
+          <ol v-else class="flex flex-col gap-3" data-testid="summary-patrons">
             <li
-              v-for="r in p.rows"
-              :key="r.id"
-              class="font-mono text-xl"
-              :class="r.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
+              v-for="p in patrons"
+              :key="p.patron"
+              class="rounded-lg border-2 border-slate-300 bg-white p-4"
+              data-testid="summary-patron"
             >
-              {{ r.barcode }}
+              <div class="flex flex-wrap items-baseline gap-x-4">
+                <span
+                  class="font-mono text-2xl font-bold"
+                  :class="p.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
+                >
+                  {{ p.patron }}
+                </span>
+                <span v-if="p.voided" class="text-lg text-slate-500">voided</span>
+                <span v-else class="text-lg text-slate-600">
+                  {{ p.items }} {{ p.items === 1 ? "item" : "items" }} · {{ p.clerks.join(", ") }}
+                </span>
+              </div>
+              <ul v-if="p.rows.length" class="mt-2 flex flex-wrap gap-x-6 gap-y-1 pl-4">
+                <li
+                  v-for="r in p.rows"
+                  :key="r.id"
+                  class="font-mono text-xl"
+                  :class="r.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
+                >
+                  {{ r.barcode }}
+                </li>
+              </ul>
             </li>
-          </ul>
-        </li>
-      </ol>
-    </section>
+          </ol>
+        </section>
+      </div>
+
+      <div class="flex min-w-0 flex-col gap-4">
+        <section
+          class="flex flex-col items-start gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
+        >
+          <h2 class="text-xl font-bold">Export</h2>
+          <button
+            type="button"
+            :class="toolPrimary"
+            :disabled="!canGenerate"
+            :aria-describedby="canGenerate ? undefined : 'generate-hint'"
+            @click="exportSession('pdf')"
+          >
+            Generate PDF
+          </button>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              :class="tool"
+              :disabled="!canGenerate"
+              :aria-describedby="canGenerate ? undefined : 'generate-hint'"
+              @click="exportSession('csv')"
+            >
+              Download CSV
+            </button>
+            <button
+              type="button"
+              :class="tool"
+              :disabled="!canGenerate"
+              :aria-describedby="canGenerate ? undefined : 'generate-hint'"
+              @click="exportSession('xlsx')"
+            >
+              Download Excel
+            </button>
+            <button
+              type="button"
+              :class="tool"
+              :disabled="!hasItems"
+              :aria-describedby="hasItems ? undefined : 'generate-hint'"
+              @click="exportSession('xacts')"
+            >
+              Download for Evergreen
+            </button>
+          </div>
+          <p v-if="!canGenerate" id="generate-hint" class="text-lg text-slate-600">
+            Scan at least one patron first
+          </p>
+          <p v-else-if="!hasItems" id="generate-hint" class="text-lg text-slate-600">
+            Scan at least one item to download for Evergreen
+          </p>
+          <p
+            v-if="evergreenStaleNow"
+            data-testid="evergreen-stale"
+            class="text-lg font-semibold text-red-800"
+          >
+            Items were added after the last Evergreen download. The new file contains every checkout
+            in the session, so upload only one of them unless the earlier one was never uploaded.
+          </p>
+          <h2 class="mt-1 text-xl font-bold">Scanner card</h2>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" :class="tool" @click="session.printScannerCard('receipt')">
+              Receipt printer
+            </button>
+            <button type="button" :class="tool" @click="session.printScannerCard('letter')">
+              Letter PDF
+            </button>
+          </div>
+          <template v-if="!session.closed">
+            <h2 class="mt-1 text-xl font-bold">End the session</h2>
+            <button type="button" :class="danger" @click="ask('close')">Close session</button>
+          </template>
+          <template v-else>
+            <h2 class="mt-1 text-xl font-bold">Delete session</h2>
+            <button type="button" :class="danger" @click="ask('delete')">Delete session</button>
+          </template>
+        </section>
+
+        <AddToSession />
+      </div>
+    </div>
 
     <div
       v-if="confirming"

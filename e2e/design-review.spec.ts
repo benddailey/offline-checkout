@@ -622,5 +622,28 @@ test.describe("dialog text", () => {
     await dialog.getByLabel("Your name").fill("Ann");
     await expect(add).toBeEnabled();
     await expect(hint).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Close", exact: true })).toHaveCount(0);
+  });
+});
+
+test.describe("summary", () => {
+  test("Close session and the patron list show without scrolling", async ({ page }) => {
+    await ready(page);
+    await scan(page, "P1", "I1", "OC-END");
+    await page.getByRole("button", { name: "Summary" }).click();
+    await expect(page.getByRole("button", { name: "Close session" })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("heading", { name: "Patrons" })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId("summary-patron").first()).toBeInViewport();
+  });
+
+  test("the scanner input is quiet here but prominent on the scan screen", async ({ page }) => {
+    await ready(page);
+    const input = page.getByLabel("Scanner input");
+    await expect(input).toHaveCSS("border-top-width", "4px");
+    await page.getByRole("button", { name: "Summary" }).click();
+    await page.getByRole("heading", { name: "Session summary" }).waitFor();
+    await expect(input).toHaveCSS("border-top-width", "2px");
+    expect((await input.boundingBox())!.height).toBeLessThanOrEqual(44);
+    await expect(input).toBeFocused();
   });
 });
