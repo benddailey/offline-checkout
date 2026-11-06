@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 import { buildCsv } from "../export/csv";
 import type { ExportRow } from "../export/rows";
 import { buildXacts } from "../export/xacts";
-import { MAX_FILE_BYTES, readImportFile, readImportFiles } from "./read";
+import { checkRows, MAX_FILE_BYTES, readImportFile, readImportFiles } from "./read";
 import type { FileRejection, FileSource } from "./rows";
 
 const now = new Date(2026, 10, 6, 12, 0, 0).getTime();
@@ -95,4 +95,13 @@ test("readImportFiles rejects only the unreadable file", async () => {
   const out = await readImportFiles([gone, good], now);
   expect(out[0]).toEqual({ name: "folder", reason: "This file could not be read." });
   expect(out[1]).toMatchObject({ kind: "file", name: "good.csv", format: "csv" });
+});
+
+test("the shared check rejects a time that is not a finite number", () => {
+  for (const scannedAt of [NaN, Infinity]) {
+    const rows = [
+      { patron: "P1", item: "I1", scannedAt, clerk: "", workstation: "", rowNumber: 2 },
+    ];
+    expect(() => checkRows(rows, "xlsx", now)).toThrow("Row 2: Scanned at is not a date.");
+  }
 });

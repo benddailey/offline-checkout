@@ -9,6 +9,7 @@ import type { FileRejection, FileSource } from "../import/rows";
 import { sessionSource, type SessionSource } from "../import/session";
 import { randomId, recordId } from "../log/ids";
 import { reduce } from "../log/reduce";
+import { isLogRecord } from "../log/validate";
 import type {
   ExportKind,
   ItemState,
@@ -927,6 +928,7 @@ export const useSession = defineStore("session", () => {
       const plan = planFor(sources);
       if (!plan.anythingNew) return;
       try {
+        if (!plan.records.every(isLogRecord)) throw new Error("a record was not valid");
         const written = await target.importRecords(
           plan.records,
           plan.audits.map((body) => ({ employee: clerk, body })),

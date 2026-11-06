@@ -1846,6 +1846,21 @@ describe("addToSession", () => {
     expect(s.state.totals.patrons).toBe(1);
   });
 
+  it("refuses to store an invalid record, and changes nothing", async () => {
+    const s = await started();
+    const before = db.logs.get(s.meta!.sessionId)!.length;
+    const bad = fileOf("a.csv", [["P1", "I1"]]);
+    bad.rows[0]!.scannedAt = NaN;
+    expect(await s.addToSession([bad], "Bob")).toBe(false);
+    expect(s.message).toEqual({
+      tone: "error",
+      text: "Could not add to this session, so nothing was changed. (a record was not valid)",
+    });
+    expect(s.fatal).toBeNull();
+    expect(db.logs.get(s.meta!.sessionId)).toHaveLength(before);
+    expect(s.records).toHaveLength(before);
+  });
+
   it("doesn't add to a session that was switched", async () => {
     const s = await started();
     const first = s.meta!.sessionId;

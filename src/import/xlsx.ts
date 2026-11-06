@@ -9,6 +9,8 @@ const UNKNOWN = "This isn't a file exported by Offline Checkout.";
 const WORKBOOK = "xl/workbook.xml";
 const RELS = "xl/_rels/workbook.xml.rels";
 const SHARED = "xl/sharedStrings.xml";
+/** 31 December 9999, the last date Excel accepts. */
+const MAX_SERIAL = 2_958_465;
 
 /** Inverse of `excelDate`: the serial's wall clock, to the second, as a local time. */
 export function fromExcelDate(serial: number): number {
@@ -205,13 +207,17 @@ export function parseXlsx(bytes: Uint8Array, opts: { maxPartBytes?: number } = {
     const when = at(2);
     if (when?.text) throw new RejectFile(`Row ${r.rowNumber}: Scanned at is not a date.`);
     const serial = when ? Number(when.value) : null;
-    if (serial !== null && !Number.isFinite(serial)) {
+    const scannedAt = serial === null ? null : fromExcelDate(serial);
+    if (
+      serial !== null &&
+      (!Number.isFinite(serial) || serial < 0 || serial > MAX_SERIAL || !Number.isFinite(scannedAt))
+    ) {
       throw new RejectFile(`Row ${r.rowNumber}: Scanned at is not a date.`);
     }
     return {
       patron,
       item,
-      scannedAt: serial === null ? null : fromExcelDate(serial),
+      scannedAt,
       clerk: at(3)?.value ?? "",
       workstation: at(4)?.value ?? "",
       rowNumber: r.rowNumber,

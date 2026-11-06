@@ -127,6 +127,25 @@ test("rejects numeric Patron and Item cells", () => {
   );
 });
 
+test("rejects a Scanned at serial outside Excel's range, or a boolean", () => {
+  const bad = "Row 2: Scanned at is not a date.";
+  for (const cell of [
+    n("C2", 21234567890123),
+    n("C2", -1),
+    n("C2", 2958466),
+    '<c r="C2" t="b"><v>1</v></c>',
+  ]) {
+    expect(reasonOf(() => parseXlsx(one(`<row r="2">${t("A2", "P")}${cell}</row>`)))).toBe(bad);
+  }
+  const bytes = one(`<row r="2">${t("A2", "P")}${n("C2", 21234567890123)}</row>`);
+  expect(reasonOf(() => parseXlsx(bytes))).toBe(bad);
+  expect(
+    Number.isFinite(
+      parseXlsx(one(`<row r="2">${t("A2", "P")}${n("C2", 46000.5)}</row>`))[0]!.scannedAt,
+    ),
+  ).toBe(true);
+});
+
 test("rejects text in Scanned at, but allows it empty", () => {
   expect(
     reasonOf(() => parseXlsx(one(`<row r="2">${t("A2", "P")}${t("C2", "yesterday")}</row>`))),

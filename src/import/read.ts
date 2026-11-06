@@ -25,13 +25,16 @@ function checkBarcode(value: string, rowNumber: number, label: string): void {
   if (!check.ok) throw new RejectFile(`${label} ${rowNumber}: ${check.reason}`);
 }
 
-function checkRows(rows: NumberedRow[], format: FileFormat, now: number): void {
+export function checkRows(rows: NumberedRow[], format: FileFormat, now: number): void {
   const label = format === "xacts" ? "Line" : "Row";
   for (const r of rows) {
     checkBarcode(r.patron, r.rowNumber, label);
     if (r.item !== "") checkBarcode(r.item, r.rowNumber, label);
     if (r.item !== "" && r.scannedAt === null) {
       throw new RejectFile(`${label} ${r.rowNumber}: the item has no time.`);
+    }
+    if (r.scannedAt !== null && !Number.isFinite(r.scannedAt)) {
+      throw new RejectFile(`${label} ${r.rowNumber}: Scanned at is not a date.`);
     }
     if (r.scannedAt !== null && r.scannedAt > now + DAY) {
       throw new RejectFile(`${label} ${r.rowNumber}: the time is more than a day in the future.`);
