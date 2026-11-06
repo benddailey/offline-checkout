@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useTemplateRef, watch } from "vue";
 import { MAX_NAME } from "../../log/limits";
-import { danger, field, primary, secondary, tool, toolDanger } from "../classes";
+import {
+  danger,
+  dialogBox,
+  dialogOverlay,
+  field,
+  primary,
+  secondary,
+  tool,
+  toolDanger,
+} from "../classes";
 import { useSession } from "../session";
 
 const session = useSession();
@@ -156,19 +165,14 @@ function trapTab(e: KeyboardEvent): void {
       </p>
     </div>
 
-    <div
-      v-if="dialog"
-      class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6"
-      @keydown.esc="dialog = null"
-      @keydown.tab="trapTab"
-    >
+    <div v-if="dialog" :class="dialogOverlay" @keydown.esc="dialog = null" @keydown.tab="trapTab">
       <form
         v-if="dialog === 'clerk'"
         ref="box"
         role="dialog"
         aria-modal="true"
         aria-labelledby="clerk-title"
-        class="flex w-full max-w-xl flex-col gap-5 rounded-xl border-4 border-blue-700 bg-white p-6"
+        :class="[dialogBox, 'w-full max-w-xl border-blue-700']"
         @submit.prevent="saveClerk"
       >
         <h2 id="clerk-title" class="text-3xl font-extrabold">Change clerk</h2>
@@ -201,7 +205,7 @@ function trapTab(e: KeyboardEvent): void {
         aria-modal="true"
         aria-labelledby="exit-title"
         aria-describedby="exit-text"
-        class="flex max-w-xl flex-col gap-5 rounded-xl border-4 border-red-700 bg-white p-6"
+        :class="[dialogBox, 'max-w-xl border-red-700']"
       >
         <h2 id="exit-title" class="text-3xl font-extrabold">Exit session</h2>
         <p id="exit-text" class="text-2xl">

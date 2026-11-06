@@ -5,9 +5,9 @@ import MessageBanner from "../components/MessageBanner.vue";
 import ScanInput from "../components/ScanInput.vue";
 import SessionClosedBanner from "../components/SessionClosedBanner.vue";
 import SlideToConfirm from "../components/SlideToConfirm.vue";
-import { danger, primary, secondary } from "../classes";
+import { danger, dialogBox, dialogOverlay, dialogText, primary, secondary } from "../classes";
 import { evergreenStale, exportLines } from "../exports";
-import { trapTab } from "../focus-trap";
+import { trapTab, vScrollStop } from "../focus-trap";
 import { useSession } from "../session";
 import { summaryPatrons } from "../summary";
 import { hasWorkstations, workstationLabel } from "../../log/reduce";
@@ -287,7 +287,7 @@ function onScan(code: string): void {
 
     <div
       v-if="confirming"
-      class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6"
+      :class="dialogOverlay"
       @keydown.esc="dismiss"
       @keydown.tab="trapTab(dialog, $event)"
     >
@@ -297,10 +297,11 @@ function onScan(code: string): void {
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-text"
-        class="flex max-w-xl flex-col gap-5 rounded-xl border-4 bg-white p-6"
-        :class="
-          confirming === 'close' || confirming === 'delete' ? 'border-red-700' : 'border-amber-600'
-        "
+        :class="[
+          dialogBox,
+          'max-w-xl',
+          confirming === 'close' || confirming === 'delete' ? 'border-red-700' : 'border-amber-600',
+        ]"
       >
         <h2 id="confirm-title" class="text-3xl font-extrabold">
           {{
@@ -309,7 +310,7 @@ function onScan(code: string): void {
               : (confirmingExport?.action ?? "Close session")
           }}
         </h2>
-        <div id="confirm-text" class="flex flex-col gap-3 text-2xl">
+        <div id="confirm-text" v-scroll-stop :class="dialogText">
           <p v-if="confirming === 'close'">
             Close this session for all workstations? Scanning will stop everywhere. This can't be
             undone. Stopping for the day? Use <strong>Exit session</strong> instead, and resume

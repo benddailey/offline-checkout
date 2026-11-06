@@ -13,7 +13,7 @@ import type { ImportSource } from "../../import/plan";
 import type { FileRejection, FileSource } from "../../import/rows";
 import { MAX_NAME, clampName } from "../../log/limits";
 import type { SessionSummary } from "../../store/db";
-import { field, primary, secondary } from "../classes";
+import { dialogBox, dialogOverlay, field, primary, secondary } from "../classes";
 import { trapTab } from "../focus-trap";
 import { importLine, previewWarnings, sourceHeading, sourceLine } from "../import-preview";
 import { useSession } from "../session";
@@ -226,7 +226,7 @@ onUnmounted(() => {
 
     <div
       v-if="sources"
-      class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6 outline-none"
+      :class="[dialogOverlay, 'outline-none']"
       tabindex="-1"
       @keydown.esc="dismiss"
       @keydown.tab="trapTab(dialog, $event)"
@@ -236,7 +236,7 @@ onUnmounted(() => {
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-title"
-        class="flex max-h-[90vh] w-full max-w-3xl flex-col gap-4 overflow-y-auto rounded-xl border-4 border-blue-700 bg-white p-6"
+        :class="[dialogBox, 'w-full max-w-3xl border-blue-700']"
       >
         <h2 id="add-title" class="text-3xl font-extrabold">Add to this session</h2>
 

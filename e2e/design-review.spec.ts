@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openApp, startSession } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { stubPrint } from "./helpers/print";
@@ -133,6 +133,95 @@ test("the slide handle and its arrow are centred in the track", async ({ page })
   expect(m.arrowOffsetX).toBe(0);
   expect(m.handleOffset).toBe(0);
   expect(m.overhang).toBeLessThan(0);
+});
+
+/** The dialog stays inside the window, and scrolling it reaches every control. */
+async function expectReachable(page: Page, dialog: Locator, height: number): Promise<void> {
+  await page.setViewportSize({ width: 1366, height });
+  const box = (await dialog.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(height);
+  for (const control of await dialog.locator("button, input, [role=slider]").all()) {
+    await control.scrollIntoViewIfNeeded();
+    await expect(control).toBeInViewport({ ratio: 1 });
+  }
+}
+
+test("a tall dialog keeps its title and controls on screen and scrolls its text", async ({
+  page,
+}) => {
+  await ready(page);
+  await closeSession(page);
+  await page.getByRole("button", { name: "Delete session" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await page.setViewportSize({ width: 1366, height: 420 });
+
+  const title = dialog.getByRole("heading", { name: "Delete session" });
+  const slider = dialog.getByRole("slider");
+  const cancel = dialog.getByRole("button", { name: "Cancel" });
+  for (const part of [title, slider, cancel]) {
+    await expect(part).toBeInViewport({ ratio: 1 });
+  }
+
+  const text = dialog.locator("#confirm-text");
+  const sizes = await text.evaluate((el) => ({ all: el.scrollHeight, shown: el.clientHeight }));
+  expect(sizes.all).toBeGreaterThan(sizes.shown);
+  const warning = dialog.getByText("Download the Evergreen file first");
+  await warning.scrollIntoViewIfNeeded();
+  await expect(warning).toBeInViewport({ ratio: 1 });
+  for (const part of [title, slider, cancel]) {
+    await expect(part).toBeInViewport({ ratio: 1 });
+  }
+
+  // A keyboard can scroll it too, without leaving the dialog.
+  await cancel.focus();
+  await page.keyboard.press("Tab");
+  await expect(text).toBeFocused();
+});
+
+test("every dialog can be scrolled to all its controls in a very short window", async ({
+  browser,
+}) => {
+  test.setTimeout(60_000);
+  const contexts = await Promise.all([1, 2].map(() => browser.newContext({ viewport: WINDOW })));
+  try {
+    const [a, b] = await Promise.all(contexts.map((c) => c.newPage()));
+    await ready(a!);
+    await stubPrint(b!);
+    await openApp(b!, "Desk 2");
+    await pairViaPaste(a!, b!, "Ben");
+
+    await scan(a!, "P1", "I1");
+    await a!.getByRole("button", { name: "Void patron" }).click();
+    await expectReachable(a!, a!.getByRole("alertdialog"), 240);
+    await a!.setViewportSize(WINDOW);
+    await a!.keyboard.press("Escape");
+    await scan(a!, "OC-END");
+
+    await a!.getByRole("button", { name: "Change clerk" }).click();
+    await expectReachable(a!, a!.getByRole("dialog"), 240);
+    await a!.setViewportSize(WINDOW);
+    await a!.keyboard.press("Escape");
+
+    await a!.getByRole("button", { name: "Exit session" }).click();
+    await expectReachable(a!, a!.getByRole("alertdialog"), 240);
+    await a!.setViewportSize(WINDOW);
+    await a!.keyboard.press("Escape");
+
+    await a!.getByRole("button", { name: "Summary" }).click();
+    await a!.getByRole("button", { name: "Close session" }).click();
+    await expectReachable(a!, a!.getByRole("alertdialog"), 240);
+    await a!.setViewportSize(WINDOW);
+    await a!.keyboard.press("Escape");
+    await expect(a!.getByRole("alertdialog")).toHaveCount(0);
+
+    await a!.getByRole("button", { name: "Close session" }).click();
+    await a!.getByRole("button", { name: "Yes, close session" }).click();
+    await a!.getByRole("button", { name: "Delete session" }).click();
+    await expectReachable(a!, a!.getByRole("alertdialog"), 240);
+  } finally {
+    await Promise.all(contexts.map((c) => c.close()));
+  }
 });
 
 test.describe("pairing", () => {

@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, useTemplateRef } from "vue";
-import { danger, dangerOutline, primary, secondary, success, toolDanger } from "../classes";
+import {
+  danger,
+  dangerOutline,
+  dialogBox,
+  dialogOverlay,
+  primary,
+  secondary,
+  success,
+  toolDanger,
+} from "../classes";
 import MessageBanner from "../components/MessageBanner.vue";
 import ScanInput from "../components/ScanInput.vue";
 import SessionClosedBanner from "../components/SessionClosedBanner.vue";
@@ -150,7 +159,7 @@ function printCard(format: "receipt" | "letter") {
 
     <div
       v-if="confirmingVoid && session.currentVisit"
-      class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6"
+      :class="dialogOverlay"
       @keydown.esc="dismissVoid"
       @keydown.tab="trapTab(dialog, $event)"
     >
@@ -160,7 +169,7 @@ function printCard(format: "receipt" | "letter") {
         aria-modal="true"
         aria-labelledby="void-title"
         aria-describedby="void-text"
-        class="flex max-w-xl flex-col gap-5 rounded-xl border-4 border-red-700 bg-white p-6"
+        :class="[dialogBox, 'max-w-xl border-red-700']"
       >
         <h2 id="void-title" class="text-3xl font-extrabold">Void patron</h2>
         <p id="void-text" class="text-2xl">
