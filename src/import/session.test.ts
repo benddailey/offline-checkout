@@ -109,7 +109,7 @@ describe("rewriteSession", () => {
 
   it("drops replaced records' body fields", async () => {
     const out = await rewriteSession(source(), SRC, TARGET);
-    const gap = out[0]! as Record<string, unknown>;
+    const gap = out[0]!;
     expect(gap.type).toBe("import-gap");
     expect(Object.keys(gap).sort()).toEqual(
       ["at", "deviceId", "employee", "imported", "seq", "sessionId", "type"].sort(),
