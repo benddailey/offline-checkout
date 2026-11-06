@@ -172,7 +172,7 @@ onUnmounted(() => {
 
 <template>
   <section class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5">
-    <h2 class="text-2xl font-bold">Add to this session</h2>
+    <h2 class="text-xl font-bold">Add to this session</h2>
 
     <div class="flex flex-col items-start gap-2" data-testid="other-sessions">
       <h3 class="text-lg font-bold text-slate-700">Add another session</h3>
@@ -285,6 +285,13 @@ onUnmounted(() => {
           />
         </label>
 
+        <p
+          v-if="ready && clampName(clerk) === ''"
+          id="add-name-hint"
+          class="text-lg text-slate-600"
+        >
+          Enter your name to add these.
+        </p>
         <div v-if="ready" class="flex flex-wrap gap-3">
           <button
             type="button"
@@ -299,13 +306,6 @@ onUnmounted(() => {
             Cancel
           </button>
         </div>
-        <p
-          v-if="ready && clampName(clerk) === ''"
-          id="add-name-hint"
-          class="text-lg text-slate-600"
-        >
-          Enter your name to add these.
-        </p>
         <div v-else>
           <button ref="closeButton" type="button" :class="secondary" @click="closePreview">
             Close
