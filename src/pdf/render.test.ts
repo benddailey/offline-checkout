@@ -21,6 +21,7 @@ function state(visits: unknown[], name: string | null = "Spring Sale"): SessionS
     perClerk: { Zed: { patrons: 1, items: 1 }, Amy: { patrons: 2, items: 3 } },
     perWorkstation: { "": { patrons: 3, items: 4 } },
     exports: [],
+    imports: [],
   } as unknown as SessionState;
 }
 

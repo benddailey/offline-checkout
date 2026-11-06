@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { MAX_NAME } from "./limits";
 import type { LogRecord, RecordBody } from "./types";
 import { isLogRecord } from "./validate";
 
@@ -11,6 +12,25 @@ function rec(seq: number, body: RecordBody, deviceId = DEV): LogRecord {
 }
 
 describe("isLogRecord", () => {
+  const env = { sessionId: SID, deviceId: DEV, seq: 1, employee: "Ann", at: 1000 };
+  const patron = { ...env, type: "patron-started", patron: "P1" };
+
+  it("accepts imported only as true or absent", () => {
+    expect(isLogRecord({ ...patron, imported: true })).toBe(true);
+    expect(isLogRecord({ ...patron, imported: false })).toBe(false);
+    expect(isLogRecord({ ...patron, imported: 1 })).toBe(false);
+  });
+
+  it("checks import records", () => {
+    const body = { type: "imported", source: "file", name: "a.csv", patrons: 1, items: 2 };
+    expect(isLogRecord({ ...env, ...body })).toBe(true);
+    expect(isLogRecord({ ...env, ...body, source: "pdf" })).toBe(false);
+    expect(isLogRecord({ ...env, ...body, name: "x".repeat(MAX_NAME + 1) })).toBe(false);
+    expect(isLogRecord({ ...env, ...body, patrons: -1 })).toBe(false);
+    expect(isLogRecord({ ...env, ...body, items: 1.5 })).toBe(false);
+    expect(isLogRecord({ ...env, type: "import-gap" })).toBe(true);
+  });
+
   it("accepts every valid record type", () => {
     for (const r of [
       rec(1, { type: "session-created", name: "n" }),

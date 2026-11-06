@@ -8,6 +8,8 @@ export interface Envelope {
   /** The workstation's name when the record was written; absent on records from before names. */
   workstation?: string;
   at: number;
+  /** Set on records copied in from another session or file; absent otherwise. */
+  imported?: true;
 }
 
 export type ExportKind = "pdf" | "csv" | "xlsx" | "xacts";
@@ -19,7 +21,11 @@ export type RecordBody =
   | { type: "patron-ended"; visitId: RecordId }
   | { type: "voided"; target: RecordId }
   | { type: "session-closed" }
-  | { type: "exported"; kind: ExportKind };
+  | { type: "exported"; kind: ExportKind }
+  | { type: "imported"; source: "session" | "file"; name: string; patrons: number; items: number }
+  | { type: "import-gap" };
+
+export type ImportedBody = Extract<RecordBody, { type: "imported" }>;
 
 export type LogRecord = Envelope & RecordBody;
 
@@ -44,11 +50,23 @@ export interface VisitState {
   at: number;
   ended: boolean;
   voided: boolean;
+  imported: boolean;
   items: ItemState[];
 }
 
 export interface ExportState {
   kind: ExportKind;
+  at: number;
+  employee: string;
+  /** "" when the record has no workstation name. */
+  workstation: string;
+}
+
+export interface ImportState {
+  source: "session" | "file";
+  name: string;
+  patrons: number;
+  items: number;
   at: number;
   employee: string;
   /** "" when the record has no workstation name. */
@@ -72,6 +90,8 @@ export interface SessionState {
   perWorkstation: Record<string, { patrons: number; items: number }>;
   /** Downloads recorded in the log, in record order. */
   exports: ExportState[];
+  /** Imports recorded in the log, in record order. */
+  imports: ImportState[];
 }
 
 export type VersionVector = Record<string, number>;
