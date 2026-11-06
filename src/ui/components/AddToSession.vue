@@ -227,7 +227,7 @@ onUnmounted(() => {
 
     <div
       v-if="sources"
-      :class="[dialogOverlay, 'outline-none']"
+      :class="dialogOverlay"
       tabindex="-1"
       @keydown.esc="dismiss"
       @keydown.tab="trapTab(dialog, $event)"

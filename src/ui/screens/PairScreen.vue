@@ -167,7 +167,8 @@ function onOffer(text: string): void {
 }
 
 const clerkInput = useTemplateRef<HTMLInputElement>("clerkInput");
-const vFocus = { mounted: (el: HTMLElement) => el.focus() };
+/** Not on a re-pair: a scan there must record into the open session, not land in the name. */
+const vFocus = { mounted: (el: HTMLElement) => repair || el.focus() };
 
 async function submitName(): Promise<void> {
   const name = clerk.value.trim();

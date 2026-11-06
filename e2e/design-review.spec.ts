@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { appUrl, openApp, startSession } from "./helpers/app";
+import { appUrl, openApp, resumeAs, startSession } from "./helpers/app";
 import { pairViaPaste } from "./helpers/pair";
 import { stubPrint } from "./helpers/print";
 
@@ -69,6 +69,108 @@ test("Void patron does not ask for a patron with no items", async ({ page }) => 
   await page.getByRole("button", { name: "Void patron" }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await expect(page.getByText("Scan patron card")).toBeVisible();
+});
+
+test("scanning still works if the patron ends just as Void patron is clicked", async ({ page }) => {
+  await ready(page);
+  await scan(page, "P1", "I1");
+  await expect(page.getByTestId("item")).toHaveCount(1);
+  // In one task, so the click lands before OC-END has finished saving.
+  await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>('[data-testid="scan-input"]')!;
+    input.value = "OC-END";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent?.trim() === "Void patron")!
+      .click();
+  });
+  await expect(page.getByText("Scan patron card")).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await scan(page, "P2");
+  await expect(page.getByTestId("patron")).toHaveText("P2");
+});
+
+test("the Void patron dialog closes when another desk closes the session", async ({ browser }) => {
+  test.setTimeout(60_000);
+  const contexts = await Promise.all([1, 2].map(() => browser.newContext({ viewport: WINDOW })));
+  try {
+    const [a, b] = await Promise.all(contexts.map((c) => c.newPage()));
+    await ready(a!);
+    await stubPrint(b!);
+    await openApp(b!, "Desk 2");
+    await pairViaPaste(a!, b!, "Ben");
+    await scan(a!, "P1", "I1");
+    await expect(a!.getByTestId("item")).toHaveCount(1);
+    await a!.getByRole("button", { name: "Void patron" }).click();
+    await expect(a!.getByRole("alertdialog")).toBeVisible();
+
+    await closeSession(b!);
+
+    await expect(a!.getByRole("alertdialog")).toHaveCount(0, { timeout: 15_000 });
+    await expect(a!.getByText("Session closed", { exact: true })).toBeVisible();
+  } finally {
+    await Promise.all(contexts.map((c) => c.close()));
+  }
+});
+
+test("clicking outside a dialog's buttons leaves Esc and Tab working", async ({ page }) => {
+  await ready(page);
+  await scan(page, "P1", "I1");
+  await expect(page.getByTestId("item")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Void patron" }).click();
+  const voidDialog = page.getByRole("alertdialog");
+  await page.mouse.click(5, 5);
+  await page.keyboard.press("Tab");
+  await expect(voidDialog.getByRole("button", { name: "Yes, void patron" })).toBeFocused();
+  await page.mouse.click(5, 5);
+  await page.keyboard.press("Escape");
+  await expect(voidDialog).toHaveCount(0);
+  await scan(page, "OC-END");
+
+  await page.getByRole("button", { name: "Change clerk" }).click();
+  await page.mouse.click(5, 5);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Summary" }).click();
+  await page.getByRole("button", { name: "Close session" }).click();
+  await page.mouse.click(5, 5);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+});
+
+test("a scan during a re-pair's name step records instead of joining the clerk name", async ({
+  browser,
+}) => {
+  test.setTimeout(60_000);
+  const contexts = await Promise.all([1, 2].map(() => browser.newContext({ viewport: WINDOW })));
+  try {
+    const [a, b] = await Promise.all(contexts.map((c) => c.newPage()));
+    await ready(a!);
+    await stubPrint(b!);
+    await openApp(b!, "Desk 2");
+    await pairViaPaste(a!, b!, "Ben");
+
+    await b!.reload();
+    await resumeAs(b!, /Outage/, "Ben");
+    await a!.getByRole("button", { name: "Add workstation" }).click();
+    const offer = a!.getByLabel("Join code", { exact: true });
+    await expect(offer).not.toHaveValue("", { timeout: 15_000 });
+    await b!.getByRole("button", { name: "Re-pair" }).click();
+    await b!.getByLabel("Pasted code").fill(await offer.inputValue());
+    await b!.getByRole("button", { name: "Use pasted code" }).click();
+    await b!.getByRole("button", { name: "Join", exact: true }).click();
+    const clerk = b!.getByLabel("Clerk name");
+    await expect(clerk).toBeVisible();
+    await expect(clerk).not.toBeFocused();
+
+    await scan(b!, "P9");
+
+    await expect(b!.getByTestId("patron")).toHaveText("P9");
+  } finally {
+    await Promise.all(contexts.map((c) => c.close()));
+  }
 });
 
 test("a closed session does not ask for a patron card", async ({ page }) => {

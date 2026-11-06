@@ -175,7 +175,13 @@ function trapTab(e: KeyboardEvent): void {
       </p>
     </div>
 
-    <div v-if="dialog" :class="dialogOverlay" @keydown.esc="dialog = null" @keydown.tab="trapTab">
+    <div
+      v-if="dialog"
+      :class="dialogOverlay"
+      tabindex="-1"
+      @keydown.esc="dialog = null"
+      @keydown.tab="trapTab"
+    >
       <form
         v-if="dialog === 'clerk'"
         ref="box"

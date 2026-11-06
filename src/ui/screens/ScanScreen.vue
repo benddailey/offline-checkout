@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, useTemplateRef } from "vue";
+import { computed, nextTick, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import {
   danger,
   dangerOutline,
@@ -46,6 +46,13 @@ function confirmVoid(): void {
   dismissVoid();
   void session.voidPatron();
 }
+
+watch(
+  () => session.closed || !session.currentVisit,
+  (cannotVoid) => {
+    if (cannotVoid && confirmingVoid.value) dismissVoid();
+  },
+);
 
 onUnmounted(() => {
   if (confirmingVoid.value) session.toolbarDialog = false;
@@ -160,6 +167,7 @@ function printCard(format: "receipt" | "letter") {
     <div
       v-if="confirmingVoid && session.currentVisit"
       :class="dialogOverlay"
+      tabindex="-1"
       @keydown.esc="dismissVoid"
       @keydown.tab="trapTab(dialog, $event)"
     >

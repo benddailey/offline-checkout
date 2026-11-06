@@ -301,6 +301,7 @@ function onScan(code: string): void {
     <div
       v-if="confirming"
       :class="dialogOverlay"
+      tabindex="-1"
       @keydown.esc="dismiss"
       @keydown.tab="trapTab(dialog, $event)"
     >
