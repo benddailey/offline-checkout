@@ -369,3 +369,30 @@ test.describe("form errors", () => {
     }
   });
 });
+
+test.describe("start page", () => {
+  test("the Join button lines up with Start session", async ({ page }) => {
+    await page.setViewportSize(WINDOW);
+    await stubPrint(page);
+    await openApp(page);
+    const start = await page.getByRole("button", { name: "Start session" }).boundingBox();
+    const join = await page.getByRole("button", { name: "Join session" }).boundingBox();
+    expect(join!.y + join!.height).toBe(start!.y + start!.height);
+  });
+
+  test("the start form opened by its button doesn't repeat the name", async ({ page }) => {
+    await ready(page);
+    await page.getByRole("button", { name: "Exit session" }).click();
+    await page.getByRole("button", { name: "Start new session" }).click();
+    await expect(page.getByTestId("start-form")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Start new session" })).toHaveCount(0);
+    await expect(page.getByRole("form", { name: "Start new session" })).toBeVisible();
+  });
+
+  test("session times have no seconds", async ({ page }) => {
+    await ready(page);
+    await page.getByRole("button", { name: "Exit session" }).click();
+    await expect(page.getByTestId("resume-list")).not.toContainText(/\d:\d\d:\d\d/);
+    await expect(page.getByTestId("resume-list")).toContainText(/\d:\d\d/);
+  });
+});

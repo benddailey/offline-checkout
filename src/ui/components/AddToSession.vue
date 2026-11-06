@@ -17,6 +17,7 @@ import { dialogBox, dialogOverlay, field, primary, secondary } from "../classes"
 import { trapTab } from "../focus-trap";
 import { importLine, previewWarnings, sourceHeading, sourceLine } from "../import-preview";
 import { useSession } from "../session";
+import { dateTime } from "../when";
 
 const session = useSession();
 
@@ -187,7 +188,7 @@ onUnmounted(() => {
           >
             {{ s.name }}
             <span class="font-normal text-slate-600">
-              · Started {{ new Date(s.createdAt).toLocaleString() }} ·
+              · Started {{ dateTime(s.createdAt) }} ·
               {{ s.closedAt === undefined ? "open" : "closed" }}
             </span>
           </button>

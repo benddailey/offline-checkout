@@ -7,6 +7,7 @@ import StartSessionForm from "../components/StartSessionForm.vue";
 import WorkstationNameForm from "../components/WorkstationNameForm.vue";
 import { field, primary, secondary, secondaryOn, tool } from "../classes";
 import { useSession } from "../session";
+import { dateTime } from "../when";
 import { otherWorkstations, type OtherWorkstation } from "../workstations";
 
 /** An open session with no records for this long is not expanded, nor are its workstations listed. */
@@ -156,7 +157,7 @@ async function resume(id: string, form: HTMLFormElement) {
         <p class="text-lg text-slate-700">
           Join a session already running on another workstation by scanning its pairing code.
         </p>
-        <button type="button" :class="secondary" @click="session.screen = 'pair-join'">
+        <button type="button" :class="[secondary, 'mt-auto']" @click="session.screen = 'pair-join'">
           Join session
         </button>
       </section>
@@ -194,10 +195,8 @@ async function resume(id: string, form: HTMLFormElement) {
                 </span>
               </span>
               <span class="flex flex-col text-lg font-normal text-slate-600">
-                <span>{{ s.employee }} · Started {{ new Date(s.createdAt).toLocaleString() }}</span>
-                <span v-if="s.closedAt !== undefined">
-                  Closed {{ new Date(s.closedAt).toLocaleString() }}
-                </span>
+                <span>{{ s.employee }} · Started {{ dateTime(s.createdAt) }}</span>
+                <span v-if="s.closedAt !== undefined"> Closed {{ dateTime(s.closedAt) }} </span>
               </span>
             </button>
             <form
@@ -267,9 +266,7 @@ async function resume(id: string, form: HTMLFormElement) {
           class="flex flex-wrap items-baseline justify-between gap-x-4 rounded-lg border-2 border-slate-200 px-4 py-2 text-xl"
         >
           <b class="text-slate-900">{{ w.name }}</b>
-          <span class="text-lg text-slate-600"
-            >{{ w.sessionName }} · {{ new Date(w.lastAt).toLocaleString() }}</span
-          >
+          <span class="text-lg text-slate-600">{{ w.sessionName }} · {{ dateTime(w.lastAt) }}</span>
         </li>
       </ul>
     </section>

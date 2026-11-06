@@ -4,6 +4,7 @@ import { MAX_NAME } from "../../log/limits";
 import { field, primary } from "../classes";
 import { useSession, ymd } from "../session";
 
+/** `autofocus`: opened by a Start new session button, which also serves as its heading. */
 const props = defineProps<{ autofocus?: boolean }>();
 
 const session = useSession();
@@ -33,11 +34,11 @@ async function start() {
 <template>
   <form
     class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
-    aria-labelledby="start-title"
+    aria-label="Start new session"
     data-testid="start-form"
     @submit.prevent="start"
   >
-    <h2 id="start-title" class="text-2xl font-bold">Start new session</h2>
+    <h2 v-if="!autofocus" class="text-2xl font-bold">Start new session</h2>
     <label class="flex flex-col gap-1 text-lg font-semibold">
       Session name
       <input v-model="name" :class="field" type="text" autocomplete="off" :maxlength="MAX_NAME" />
