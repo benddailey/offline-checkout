@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useTemplateRef } from "vue";
+import AddToSession from "../components/AddToSession.vue";
 import MessageBanner from "../components/MessageBanner.vue";
 import ScanInput from "../components/ScanInput.vue";
 import SessionClosedBanner from "../components/SessionClosedBanner.vue";
 import SlideToConfirm from "../components/SlideToConfirm.vue";
 import { exportLines } from "../exports";
+import { trapTab } from "../focus-trap";
 import { useSession } from "../session";
 import { summaryPatrons } from "../summary";
 import { hasWorkstations, workstationLabel } from "../../log/reduce";
@@ -98,24 +100,8 @@ async function confirm(): Promise<void> {
 
 const dialog = useTemplateRef<HTMLElement>("dialog");
 
-/** Keep Tab and Shift+Tab inside the dialog. */
 function dismiss(): void {
   if (!session.deletingSession) confirming.value = null;
-}
-
-function trapTab(e: KeyboardEvent): void {
-  const buttons = [...(dialog.value?.querySelectorAll("button, [role=slider]") ?? [])];
-  const first = buttons[0];
-  const last = buttons.at(-1);
-  if (!first || !last) return;
-  const active = document.activeElement;
-  if (e.shiftKey && (active === first || !dialog.value?.contains(active))) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && (active === last || !dialog.value?.contains(active))) {
-    e.preventDefault();
-    first.focus();
-  }
 }
 
 /** A scan made while the summary is open is recorded on the scan screen as usual. */
@@ -255,6 +241,8 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
       </div>
     </section>
 
+    <AddToSession />
+
     <section class="flex flex-col gap-3">
       <h2 class="text-2xl font-bold">Patrons</h2>
       <p v-if="patrons.length === 0" class="text-lg text-slate-600">No patrons scanned yet.</p>
@@ -295,7 +283,7 @@ const danger = `${button} border-red-800 bg-red-700 text-white hover:bg-red-800`
       v-if="confirming"
       class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-6"
       @keydown.esc="dismiss"
-      @keydown.tab="trapTab"
+      @keydown.tab="trapTab(dialog, $event)"
     >
       <div
         ref="dialog"
