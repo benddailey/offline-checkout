@@ -109,3 +109,21 @@ test("the scanner card offer closes once the first patron is scanned", async ({ 
   await expect(page.getByTestId("patron")).toHaveText("P1");
   await expect(offer).toBeHidden();
 });
+
+test("the status bar is one row on a wide window and wraps on a narrow one", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await openApp(page);
+  await startSession(page, "Outage", "Ann");
+  const bar = page.getByTestId("status-bar");
+  const button = bar.getByRole("button", { name: "Add workstation" });
+  const totals = bar.getByTestId("totals");
+  const centre = async (l: typeof button) => {
+    const b = (await l.boundingBox())!;
+    return b.y + b.height / 2;
+  };
+  expect(Math.abs((await centre(totals)) - (await centre(button)))).toBeLessThan(2);
+  expect((await totals.boundingBox())!.x).toBeGreaterThan((await button.boundingBox())!.x);
+
+  await page.setViewportSize({ width: 900, height: 900 });
+  expect(await centre(totals)).toBeGreaterThan(await centre(button));
+});

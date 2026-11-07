@@ -8,7 +8,8 @@ is back they scan them into the library system. A PDF with a barcode for every p
 the session is also available as a complete copy.
 
 It runs in Chrome, Edge or Chromium on Windows, macOS and Linux. It needs no internet, no server, no
-admin rights and no installs.
+admin rights and no installs. When the PC is online, it downloads the optional photo backgrounds
+(about 5 MB, once per PC) from GitHub; nothing about your sessions or patrons is sent.
 
 ## What you need
 
@@ -212,8 +213,17 @@ to the title on the start screen and on the Summary.
   appears, close every Offline Checkout window and open the app from that shortcut.
 - To change the receipt printer, repeat **Choose the receipt printer** from the setup.
 - Test the printed barcodes with your own scanners before you rely on them.
-- **Theme** at the top of the screen switches between light and dark, even in the middle of a
-  patron. Each PC remembers its own choice. Receipts and QR codes look the same in both.
+- **Theme** at the top of the screen opens a menu with two choices. You can change them even in
+  the middle of a patron, and each PC remembers its own.
+  - **Theme:** **Light** or **Dark**.
+  - **Background:** **None**, **Evergreen shelves**, or a photo of a famous library. Evergreen
+    shelves has one book for each Evergreen Indiana library, sized by the population it serves.
+    The photos are listed once the PC has downloaded them, the first time it opens the app while
+    online; open it once before an outage to have them. The menu credits the chosen photo;
+    `THIRD-PARTY-NOTICES.txt` credits every photo.
+  - With a background, drag the middle panel by its edge or any empty space in it, for example to
+    uncover your library's book. Double-click that space to put the panel back.
+  - Receipts and QR codes look the same with every choice.
 
 ## License
 

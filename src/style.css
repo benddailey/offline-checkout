@@ -65,6 +65,8 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
+  --wash: rgb(10 8 6 / 0.45);
+
   --color-page: var(--color-slate-900);
   --color-surface: var(--color-slate-800);
   --color-raised: var(--color-slate-700);
@@ -112,4 +114,59 @@
 
   --color-online: var(--color-green-500);
   --color-offline: var(--color-red-500);
+}
+
+/* Backgrounds, chosen apart from the theme: the Evergreen shelves (an SVG for each theme) or a
+   downloaded photo (under --wash so it suits the theme). Each screen's column then gets a solid
+   panel, because text sits directly on --color-page. It moves with --panel-x and --panel-y
+   (src/ui/panel.ts), which also keep it inside the window so it never adds scroll bars. */
+:root {
+  --wash: rgb(255 255 255 / 0.18);
+}
+
+[data-background="shelves"] {
+  --backdrop: url("./ui/backgrounds/shelf-light.svg");
+}
+
+[data-theme="dark"][data-background="shelves"] {
+  --backdrop: url("./ui/backgrounds/shelf-dark.svg");
+}
+
+/* A downloaded photo, as a blob: URL in --photo (src/ui/theme.ts). */
+[data-photo] {
+  --backdrop: linear-gradient(var(--wash), var(--wash)), var(--photo);
+}
+
+@utility backdrop {
+  background-image: var(--backdrop, none);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+[data-background]:not([data-background="none"]) main {
+  position: relative;
+  left: var(--panel-x, 0px);
+  top: var(--panel-y, 0px);
+  cursor: grab;
+  border-radius: var(--radius-xl);
+  background-color: var(--color-page);
+  box-shadow: 0 12px 48px rgb(0 0 0 / 0.45);
+}
+
+/* The grip: the panel's background is what drags it (src/ui/panel.ts), not its contents. */
+[data-background]:not([data-background="none"]) main::before {
+  content: "";
+  position: absolute;
+  top: 0.375rem;
+  left: 50%;
+  width: 4rem;
+  height: 0.3125rem;
+  translate: -50%;
+  border-radius: 9999px;
+  background-color: var(--color-line-3);
+}
+
+[data-background]:not([data-background="none"]) main > * {
+  cursor: auto;
 }

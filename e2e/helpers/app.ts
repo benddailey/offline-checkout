@@ -9,6 +9,8 @@ export const CHROMIUM_ARGS = [
   "--use-fake-ui-for-media-stream",
   "--use-fake-device-for-media-stream",
   "--disable-features=WebRtcHideLocalIpsWithMdns",
+  // No test downloads the photo backgrounds; the ones that need them serve them (helpers/photos.ts).
+  "--host-resolver-rules=MAP benddailey.github.io ~NOTFOUND",
 ];
 
 export function appUrl(): string {

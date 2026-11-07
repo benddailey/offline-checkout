@@ -2,6 +2,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Plugin } from "vite-plus";
+import { PHOTO_BASE, PHOTOS } from "../src/ui/backgrounds/photos";
 
 const ROOT = resolve(import.meta.dirname, "..");
 export const NOTICES_FILE = "THIRD-PARTY-NOTICES.md";
@@ -51,6 +52,21 @@ const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8").trim();
 const text = (source: string | Uint8Array) =>
   typeof source === "string" ? source : new TextDecoder().decode(source);
 
+/** Every background photo is credited, public domain ones too. */
+export function photoCredits(): string {
+  const entries = PHOTOS.map((p) =>
+    [
+      `### ${p.title}`,
+      "",
+      `Photo: ${p.author}`,
+      `License: ${p.license}${p.licenseUrl ? ` (${p.licenseUrl})` : ""}`,
+      `Source: ${p.source}`,
+      `Changes: resized to 1920 pixels wide and saved as WebP.`,
+    ].join("\n"),
+  );
+  return `## Background photos\n\nThe photo backgrounds come from Wikimedia Commons. They are not in this file: each PC downloads them once from ${PHOTO_BASE}\n\n${entries.join("\n\n")}`;
+}
+
 /** Needs `build.license: { fileName: NOTICES_FILE }`. `title` heads the comment in the HTML. */
 export function thirdPartyNotices(title: string): Plugin {
   return {
@@ -66,6 +82,7 @@ export function thirdPartyNotices(title: string): Plugin {
         if (/^## zxing-wasm - /m.test(md)) {
           md += `\n\n${read("licenses/zxing-wasm-native.md")}\n\n${read("licenses/Apache-2.0.txt")}`;
         }
+        md += `\n\n${photoCredits()}`;
         notices.source = `${md}\n`;
         for (const file of Object.values(bundle)) {
           if (file.type === "asset" && file.fileName.endsWith(".html")) {

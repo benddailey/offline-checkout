@@ -113,23 +113,34 @@ function printCard(format: "receipt" | "letter") {
             {{ session.currentVisit.patron }}
           </p>
         </div>
-        <div class="ml-auto flex gap-3">
-          <button
-            type="button"
-            :class="success"
-            :disabled="session.closed"
-            @click="session.endPatron()"
+        <div class="ml-auto flex flex-col items-end gap-2">
+          <!-- The status bar's disabled buttons point here; it lives in the panel so the bar's height never changes mid-patron. -->
+          <p
+            v-if="session.lockedPatron"
+            id="finish-patron"
+            class="text-base font-semibold text-ink-3"
+            data-testid="finish-patron"
           >
-            End patron
-          </button>
-          <button
-            type="button"
-            :class="dangerOutline"
-            :disabled="session.closed"
-            @click="askVoidPatron"
-          >
-            Void patron
-          </button>
+            Finish patron {{ session.lockedPatron }} first: End patron or Void patron
+          </p>
+          <div class="flex gap-3">
+            <button
+              type="button"
+              :class="success"
+              :disabled="session.closed"
+              @click="session.endPatron()"
+            >
+              End patron
+            </button>
+            <button
+              type="button"
+              :class="dangerOutline"
+              :disabled="session.closed"
+              @click="askVoidPatron"
+            >
+              Void patron
+            </button>
+          </div>
         </div>
       </div>
 
