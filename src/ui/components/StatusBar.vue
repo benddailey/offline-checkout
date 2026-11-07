@@ -83,100 +83,94 @@ function trapTab(e: KeyboardEvent): void {
 
 <template>
   <header
-    class="flex flex-col gap-2 border-b-2 border-line-2 bg-raised px-4 py-2"
+    class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b-2 border-line-2 bg-raised px-4 py-2"
     data-testid="status-bar"
   >
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-1">
+    <div class="flex flex-wrap gap-2">
+      <button
+        v-if="session.disconnected"
+        type="button"
+        :class="toolDanger"
+        :disabled="session.lockedPatron !== null"
+        :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
+        @click="session.screen = 'pair-join'"
+      >
+        Re-pair
+      </button>
+      <button
+        type="button"
+        :class="tool"
+        :disabled="session.lockedPatron !== null"
+        :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
+        @click="session.screen = 'pair-invite'"
+      >
+        Add workstation
+      </button>
+      <button
+        type="button"
+        :class="session.screen === 'summary' ? toolOn : tool"
+        :disabled="session.lockedPatron !== null"
+        :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
+        :aria-current="session.screen === 'summary' ? 'page' : undefined"
+        @click="session.screen = 'summary'"
+      >
+        Summary
+      </button>
+      <button
+        v-if="!session.closed"
+        type="button"
+        :class="tool"
+        :disabled="session.lockedPatron !== null"
+        :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
+        @click="changeClerk"
+      >
+        Change clerk
+      </button>
+      <button
+        type="button"
+        :class="tool"
+        :disabled="session.lockedPatron !== null || session.deletingSession"
+        :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
+        @click="exit"
+      >
+        Exit session
+      </button>
+      <ThemeButton />
+    </div>
+    <ul
+      v-if="session.peers.length"
+      class="flex flex-wrap items-center gap-4"
+      aria-label="Workstations"
+    >
+      <li v-for="p in session.peers" :key="p.deviceId" class="flex items-center gap-2 text-lg">
+        <span
+          role="img"
+          class="inline-block size-4 rounded-full"
+          :class="p.connected ? 'bg-online' : 'bg-offline'"
+          :aria-label="p.connected ? 'connected' : 'disconnected'"
+        ></span>
+        {{ p.employee }}
+        <template v-if="session.workstationNames.get(p.deviceId)">
+          ({{ session.workstationNames.get(p.deviceId)?.workstation }})
+        </template>
+        <span v-if="!p.connected" class="font-semibold text-danger-text-2">not connected</span>
+      </li>
+    </ul>
+    <p v-if="session.disconnected" class="text-lg font-semibold text-danger-text">
+      Disconnected — re-pair with any workstation
+    </p>
+    <div class="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
       <div class="text-lg font-bold text-ink">
         {{ session.meta?.name }}
         <span class="text-lg font-semibold text-ink-2" data-testid="clerk">
           · {{ session.meta?.employee }}
         </span>
       </div>
-      <ul class="flex flex-wrap items-center gap-4" aria-label="Workstations">
-        <li v-for="p in session.peers" :key="p.deviceId" class="flex items-center gap-2 text-lg">
-          <span
-            role="img"
-            class="inline-block size-4 rounded-full"
-            :class="p.connected ? 'bg-online' : 'bg-offline'"
-            :aria-label="p.connected ? 'connected' : 'disconnected'"
-          ></span>
-          {{ p.employee }}
-          <template v-if="session.workstationNames.get(p.deviceId)">
-            ({{ session.workstationNames.get(p.deviceId)?.workstation }})
-          </template>
-          <span v-if="!p.connected" class="font-semibold text-danger-text-2">not connected</span>
-        </li>
-      </ul>
-      <p v-if="session.disconnected" class="text-lg font-semibold text-danger-text">
-        Disconnected — re-pair with any workstation
-      </p>
-      <p class="ml-auto text-xl font-bold text-ink" data-testid="totals">
+      <span aria-hidden="true" class="w-0.5 self-stretch rounded-full bg-line-3"></span>
+      <p class="text-xl font-bold text-ink" data-testid="totals">
         Patrons {{ session.state.totals.patrons }} · Items {{ session.state.totals.items }}
       </p>
     </div>
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-if="session.disconnected"
-          type="button"
-          :class="toolDanger"
-          :disabled="session.lockedPatron !== null"
-          :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
-          @click="session.screen = 'pair-join'"
-        >
-          Re-pair
-        </button>
-        <button
-          type="button"
-          :class="tool"
-          :disabled="session.lockedPatron !== null"
-          :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
-          @click="session.screen = 'pair-invite'"
-        >
-          Add workstation
-        </button>
-        <button
-          type="button"
-          :class="session.screen === 'summary' ? toolOn : tool"
-          :disabled="session.lockedPatron !== null"
-          :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
-          :aria-current="session.screen === 'summary' ? 'page' : undefined"
-          @click="session.screen = 'summary'"
-        >
-          Summary
-        </button>
-        <button
-          v-if="!session.closed"
-          type="button"
-          :class="tool"
-          :disabled="session.lockedPatron !== null"
-          :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
-          @click="changeClerk"
-        >
-          Change clerk
-        </button>
-        <button
-          type="button"
-          :class="tool"
-          :disabled="session.lockedPatron !== null || session.deletingSession"
-          :aria-describedby="session.lockedPatron ? 'finish-patron' : undefined"
-          @click="exit"
-        >
-          Exit session
-        </button>
-        <ThemeButton />
-      </div>
-      <p
-        v-if="session.lockedPatron"
-        id="finish-patron"
-        class="ml-auto text-lg font-semibold text-ink-3"
-        data-testid="finish-patron"
-      >
-        Finish patron {{ session.lockedPatron }} first: End patron or Void patron
-      </p>
-    </div>
-
     <div
       v-if="dialog"
       :class="dialogOverlay"
