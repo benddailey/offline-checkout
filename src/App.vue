@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from "vue";
+import { onBeforeUnmount, onMounted, useTemplateRef, watch } from "vue";
 import FatalAlert from "./ui/components/FatalAlert.vue";
 import StatusBar from "./ui/components/StatusBar.vue";
 import LaunchScreen from "./ui/screens/LaunchScreen.vue";
 import PairScreen from "./ui/screens/PairScreen.vue";
 import ScanScreen from "./ui/screens/ScanScreen.vue";
 import SummaryScreen from "./ui/screens/SummaryScreen.vue";
+import { usePanelDrag } from "./ui/panel";
 import { useSession } from "./ui/session";
+import { currentTheme } from "./ui/theme";
 
 const session = useSession();
 
@@ -16,10 +18,19 @@ function onBeforeUnload(e: BeforeUnloadEvent): void {
 }
 onMounted(() => window.addEventListener("beforeunload", onBeforeUnload));
 onBeforeUnmount(() => window.removeEventListener("beforeunload", onBeforeUnload));
+
+const root = useTemplateRef<HTMLElement>("root");
+const drag = usePanelDrag(root, () => currentTheme.value.startsWith("shelf-"));
+watch(() => [session.screen, currentTheme.value], drag.relayout, { flush: "post" });
 </script>
 
 <template>
-  <div class="min-h-screen bg-page backdrop text-ink">
+  <div
+    ref="root"
+    class="min-h-screen bg-page backdrop text-ink"
+    @pointerdown="drag.onPointerDown"
+    @dblclick="drag.onDoubleClick"
+  >
     <StatusBar v-if="session.screen === 'scan' || session.screen === 'summary'" />
     <LaunchScreen v-if="session.screen === 'launch'" />
     <ScanScreen v-else-if="session.screen === 'scan'" />

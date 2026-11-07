@@ -215,8 +215,9 @@ to the title on the start screen and on the Summary.
 - **Theme** at the top of the screen opens a list: **Light**, **Dark**, **Shelf light** and
   **Shelf dark**. You can change it even in the middle of a patron. The shelf themes show a
   bookshelf behind the screen, with one book for each Evergreen Indiana library, sized by the
-  population it serves. Each PC remembers its own choice. Receipts and QR codes look the same in
-  every theme.
+  population it serves. To uncover your library's book, drag the middle panel by its edge or any
+  empty space in it; double-click that space to put the panel back. Each PC remembers its own choice
+  and panel position. Receipts and QR codes look the same in every theme.
 
 ## License
 

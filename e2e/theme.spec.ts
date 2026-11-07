@@ -91,3 +91,50 @@ test("the shelf themes draw a bookshelf behind a solid panel without scrolling",
     ).toBe(0);
   }
 });
+
+test("in a shelf theme the panel drags by its background, stays in the window and is remembered", async ({
+  page,
+}) => {
+  await openApp(page);
+  await chooseTheme(page, "Shelf dark");
+  const panel = page.locator("main");
+  const before = (await panel.boundingBox())!;
+  // The Launch screen has no status bar, so the gap is from the top of the window.
+  expect(before.y).toBe(12);
+
+  // Its top padding is background, so it drags; text and controls inside don't.
+  await page.mouse.move(before.x + 40, before.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(before.x - 60, before.y + 28, { steps: 5 });
+  await page.mouse.up();
+  let after = (await panel.boundingBox())!;
+  expect(after.x).toBe(before.x - 100);
+  expect(after.y).toBe(before.y + 20);
+
+  // Dragged far past the window's corner, it stops at the edge without scroll bars.
+  await page.mouse.move(after.x + 40, after.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(after.x - 2000, after.y + 2000, { steps: 5 });
+  await page.mouse.up();
+  after = (await panel.boundingBox())!;
+  expect(after.x).toBe(0);
+  expect(
+    await page.evaluate(() => {
+      const d = document.documentElement;
+      return [d.scrollWidth - d.clientWidth, d.scrollHeight - d.clientHeight];
+    }),
+  ).toEqual([0, 0]);
+
+  await page.reload();
+  expect((await panel.boundingBox())!.x).toBe(0);
+
+  await page.mouse.dblclick(8, (await panel.boundingBox())!.y + 8);
+  expect((await panel.boundingBox())!.x).toBe(before.x);
+
+  await chooseTheme(page, "Light");
+  await page.mouse.move(before.x + 40, before.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(before.x - 60, before.y + 48, { steps: 5 });
+  await page.mouse.up();
+  expect((await panel.boundingBox())!.x).toBe(before.x);
+});

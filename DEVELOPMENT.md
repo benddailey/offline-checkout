@@ -30,7 +30,10 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
   CSS anchor positioning. The field probe imports the same CSS but stays Light.
   The shelf themes reuse the Light and Dark tokens and set `--backdrop` to an SVG in
   `src/ui/backgrounds/`, which the `backdrop` utility on the app root draws behind every screen;
-  each screen's `<main>` gets a solid panel so text stays on `--color-page`.
+  each screen's `<main>` gets a solid panel so text stays on `--color-page`. `src/ui/panel.ts`
+  drags that panel by its own background (an event whose target is `<main>` itself), using
+  `left`/`top` rather than a transform, which would make the panel the containing block for its
+  fixed dialogs. It is clamped to the window, so moving it never adds scroll bars.
 - **Shelf backgrounds:** `scripts/shelves.ts` draws `shelf-light.svg` and `shelf-dark.svg` from
   `src/ui/backgrounds/evergreen_indiana_population.csv`, one book per library. Every build and
   `vp dev` hashes the CSV and the script, and redraws only when the hash differs from
