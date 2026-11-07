@@ -28,3 +28,6 @@ dist-ssr
 test-results
 playwright-report
 .superpowers/
+
+# Photo backgrounds for the e2e tests, downloaded from the backgrounds-* release
+.cache/

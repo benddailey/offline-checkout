@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { credit, PHOTOS } from "../backgrounds/photos";
 import { tool, toolOn } from "../classes";
 import {
-  BACKGROUNDS,
+  availableBackgrounds,
   currentBackground,
+  missingPhotos,
   currentTheme,
   setBackground,
   setTheme,
@@ -12,11 +14,13 @@ import {
 
 defineOptions({ inheritAttrs: false });
 
-const about = computed(() =>
-  currentBackground.value === "shelves"
-    ? "One book for each Evergreen Indiana library, sized by the population it serves."
-    : "",
-);
+const about = computed(() => {
+  if (currentBackground.value === "shelves") {
+    return "One book for each Evergreen Indiana library, sized by the population it serves.";
+  }
+  const photo = PHOTOS.find((p) => p.id === currentBackground.value);
+  return photo ? credit(photo) : "";
+});
 </script>
 
 <!-- A popover of buttons, not a select: ScanInput sends scanner keys on a button to the scan field, but leaves a select focused.
@@ -54,7 +58,7 @@ const about = computed(() =>
       <h2 id="theme-menu-background" class="text-lg font-bold">Background</h2>
       <div class="grid grid-cols-2 gap-2">
         <button
-          v-for="b in BACKGROUNDS"
+          v-for="b in availableBackgrounds"
           :key="b.id"
           type="button"
           :class="b.id === currentBackground ? toolOn : tool"
@@ -68,6 +72,10 @@ const about = computed(() =>
     </div>
     <p v-if="about" class="text-base text-ink-3 sm:col-span-2" data-testid="background-credit">
       {{ about }}
+    </p>
+    <p v-if="missingPhotos" class="text-base text-ink-3 sm:col-span-2" data-testid="photos-missing">
+      {{ missingPhotos === 1 ? "1 more photo downloads" : `${missingPhotos} more photos download` }}
+      when this PC is online.
     </p>
   </div>
 </template>

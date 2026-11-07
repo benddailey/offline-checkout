@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { openApp, startSession } from "./helpers/app";
+import { servePhotos } from "./helpers/photos";
 
 type Page = import("@playwright/test").Page;
 
@@ -104,7 +105,7 @@ test("backgrounds are chosen apart from the theme and never add scroll bars", as
 
   await page.reload();
   expect(await theme(page)).toBe("dark");
-  expect(await page.evaluate(() => document.documentElement.dataset.background)).toBe("shelves");
+  expect(await image()).toMatch(/^url\("data:image\/svg/);
 });
 
 test("with a background the panel drags by its own background, stays in the window and is remembered", async ({
@@ -147,4 +148,63 @@ test("with a background the panel drags by its own background, stays in the wind
   await page.mouse.move(before.x - 60, before.y + 48, { steps: 5 });
   await page.mouse.up();
   expect((await panel.boundingBox())!.x).toBe(before.x);
+});
+
+const menuButton = (page: Page, label: string) =>
+  page.getByRole("group", { name: "Background" }).getByRole("button", { name: label, exact: true });
+
+test("offline with nothing downloaded, only None and Evergreen shelves are offered", async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem("oc-background", "longroom"));
+  await openApp(page);
+  // A chosen photo that isn't on this PC shows as None until it is.
+  expect(await page.evaluate(() => document.documentElement.dataset.background)).toBe("none");
+  await page.getByRole("button", { name: "Theme", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Background" }).getByRole("button")).toHaveText([
+    "None",
+    "Evergreen shelves",
+  ]);
+  await expect(page.getByTestId("photos-missing")).toHaveText(
+    "12 more photos download when this PC is online.",
+  );
+});
+
+test("photos download once, are checked, kept in their own bucket and shown offline", async ({
+  page,
+}) => {
+  await servePhotos(page, ["admont"]);
+  await page.addInitScript(
+    () =>
+      localStorage.getItem("oc-background") ?? localStorage.setItem("oc-background", "longroom"),
+  );
+  await openApp(page);
+  const root = page.locator("#app > div");
+  // The saved choice appears by itself once its photo arrives.
+  await expect(root).toHaveCSS("background-image", /^linear-gradient\(.*url\("blob:/);
+
+  await page.getByRole("button", { name: "Theme", exact: true }).click();
+  await expect(menuButton(page, "Tianjin Binhai")).toBeVisible();
+  // Admont's bytes didn't match its hash, so it was not kept.
+  await expect(menuButton(page, "Admont Abbey")).toHaveCount(0);
+  await expect(page.getByTestId("photos-missing")).toHaveText(
+    "1 more photo downloads when this PC is online.",
+  );
+  await expect(page.getByTestId("background-credit")).toContainText("Photo: Diliff, CC BY-SA 4.0");
+  await menuButton(page, "Library of Congress").click();
+  await expect(page.getByTestId("background-credit")).toContainText("Carol M. Highsmith");
+
+  const stores = await page.evaluate(async () => ({
+    buckets: await (
+      navigator as Navigator & { storageBuckets: { keys(): Promise<string[]> } }
+    ).storageBuckets.keys(),
+    defaults: (await indexedDB.databases()).map((d) => d.name),
+  }));
+  expect(stores.buckets).toContain("backgrounds");
+  expect(stores.defaults).not.toContain("offline-checkout-backgrounds");
+
+  await page.unrouteAll();
+  await page.reload();
+  await expect(root).toHaveCSS("background-image", /^linear-gradient\(.*url\("blob:/);
+  expect(await page.evaluate(() => document.documentElement.dataset.background)).toBe("loc");
 });

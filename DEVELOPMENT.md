@@ -31,11 +31,29 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
   the same CSS but stays Light.
 - **Backgrounds:** chosen apart from the theme (`BACKGROUNDS`, `data-background` on `<html>`). A
   `[data-background="<id>"]` rule sets `--backdrop`, which the `backdrop` utility on the app root
-  draws behind every screen. Evergreen shelves has an SVG per theme. With a background, each screen's `<main>` gets a solid panel so text stays on
+  draws behind every screen. Evergreen shelves has an SVG per theme; a photo is one WebP under
+  `--wash`, a translucent layer each theme sets. Each image is referenced once in the CSS, so it
+  is inlined once. With a background, each screen's `<main>` gets a solid panel so text stays on
   `--color-page`. `src/ui/panel.ts`
   drags that panel by its own background (an event whose target is `<main>` itself), using
   `left`/`top` rather than a transform, which would make the panel the containing block for its
   fixed dialogs. It is clamped to the window, so moving it never adds scroll bars.
+- **Photo backgrounds:** not bundled. `src/ui/backgrounds/photos.ts` lists each photo with its
+  SHA-256, Commons page, author and license, and the set it comes from (`PHOTO_SET`). The files
+  are attached to that GitHub release (`backgrounds-1`), never committed, and
+  `.github/workflows/backgrounds.yml` publishes every `backgrounds-*` release to GitHub Pages:
+  release downloads send no CORS header, so a `file://` page can't read them, but Pages does. At
+  launch the app (`src/ui/backgrounds/saved.ts`) downloads any it lacks, keeps only those whose
+  hash matches, and stores them in IndexedDB in a Storage Bucket of their own that isn't persisted;
+  the sessions' default bucket asks `navigator.storage.persist()`, which Chrome may refuse. The
+  menu lists only downloaded photos, and a chosen photo shows as None until it arrives. The build
+  credits every photo, public domain ones too, in THIRD-PARTY-NOTICES.
+  - To change the set: make each file with `magick <file> -resize 1920x -strip -quality 75
+    <id>.webp`, attach them all to a new release `backgrounds-<n>` (not marked latest), and update
+    `PHOTO_SET`, the hashes and the credits. Publishing the release runs the workflow; older sets
+    stay on Pages for older versions of the app.
+  - The e2e browsers can't reach Pages (`CHROMIUM_ARGS`). Tests that need photos call
+    `servePhotos` (`e2e/helpers/photos.ts`), which downloads the release files once into `.cache/`.
 - **Shelf backgrounds:** `scripts/shelves.ts` draws `shelf-light.svg` and `shelf-dark.svg` from
   `src/ui/backgrounds/evergreen_indiana_population.csv`, one book per library. Every build and
   `vp dev` hashes the CSV and the script, and redraws only when the hash differs from

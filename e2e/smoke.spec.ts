@@ -1,20 +1,22 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { PHOTO_BASE, PHOTOS } from "../src/ui/backgrounds/photos";
 import { appUrl } from "./helpers/app";
 
-test("built file opens from file:// with no network requests", async ({ page }) => {
+test("built file opens from file:// and reaches out only for the photo backgrounds", async ({
+  page,
+}) => {
   const external: string[] = [];
   page.on("request", (r) => {
-    if (
-      !r.url().startsWith("file:") &&
-      !r.url().startsWith("data:") &&
-      !r.url().startsWith("blob:")
-    )
-      external.push(r.url());
+    if (!/^(file|data|blob):/.test(r.url())) external.push(r.url());
   });
   await page.goto(appUrl());
   await expect(page.getByRole("heading", { name: "Offline Checkout" })).toBeVisible();
-  expect(external).toEqual([]);
+  // The e2e browsers can't resolve Pages, so each photo is attempted once and fails.
+  await expect.poll(() => external.length).toBe(PHOTOS.length);
+  expect(external.sort()).toEqual(PHOTOS.map((p) => `${PHOTO_BASE}${p.id}.webp`).sort());
+  // The requests are plain downloads: nothing about the session goes with them.
+  expect(external.every((url) => !url.includes("?"))).toBe(true);
 });
 
 test("built file carries the license notices and stays in standards mode", async ({ page }) => {
@@ -28,6 +30,9 @@ test("built file carries the license notices and stays in standards mode", async
     "Johan Lindell",
     "## zxing-cpp",
     "Apache License",
+    "## Background photos",
+    "Carol M. Highsmith",
+    "Photo: Diliff",
   ]) {
     expect(comment).toContain(text);
   }

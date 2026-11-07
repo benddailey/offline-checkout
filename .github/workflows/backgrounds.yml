@@ -1,0 +1,43 @@
+# Publishes the files attached to every backgrounds-* release to GitHub Pages, at
+# https://benddailey.github.io/offline-checkout/<tag>/<file>, where the app downloads its photo
+# backgrounds. Pages, unlike release downloads, sends the CORS header a file:// page needs.
+# Older sets stay published, so older app versions keep working.
+name: Publish photo backgrounds
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'backgrounds-')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Download every backgrounds-* release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir site
+          for tag in $(gh release list -R "$GITHUB_REPOSITORY" --limit 100 --json tagName \
+              -q '.[].tagName | select(startswith("backgrounds-"))'); do
+            gh release download "$tag" -R "$GITHUB_REPOSITORY" -p '*.webp' -D "site/$tag"
+          done
+          ls -R site
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
