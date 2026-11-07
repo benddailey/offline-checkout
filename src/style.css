@@ -62,7 +62,8 @@
   --color-camera-ink: var(--color-slate-300);
 }
 
-[data-theme="dark"] {
+[data-theme="dark"],
+[data-theme="shelf-dark"] {
   color-scheme: dark;
 
   --color-page: var(--color-slate-900);
@@ -112,4 +113,29 @@
 
   --color-online: var(--color-green-500);
   --color-offline: var(--color-red-500);
+}
+
+/* Shelf themes: Light or Dark tokens over the Evergreen bookshelf. Each screen's column gets a
+   solid panel, because text sits directly on --color-page. The panel hangs from the top with no
+   vertical margin, so a screen scrolls only when it would in Light. */
+[data-theme="shelf-light"] {
+  --backdrop: url("./ui/backgrounds/shelf-light.svg");
+}
+
+[data-theme="shelf-dark"] {
+  --backdrop: url("./ui/backgrounds/shelf-dark.svg");
+}
+
+@utility backdrop {
+  background-image: var(--backdrop, none);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+:is([data-theme="shelf-light"], [data-theme="shelf-dark"]) main {
+  border-end-start-radius: var(--radius-xl);
+  border-end-end-radius: var(--radius-xl);
+  background-color: var(--color-page);
+  box-shadow: 0 12px 48px rgb(0 0 0 / 0.45);
 }

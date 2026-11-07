@@ -9,7 +9,9 @@ describe("themes", () => {
 
   it("cycles through every theme and back to the first", () => {
     expect(nextTheme("light")).toBe("dark");
-    expect(nextTheme("dark")).toBe("light");
+    expect(nextTheme("dark")).toBe("shelf-light");
+    expect(nextTheme("shelf-light")).toBe("shelf-dark");
+    expect(nextTheme("shelf-dark")).toBe("light");
   });
 
   it("falls back to Light for a saved value it doesn't know", () => {

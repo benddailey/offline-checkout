@@ -212,8 +212,10 @@ to the title on the start screen and on the Summary.
   appears, close every Offline Checkout window and open the app from that shortcut.
 - To change the receipt printer, repeat **Choose the receipt printer** from the setup.
 - Test the printed barcodes with your own scanners before you rely on them.
-- **Theme** at the top of the screen switches between light and dark, even in the middle of a
-  patron. Each PC remembers its own choice. Receipts and QR codes look the same in both.
+- **Theme** at the top of the screen switches between **Light**, **Dark**, **Shelf light** and
+  **Shelf dark**, even in the middle of a patron. The shelf themes show a bookshelf behind the
+  screen, with one book for each Evergreen Indiana library, sized by the population it serves.
+  Each PC remembers its own choice. Receipts and QR codes look the same in every theme.
 
 ## License
 

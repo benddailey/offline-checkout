@@ -4,6 +4,8 @@ import { computed, ref } from "vue";
 export const THEMES = [
   { id: "light", label: "Light" },
   { id: "dark", label: "Dark" },
+  { id: "shelf-light", label: "Shelf light" },
+  { id: "shelf-dark", label: "Shelf dark" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];

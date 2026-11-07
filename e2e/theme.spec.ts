@@ -62,3 +62,24 @@ test("in the dark theme the QR code stays white and printing stays black on whit
   await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
   await expect(page.locator("html")).toHaveCSS("background-color", "rgb(255, 255, 255)");
 });
+
+test("the shelf themes draw a bookshelf behind a solid panel without scrolling", async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.getByRole("button", { name: "Theme: Light" }).click();
+  for (const label of ["Shelf light", "Shelf dark"]) {
+    await page.getByRole("button", { name: /^Theme: / }).click();
+    await expect(page.getByRole("button", { name: `Theme: ${label}` })).toBeVisible();
+    await expect(page.locator("#app > div")).toHaveCSS(
+      "background-image",
+      /^url\("data:image\/svg/,
+    );
+    expect(
+      await page.evaluate(() => {
+        const d = document.documentElement;
+        return d.scrollHeight - d.clientHeight;
+      }),
+    ).toBe(0);
+  }
+});
