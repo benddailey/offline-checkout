@@ -25,8 +25,9 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
   an entry in `THEMES` (`src/ui/theme.ts`). Leave `code`, `camera` and `camera-ink` alone: QR codes
   need their white margin to scan. Set `color-scheme` to match, and check that text keeps at least
   4.5:1 contrast. The choice is per browser profile, in `localStorage` so it applies before the
-  app mounts, and isn't synced. The chooser is a button because `ScanInput` leaves focus on a
-  `<select>`, so a scan would go into it. The field probe imports the same CSS but stays Light.
+  app mounts, and isn't synced. The chooser is a popover of buttons, not a `<select>`, because
+  `ScanInput` leaves focus on a `<select>`, so a scan would go into it. The popover is placed with
+  CSS anchor positioning. The field probe imports the same CSS but stays Light.
   The shelf themes reuse the Light and Dark tokens and set `--backdrop` to an SVG in
   `src/ui/backgrounds/`, which the `backdrop` utility on the app root draws behind every screen;
   each screen's `<main>` gets a solid panel so text stays on `--color-page`.

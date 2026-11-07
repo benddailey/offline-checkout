@@ -1,17 +1,10 @@
 import { globSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vite-plus/test";
-import { knownTheme, nextTheme, THEMES } from "./theme";
+import { knownTheme, THEMES } from "./theme";
 
 describe("themes", () => {
   it("starts on Light", () => {
     expect(THEMES[0]!.id).toBe("light");
-  });
-
-  it("cycles through every theme and back to the first", () => {
-    expect(nextTheme("light")).toBe("dark");
-    expect(nextTheme("dark")).toBe("shelf-light");
-    expect(nextTheme("shelf-light")).toBe("shelf-dark");
-    expect(nextTheme("shelf-dark")).toBe("light");
   });
 
   it("falls back to Light for a saved value it doesn't know", () => {

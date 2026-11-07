@@ -1,4 +1,4 @@
-import { computed, ref } from "vue";
+import { readonly, ref } from "vue";
 
 /** The first is the default. Every other theme needs a matching block in style.css. */
 export const THEMES = [
@@ -16,14 +16,9 @@ export function knownTheme(value: string | null): ThemeId {
   return THEMES.find((t) => t.id === value)?.id ?? THEMES[0].id;
 }
 
-export function nextTheme(id: ThemeId): ThemeId {
-  const i = THEMES.findIndex((t) => t.id === id);
-  return THEMES[(i + 1) % THEMES.length]!.id;
-}
-
 const current = ref<ThemeId>(THEMES[0].id);
 
-export const themeLabel = computed(() => THEMES.find((t) => t.id === current.value)!.label);
+export const currentTheme = readonly(current);
 
 function apply(id: ThemeId): void {
   current.value = id;
@@ -41,8 +36,7 @@ export function applySavedTheme(): void {
   apply(knownTheme(saved));
 }
 
-export function cycleTheme(): void {
-  const id = nextTheme(current.value);
+export function setTheme(id: ThemeId): void {
   apply(id);
   try {
     localStorage.setItem(STORAGE_KEY, id);
