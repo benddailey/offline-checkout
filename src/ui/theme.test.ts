@@ -1,6 +1,6 @@
 import { globSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vite-plus/test";
-import { knownTheme, THEMES } from "./theme";
+import { BACKGROUNDS, knownBackground, knownTheme, THEMES } from "./theme";
 
 describe("themes", () => {
   it("starts on Light", () => {
@@ -16,6 +16,19 @@ describe("themes", () => {
   it("has a block in style.css for every theme but the default", () => {
     const css = readFileSync("src/style.css", "utf8");
     for (const { id } of THEMES.slice(1)) expect(css).toContain(`[data-theme="${id}"]`);
+  });
+});
+
+describe("backgrounds", () => {
+  it("start on None and fall back to it for a saved value they don't know", () => {
+    expect(knownBackground(null)).toBe("none");
+    expect(knownBackground("retired-photo")).toBe("none");
+    expect(knownBackground("shelves")).toBe("shelves");
+  });
+
+  it("have a rule in style.css", () => {
+    const css = readFileSync("src/style.css", "utf8");
+    for (const { id } of BACKGROUNDS.slice(1)) expect(css).toContain(`[data-background="${id}"]`);
   });
 });
 

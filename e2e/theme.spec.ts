@@ -5,13 +5,28 @@ type Page = import("@playwright/test").Page;
 
 const theme = (page: Page) => page.evaluate(() => document.documentElement.dataset.theme);
 
-async function chooseTheme(page: Page, label: string) {
+/** Opens the Theme menu, picks `label` under `heading`, and closes the menu with Esc. */
+async function choose(page: Page, heading: "Theme" | "Background", label: string) {
   await page.getByRole("button", { name: "Theme", exact: true }).click();
-  const menu = page.getByRole("group", { name: "Theme" });
-  await expect(menu).toBeVisible();
-  await menu.getByRole("button", { name: label, exact: true }).click();
-  await expect(menu).toBeHidden();
+  const group = page.getByRole("group", { name: heading });
+  await expect(group).toBeVisible();
+  await group.getByRole("button", { name: label, exact: true }).click();
+  await expect(group.getByRole("button", { name: label, exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("Escape");
+  await expect(group).toBeHidden();
 }
+
+const chooseTheme = (page: Page, label: string) => choose(page, "Theme", label);
+const chooseBackground = (page: Page, label: string) => choose(page, "Background", label);
+
+const overflow = (page: Page) =>
+  page.evaluate(() => {
+    const d = document.documentElement;
+    return [d.scrollWidth - d.clientWidth, d.scrollHeight - d.clientHeight];
+  });
 
 test("the theme starts on Light, switches and is remembered", async ({ page }) => {
   await openApp(page);
@@ -27,10 +42,9 @@ test("the theme starts on Light, switches and is remembered", async ({ page }) =
   await page.reload();
   expect(await theme(page)).toBe("dark");
   await page.getByRole("button", { name: "Theme", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Dark", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(
+    page.getByRole("group", { name: "Theme" }).getByRole("button", { name: "Dark", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("a scan after changing the theme mid-patron still lands in the scan field", async ({
@@ -41,11 +55,12 @@ test("a scan after changing the theme mid-patron still lands in the scan field",
   await page.getByRole("button", { name: "Not now" }).click();
   await page.keyboard.type("P1001\n");
 
-  await chooseTheme(page, "Shelf dark");
+  await chooseTheme(page, "Dark");
+  await chooseBackground(page, "Evergreen shelves");
   await page.keyboard.type("I2001\n");
 
   await expect(page.getByTestId("item")).toHaveCount(1);
-  expect(await theme(page)).toBe("shelf-dark");
+  expect(await theme(page)).toBe("dark");
   await expect(page.getByTestId("scan-input")).toBeFocused();
 });
 
@@ -73,30 +88,30 @@ test("in the dark theme the QR code stays white and printing stays black on whit
   await expect(page.locator("html")).toHaveCSS("background-color", "rgb(255, 255, 255)");
 });
 
-test("the shelf themes draw a bookshelf behind a solid panel without scrolling", async ({
-  page,
-}) => {
+test("backgrounds are chosen apart from the theme and never add scroll bars", async ({ page }) => {
   await openApp(page);
-  for (const id of ["Shelf light", "Shelf dark"]) {
-    await chooseTheme(page, id);
-    await expect(page.locator("#app > div")).toHaveCSS(
-      "background-image",
-      /^url\("data:image\/svg/,
-    );
-    expect(
-      await page.evaluate(() => {
-        const d = document.documentElement;
-        return d.scrollHeight - d.clientHeight;
-      }),
-    ).toBe(0);
-  }
+  const root = page.locator("#app > div");
+  const image = () => root.evaluate((el) => getComputedStyle(el).backgroundImage);
+  expect(await image()).toBe("none");
+
+  await chooseBackground(page, "Evergreen shelves");
+  const lightShelves = await image();
+  expect(lightShelves).toMatch(/^url\("data:image\/svg/);
+  await chooseTheme(page, "Dark");
+  expect(await image()).toMatch(/^url\("data:image\/svg/);
+  expect(await image()).not.toBe(lightShelves);
+  expect(await overflow(page)).toEqual([0, 0]);
+
+  await page.reload();
+  expect(await theme(page)).toBe("dark");
+  expect(await page.evaluate(() => document.documentElement.dataset.background)).toBe("shelves");
 });
 
-test("in a shelf theme the panel drags by its background, stays in the window and is remembered", async ({
+test("with a background the panel drags by its own background, stays in the window and is remembered", async ({
   page,
 }) => {
   await openApp(page);
-  await chooseTheme(page, "Shelf dark");
+  await chooseBackground(page, "Evergreen shelves");
   const panel = page.locator("main");
   const before = (await panel.boundingBox())!;
   // The Launch screen has no status bar, so the gap is from the top of the window.
@@ -118,12 +133,7 @@ test("in a shelf theme the panel drags by its background, stays in the window an
   await page.mouse.up();
   after = (await panel.boundingBox())!;
   expect(after.x).toBe(0);
-  expect(
-    await page.evaluate(() => {
-      const d = document.documentElement;
-      return [d.scrollWidth - d.clientWidth, d.scrollHeight - d.clientHeight];
-    }),
-  ).toEqual([0, 0]);
+  expect(await overflow(page)).toEqual([0, 0]);
 
   await page.reload();
   expect((await panel.boundingBox())!.x).toBe(0);
@@ -131,7 +141,7 @@ test("in a shelf theme the panel drags by its background, stays in the window an
   await page.mouse.dblclick(8, (await panel.boundingBox())!.y + 8);
   expect((await panel.boundingBox())!.x).toBe(before.x);
 
-  await chooseTheme(page, "Light");
+  await chooseBackground(page, "None");
   await page.mouse.move(before.x + 40, before.y + 8);
   await page.mouse.down();
   await page.mouse.move(before.x - 60, before.y + 48, { steps: 5 });

@@ -8,7 +8,7 @@ import ScanScreen from "./ui/screens/ScanScreen.vue";
 import SummaryScreen from "./ui/screens/SummaryScreen.vue";
 import { usePanelDrag } from "./ui/panel";
 import { useSession } from "./ui/session";
-import { currentTheme } from "./ui/theme";
+import { currentBackground } from "./ui/theme";
 
 const session = useSession();
 
@@ -20,8 +20,8 @@ onMounted(() => window.addEventListener("beforeunload", onBeforeUnload));
 onBeforeUnmount(() => window.removeEventListener("beforeunload", onBeforeUnload));
 
 const root = useTemplateRef<HTMLElement>("root");
-const drag = usePanelDrag(root, () => currentTheme.value.startsWith("shelf-"));
-watch(() => [session.screen, currentTheme.value], drag.relayout, { flush: "post" });
+const drag = usePanelDrag(root, () => currentBackground.value !== "none");
+watch(() => [session.screen, currentBackground.value], drag.relayout, { flush: "post" });
 </script>
 
 <template>

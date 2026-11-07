@@ -1,6 +1,6 @@
 import { onBeforeUnmount, onMounted, ref, type ShallowRef } from "vue";
 
-/** How far the clerk has dragged the screen's panel off the bookshelf, in CSS px. Shelf themes only. */
+/** How far the clerk has dragged the screen's panel across the background, in CSS px. Only with a background. */
 export interface Offset {
   x: number;
   y: number;

@@ -27,10 +27,12 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
   4.5:1 contrast. The choice is per browser profile, in `localStorage` so it applies before the
   app mounts, and isn't synced. The chooser is a popover of buttons, not a `<select>`, because
   `ScanInput` leaves focus on a `<select>`, so a scan would go into it. The popover is placed with
-  CSS anchor positioning. The field probe imports the same CSS but stays Light.
-  The shelf themes reuse the Light and Dark tokens and set `--backdrop` to an SVG in
-  `src/ui/backgrounds/`, which the `backdrop` utility on the app root draws behind every screen;
-  each screen's `<main>` gets a solid panel so text stays on `--color-page`. `src/ui/panel.ts`
+  CSS anchor positioning, and stays open while the clerk tries choices. The field probe imports
+  the same CSS but stays Light.
+- **Backgrounds:** chosen apart from the theme (`BACKGROUNDS`, `data-background` on `<html>`). A
+  `[data-background="<id>"]` rule sets `--backdrop`, which the `backdrop` utility on the app root
+  draws behind every screen. Evergreen shelves has an SVG per theme. With a background, each screen's `<main>` gets a solid panel so text stays on
+  `--color-page`. `src/ui/panel.ts`
   drags that panel by its own background (an event whose target is `<main>` itself), using
   `left`/`top` rather than a transform, which would make the panel the containing block for its
   fixed dialogs. It is clamped to the window, so moving it never adds scroll bars.
