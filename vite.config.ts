@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import vue from "@vitejs/plugin-vue";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import { viteSingleFile } from "vite-plugin-singlefile";
+import { shelves } from "./scripts/shelves";
 import { NOTICES_FILE, thirdPartyNotices } from "./scripts/third-party-notices";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
@@ -19,6 +20,7 @@ export default defineConfig({
   },
   define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: lazyPlugins(() => [
+    shelves(),
     vue(),
     tailwindcss(),
     viteSingleFile(),

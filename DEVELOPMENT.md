@@ -27,6 +27,12 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
   4.5:1 contrast. The choice is per browser profile, in `localStorage` so it applies before the
   app mounts, and isn't synced. The chooser is a button because `ScanInput` leaves focus on a
   `<select>`, so a scan would go into it. The field probe imports the same CSS but stays Light.
+- **Shelf backgrounds:** `scripts/shelves.ts` draws `shelf-light.svg` and `shelf-dark.svg` from
+  `src/ui/backgrounds/evergreen_indiana_population.csv`, one book per library. Every build and
+  `vp dev` hashes the CSV and the script, and redraws only when the hash differs from
+  `shelves.sha256`. To add or remove a library, edit the CSV, build, and commit the CSV, both SVGs
+  and the hash. The script copies Python's `random.Random`, because the approved drafts were
+  drawn in Python; a unit test checks the committed files match the CSV.
 - **Toolchain:** Vite+ (`vp`, the `vite-plus` package):
   - `vp build` and `vp dev` (Vite);
   - `vp test` (Vitest, imported from `vite-plus/test`);
