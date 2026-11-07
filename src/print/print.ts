@@ -12,6 +12,7 @@ const BASE_CSS = `
    and the roll feeds to it. Unsized, the receipt starts at the top and the driver cuts after it. */
 @page { margin: 0 }
 @media print {
+  html { color-scheme: light !important; }
   html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
   body > *:not(#${PRINT_ROOT_ID}) { display: none !important; }
   #${PRINT_ROOT_ID} { position: static; visibility: visible; width: ${RECEIPT_WIDTH_MM}mm; }

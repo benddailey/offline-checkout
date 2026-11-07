@@ -8,7 +8,7 @@ defineProps<{ text: string }>();
     aria-modal="true"
     aria-labelledby="fatal-title"
     aria-describedby="fatal-text"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-red-700 p-8 text-white"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-danger p-8 text-on-solid"
   >
     <div class="max-w-3xl text-center">
       <h2 id="fatal-title" class="mb-6 text-5xl font-extrabold">Stop</h2>

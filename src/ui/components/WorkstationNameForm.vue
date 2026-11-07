@@ -29,7 +29,7 @@ async function save() {
 
 <template>
   <form
-    class="flex flex-col gap-3 rounded-xl border-2 border-blue-700 bg-blue-50 p-5"
+    class="flex flex-col gap-3 rounded-xl border-2 border-accent bg-accent-soft p-5"
     aria-labelledby="workstation-title"
     data-testid="workstation-form"
     @submit.prevent="save"
@@ -37,7 +37,7 @@ async function save() {
     <h2 id="workstation-title" class="text-2xl font-bold">
       {{ cancellable ? "Rename this workstation" : "Name this workstation" }}
     </h2>
-    <p class="text-lg text-slate-700">
+    <p class="text-lg text-ink-3">
       Every scan made here is recorded with this name, beside the clerk's, so the exports show which
       computer it was made on. For example: <b>Front desk 1</b>.
     </p>
@@ -61,12 +61,12 @@ async function save() {
         Cancel
       </button>
     </div>
-    <p v-if="nameError" id="workstation-error" class="text-lg font-semibold text-red-700">
+    <p v-if="nameError" id="workstation-error" class="text-lg font-semibold text-danger-text">
       Enter a name for this workstation.
     </p>
     <p
       v-else-if="session.message?.tone === 'error'"
-      class="text-lg font-semibold text-red-700"
+      class="text-lg font-semibold text-danger-text"
       role="alert"
     >
       {{ session.message.text }}

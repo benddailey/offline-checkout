@@ -81,7 +81,7 @@ function print() {
       v-if="dataUrl"
       :src="dataUrl"
       :alt="`QR code: ${label}`"
-      class="aspect-square w-full max-w-[min(50vh,420px)] bg-white [image-rendering:pixelated]"
+      class="aspect-square w-full max-w-[min(50vh,420px)] bg-code [image-rendering:pixelated]"
     />
     <div class="flex flex-wrap justify-center gap-3">
       <button type="button" :class="secondary" @click="copy">
@@ -98,11 +98,11 @@ function print() {
         {{ saved ? "Saved" : "Save to file" }}
       </button>
     </div>
-    <p v-if="printError" role="alert" class="rounded bg-amber-100 p-2 text-base text-amber-900">
+    <p v-if="printError" role="alert" class="rounded bg-warn-soft p-2 text-base text-warn-ink-2">
       {{ printError }}
     </p>
     <details ref="textBox" class="w-full text-base">
-      <summary class="cursor-pointer font-semibold text-slate-700">Show the code as text</summary>
+      <summary class="cursor-pointer font-semibold text-ink-3">Show the code as text</summary>
       <label class="mt-2 flex flex-col gap-1 font-semibold">
         {{ label }}
         <textarea
@@ -110,7 +110,7 @@ function print() {
           readonly
           rows="4"
           :value="text"
-          class="w-full rounded border-2 border-slate-500 p-2 font-mono text-xs break-all"
+          class="w-full rounded border-2 border-line-4 p-2 font-mono text-xs break-all"
           @focus="area?.select()"
         />
       </label>

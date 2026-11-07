@@ -129,8 +129,8 @@ function onScan(code: string): void {
     <SessionClosedBanner v-if="session.closed" />
 
     <div class="flex flex-wrap items-center gap-4">
-      <h1 class="text-3xl font-extrabold text-slate-900">Session summary</h1>
-      <span class="text-lg text-slate-600" data-testid="app-version">Version {{ version }}</span>
+      <h1 class="text-3xl font-extrabold text-ink">Session summary</h1>
+      <span class="text-lg text-ink-4" data-testid="app-version">Version {{ version }}</span>
       <div class="ml-auto flex flex-wrap gap-3">
         <button type="button" :class="secondary" @click="session.screen = 'scan'">
           Back to scanning
@@ -144,7 +144,7 @@ function onScan(code: string): void {
 
     <ul
       v-if="session.notConnected.length"
-      class="flex flex-col gap-1 rounded-lg border-l-8 border-amber-600 bg-amber-100 p-3 text-xl font-semibold text-amber-950"
+      class="flex flex-col gap-1 rounded-lg border-l-8 border-warn-line bg-warn-soft p-3 text-xl font-semibold text-warn-ink"
       data-testid="not-connected"
     >
       <li v-for="d in session.notConnected" :key="d.deviceId">
@@ -154,14 +154,14 @@ function onScan(code: string): void {
 
     <div class="grid items-start gap-4 md:grid-cols-2">
       <div class="flex min-w-0 flex-col gap-4">
-        <section class="rounded-xl border-2 border-slate-300 bg-white p-5">
+        <section class="rounded-xl border-2 border-line-2 bg-surface p-5">
           <h2 class="mb-2 text-xl font-bold">Totals</h2>
           <p class="text-xl">
             Patrons <b>{{ session.state.totals.patrons }}</b> · Items
             <b>{{ session.state.totals.items }}</b>
           </p>
-          <h3 class="mt-4 mb-1 text-lg font-bold text-slate-700">By clerk</h3>
-          <p v-if="clerks.length === 0" class="text-lg text-slate-600">Nothing scanned yet.</p>
+          <h3 class="mt-4 mb-1 text-lg font-bold text-ink-3">By clerk</h3>
+          <p v-if="clerks.length === 0" class="text-lg text-ink-4">Nothing scanned yet.</p>
           <ul v-else class="text-lg" data-testid="per-clerk">
             <li v-for="c in clerks" :key="c.name">
               {{ c.name }}: {{ c.patrons }} {{ c.patrons === 1 ? "patron" : "patrons" }},
@@ -170,7 +170,7 @@ function onScan(code: string): void {
             </li>
           </ul>
           <template v-if="workstations.length">
-            <h3 class="mt-4 mb-1 text-lg font-bold text-slate-700">By workstation</h3>
+            <h3 class="mt-4 mb-1 text-lg font-bold text-ink-3">By workstation</h3>
             <ul class="text-lg" data-testid="per-workstation">
               <li v-for="w in workstations" :key="w.name">
                 {{ w.name }}: {{ w.patrons }} {{ w.patrons === 1 ? "patron" : "patrons" }},
@@ -183,23 +183,23 @@ function onScan(code: string): void {
 
         <section class="flex flex-col gap-3">
           <h2 class="text-xl font-bold">Patrons</h2>
-          <p v-if="patrons.length === 0" class="text-lg text-slate-600">No patrons scanned yet.</p>
+          <p v-if="patrons.length === 0" class="text-lg text-ink-4">No patrons scanned yet.</p>
           <ol v-else class="flex flex-col gap-3" data-testid="summary-patrons">
             <li
               v-for="p in patrons"
               :key="p.patron"
-              class="rounded-lg border-2 border-slate-300 bg-white p-4"
+              class="rounded-lg border-2 border-line-2 bg-surface p-4"
               data-testid="summary-patron"
             >
               <div class="flex flex-wrap items-baseline gap-x-4">
                 <span
                   class="font-mono text-2xl font-bold"
-                  :class="p.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
+                  :class="p.voided ? 'text-ink-5 line-through' : 'text-ink'"
                 >
                   {{ p.patron }}
                 </span>
-                <span v-if="p.voided" class="text-lg text-slate-500">voided</span>
-                <span v-else class="text-lg text-slate-600">
+                <span v-if="p.voided" class="text-lg text-ink-5">voided</span>
+                <span v-else class="text-lg text-ink-4">
                   {{ p.items }} {{ p.items === 1 ? "item" : "items" }} · {{ p.clerks.join(", ") }}
                 </span>
               </div>
@@ -208,7 +208,7 @@ function onScan(code: string): void {
                   v-for="r in p.rows"
                   :key="r.id"
                   class="font-mono text-xl"
-                  :class="r.voided ? 'text-slate-500 line-through' : 'text-slate-900'"
+                  :class="r.voided ? 'text-ink-5 line-through' : 'text-ink'"
                 >
                   {{ r.barcode }}
                 </li>
@@ -220,7 +220,7 @@ function onScan(code: string): void {
 
       <div class="flex min-w-0 flex-col gap-4">
         <section
-          class="flex flex-col items-start gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
+          class="flex flex-col items-start gap-3 rounded-xl border-2 border-line-2 bg-surface p-5"
         >
           <h2 class="text-xl font-bold">Export</h2>
           <button
@@ -261,16 +261,16 @@ function onScan(code: string): void {
               Download for Evergreen
             </button>
           </div>
-          <p v-if="!canGenerate" id="generate-hint" class="text-lg text-slate-600">
+          <p v-if="!canGenerate" id="generate-hint" class="text-lg text-ink-4">
             Scan at least one patron first
           </p>
-          <p v-else-if="!hasItems" id="generate-hint" class="text-lg text-slate-600">
+          <p v-else-if="!hasItems" id="generate-hint" class="text-lg text-ink-4">
             Scan at least one item to download for Evergreen
           </p>
           <p
             v-if="evergreenStaleNow"
             data-testid="evergreen-stale"
-            class="text-lg font-semibold text-red-800"
+            class="text-lg font-semibold text-danger-text-2"
           >
             Items were added after the last Evergreen download. The new file contains every checkout
             in the session, so upload only one of them unless the earlier one was never uploaded.
@@ -314,7 +314,9 @@ function onScan(code: string): void {
         :class="[
           dialogBox,
           'max-w-xl',
-          confirming === 'close' || confirming === 'delete' ? 'border-red-700' : 'border-amber-600',
+          confirming === 'close' || confirming === 'delete'
+            ? 'border-danger-line'
+            : 'border-warn-line',
         ]"
       >
         <h2 id="confirm-title" class="text-3xl font-extrabold">
@@ -334,7 +336,7 @@ function onScan(code: string): void {
             Patron in progress: {{ inProgress.join(", ") }}. Their visits will stay open.
           </p>
           <template v-if="confirming === 'delete'">
-            <p v-if="!evergreenExported" class="font-semibold text-red-800">
+            <p v-if="!evergreenExported" class="font-semibold text-danger-text-2">
               Download the Evergreen file first if these checkouts are not in Evergreen yet.
             </p>
             <p>

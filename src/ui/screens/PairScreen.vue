@@ -10,6 +10,7 @@ import QrDisplay from "../../qr/QrDisplay.vue";
 import QrScan from "../../qr/QrScan.vue";
 import { field, primary, secondary } from "../classes";
 import MessageBanner from "../components/MessageBanner.vue";
+import ThemeButton from "../components/ThemeButton.vue";
 import { createScanCapture, type KeyLike } from "../scan-capture";
 import { useSession, type Message } from "../session";
 
@@ -319,46 +320,45 @@ const title =
       ? "Re-pair this workstation"
       : "Join session";
 
-const step = "text-2xl font-bold text-slate-900";
+const step = "text-2xl font-bold text-ink";
 </script>
 
 <template>
   <main class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
     <div class="flex flex-wrap items-center gap-4">
-      <h1 class="text-3xl font-extrabold text-slate-900">{{ title }}</h1>
+      <h1 class="text-3xl font-extrabold text-ink">{{ title }}</h1>
       <p
         v-if="mode === 'invite' && invite && phase !== 'error' && phase !== 'working'"
-        class="text-lg text-slate-700"
+        class="text-lg text-ink-3"
         data-testid="countdown"
       >
         Expires in <span class="font-mono font-bold">{{ countdown }}</span>
       </p>
-      <button v-if="!adopting" type="button" :class="[secondary, 'ml-auto']" @click="leave">
-        Back
-      </button>
+      <ThemeButton class="ml-auto" />
+      <button v-if="!adopting" type="button" :class="secondary" @click="leave">Back</button>
     </div>
 
     <MessageBanner v-if="scanNote" :message="scanNote" />
 
-    <p v-if="phase === 'start'" class="text-xl text-slate-700">Preparing the join code…</p>
+    <p v-if="phase === 'start'" class="text-xl text-ink-3">Preparing the join code…</p>
 
     <div v-else-if="phase === 'error'" class="flex flex-col items-start gap-4">
       <p
         role="alert"
-        class="rounded-lg border-l-8 border-red-700 bg-red-100 p-4 text-2xl font-semibold text-red-900"
+        class="rounded-lg border-l-8 border-danger-line bg-danger-soft p-4 text-2xl font-semibold text-danger-ink"
       >
         {{ error }}
       </p>
       <button type="button" :class="primary" @click="tryAgain">Try again</button>
     </div>
 
-    <p v-else-if="phase === 'working'" class="text-xl text-slate-700" role="status">
+    <p v-else-if="phase === 'working'" class="text-xl text-ink-3" role="status">
       {{ status }}
     </p>
 
     <!-- Invite: show the join code, then scan the reply code. -->
     <div v-else-if="mode === 'invite' && invite" class="grid gap-6 md:grid-cols-2">
-      <section class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5">
+      <section class="flex flex-col gap-3 rounded-xl border-2 border-line-2 bg-surface p-5">
         <h2 :class="step">1. On the new workstation, click Join session and scan this code</h2>
         <QrDisplay
           :text="invite.payload"
@@ -368,7 +368,7 @@ const step = "text-2xl font-bold text-slate-900";
           :file-name="inviteFile"
         />
       </section>
-      <section class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5">
+      <section class="flex flex-col gap-3 rounded-xl border-2 border-line-2 bg-surface p-5">
         <h2 :class="step">2. Scan the reply code shown on the new workstation</h2>
         <QrScan ref="scanner" :key="attempt" files @decoded="onAnswer" />
       </section>
@@ -377,7 +377,7 @@ const step = "text-2xl font-bold text-slate-900";
     <!-- Join: scan the join code. -->
     <section
       v-else-if="phase === 'scan'"
-      class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
+      class="flex flex-col gap-3 rounded-xl border-2 border-line-2 bg-surface p-5"
     >
       <h2 :class="step">
         Scan the join code shown under Add workstation on a workstation already in the session
@@ -387,12 +387,10 @@ const step = "text-2xl font-bold text-slate-900";
 
     <section
       v-else-if="phase === 'confirm' && offer"
-      class="flex flex-col items-start gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
+      class="flex flex-col items-start gap-4 rounded-xl border-2 border-line-2 bg-surface p-5"
     >
       <h2 class="text-3xl font-bold">Join {{ offer.sessionName }}?</h2>
-      <p class="text-xl text-slate-700">
-        Invited by {{ offer.employee || "another workstation" }}.
-      </p>
+      <p class="text-xl text-ink-3">Invited by {{ offer.employee || "another workstation" }}.</p>
       <div class="flex gap-3">
         <button type="button" :class="primary" @click="phase = 'name'">Join</button>
         <button type="button" :class="secondary" @click="tryAgain">Scan a different code</button>
@@ -401,7 +399,7 @@ const step = "text-2xl font-bold text-slate-900";
 
     <form
       v-else-if="phase === 'name'"
-      class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
+      class="flex flex-col gap-4 rounded-xl border-2 border-line-2 bg-surface p-5"
       @submit.prevent="submitName"
     >
       <h2 :class="step">Who is working at this workstation?</h2>
@@ -419,7 +417,7 @@ const step = "text-2xl font-bold text-slate-900";
           aria-describedby="join-clerk-error"
         />
       </label>
-      <p v-if="clerkError" id="join-clerk-error" class="text-lg font-semibold text-red-700">
+      <p v-if="clerkError" id="join-clerk-error" class="text-lg font-semibold text-danger-text">
         Enter your name to join.
       </p>
       <button type="submit" :class="[primary, 'self-start']">Continue</button>
@@ -427,7 +425,7 @@ const step = "text-2xl font-bold text-slate-900";
 
     <section
       v-else-if="phase === 'answer'"
-      class="flex flex-col gap-3 rounded-xl border-2 border-slate-300 bg-white p-5"
+      class="flex flex-col gap-3 rounded-xl border-2 border-line-2 bg-surface p-5"
     >
       <h2 :class="step">
         On {{ offer?.employee || "the other" }}'s workstation, scan this reply code
@@ -438,7 +436,7 @@ const step = "text-2xl font-bold text-slate-900";
         :session-name="offer?.sessionName"
         :file-name="answerFile"
       />
-      <p class="text-lg text-slate-700" role="status">Waiting for the other workstation…</p>
+      <p class="text-lg text-ink-3" role="status">Waiting for the other workstation…</p>
     </section>
   </main>
 </template>

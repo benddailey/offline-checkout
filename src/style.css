@@ -1,1 +1,115 @@
 @import "tailwindcss";
+
+/* The default theme, Light. Screens use these tokens, never Tailwind's palette directly.
+   DEVELOPMENT.md explains how to add a theme. */
+@theme {
+  --color-page: var(--color-slate-50);
+  --color-surface: var(--color-white);
+  --color-raised: var(--color-slate-100);
+  --color-overlay: color-mix(in oklab, var(--color-slate-900) 60%, transparent);
+
+  --color-ink: var(--color-slate-900);
+  --color-ink-2: var(--color-slate-800);
+  --color-ink-3: var(--color-slate-700);
+  --color-ink-4: var(--color-slate-600);
+  --color-ink-5: var(--color-slate-500);
+  --color-on-solid: var(--color-white);
+
+  --color-line-1: var(--color-slate-200);
+  --color-line-2: var(--color-slate-300);
+  --color-line-3: var(--color-slate-400);
+  --color-line-4: var(--color-slate-500);
+  --color-line-5: var(--color-slate-700);
+
+  --color-action: var(--color-blue-700);
+  --color-action-hover: var(--color-blue-800);
+  --color-action-edge: var(--color-blue-800);
+  --color-accent: var(--color-blue-700);
+  --color-accent-2: var(--color-blue-600);
+  --color-accent-soft: var(--color-blue-50);
+  --color-accent-soft-2: var(--color-blue-100);
+  --color-accent-ink: var(--color-blue-900);
+  --color-accent-ring: var(--color-blue-300);
+  --color-accent-ring-2: var(--color-blue-400);
+
+  --color-danger: var(--color-red-700);
+  --color-danger-hover: var(--color-red-800);
+  --color-danger-edge: var(--color-red-800);
+  --color-danger-line: var(--color-red-700);
+  --color-danger-tint: var(--color-red-50);
+  --color-danger-soft: var(--color-red-100);
+  --color-danger-fill: var(--color-red-300);
+  --color-danger-text: var(--color-red-700);
+  --color-danger-text-2: var(--color-red-800);
+  --color-danger-ink: var(--color-red-900);
+  --color-danger-ring: var(--color-red-300);
+
+  --color-success: var(--color-green-700);
+  --color-success-hover: var(--color-green-800);
+  --color-success-edge: var(--color-green-800);
+
+  --color-warn-soft: var(--color-amber-100);
+  --color-warn-line: var(--color-amber-600);
+  --color-warn-ink: var(--color-amber-950);
+  --color-warn-ink-2: var(--color-amber-900);
+
+  --color-online: var(--color-green-600);
+  --color-offline: var(--color-red-600);
+
+  /* The same in every theme: a QR code needs a white margin to scan, and a viewfinder stays dark. */
+  --color-code: var(--color-white);
+  --color-camera: var(--color-slate-900);
+  --color-camera-ink: var(--color-slate-300);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-page: var(--color-slate-900);
+  --color-surface: var(--color-slate-800);
+  --color-raised: var(--color-slate-700);
+  --color-overlay: color-mix(in oklab, var(--color-black) 70%, transparent);
+
+  --color-ink: var(--color-slate-100);
+  --color-ink-2: var(--color-slate-200);
+  --color-ink-3: var(--color-slate-200);
+  --color-ink-4: var(--color-slate-300);
+  --color-ink-5: var(--color-slate-300);
+
+  --color-line-1: var(--color-slate-700);
+  --color-line-2: var(--color-slate-600);
+  --color-line-3: var(--color-slate-500);
+  --color-line-4: var(--color-slate-400);
+  --color-line-5: var(--color-slate-400);
+
+  --color-action: var(--color-blue-600);
+  --color-action-hover: var(--color-blue-700);
+  --color-action-edge: var(--color-blue-500);
+  --color-accent: var(--color-blue-400);
+  --color-accent-2: var(--color-blue-500);
+  --color-accent-soft: var(--color-blue-950);
+  --color-accent-soft-2: var(--color-blue-900);
+  --color-accent-ink: var(--color-blue-100);
+  --color-accent-ring: var(--color-blue-800);
+  --color-accent-ring-2: var(--color-blue-500);
+
+  --color-danger-edge: var(--color-red-500);
+  --color-danger-line: var(--color-red-400);
+  --color-danger-tint: var(--color-red-950);
+  --color-danger-soft: var(--color-red-950);
+  --color-danger-fill: var(--color-red-800);
+  --color-danger-text: var(--color-red-300);
+  --color-danger-text-2: var(--color-red-300);
+  --color-danger-ink: var(--color-red-100);
+  --color-danger-ring: var(--color-red-800);
+
+  --color-success-edge: var(--color-green-500);
+
+  --color-warn-soft: var(--color-amber-950);
+  --color-warn-line: var(--color-amber-500);
+  --color-warn-ink: var(--color-amber-100);
+  --color-warn-ink-2: var(--color-amber-100);
+
+  --color-online: var(--color-green-500);
+  --color-offline: var(--color-red-500);
+}

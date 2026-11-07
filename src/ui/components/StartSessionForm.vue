@@ -33,7 +33,7 @@ async function start() {
 
 <template>
   <form
-    class="flex flex-col gap-4 rounded-xl border-2 border-slate-300 bg-white p-5"
+    class="flex flex-col gap-4 rounded-xl border-2 border-line-2 bg-surface p-5"
     aria-label="Start new session"
     data-testid="start-form"
     @submit.prevent="start"
@@ -56,7 +56,7 @@ async function start() {
         aria-describedby="clerk-error"
       />
     </label>
-    <p v-if="clerkError" id="clerk-error" class="text-lg font-semibold text-red-700">
+    <p v-if="clerkError" id="clerk-error" class="text-lg font-semibold text-danger-text">
       Enter your name to start.
     </p>
     <button type="submit" :class="primary" :disabled="busy">Start session</button>

@@ -61,14 +61,14 @@ function onBlur() {
 <template>
   <div
     ref="track"
-    class="relative min-h-12 select-none overflow-hidden rounded-lg border-2 border-red-800 bg-red-100"
+    class="relative min-h-12 select-none overflow-hidden rounded-lg border-2 border-danger-edge bg-danger-soft"
   >
     <div
-      class="pointer-events-none absolute inset-y-0 left-0 bg-red-300"
+      class="pointer-events-none absolute inset-y-0 left-0 bg-danger-fill"
       :style="{ width: `calc(${value / 100} * (100% - 4rem) + 4rem)` }"
     ></div>
     <span
-      class="pointer-events-none absolute inset-0 flex items-center justify-center pl-16 text-xl font-semibold text-red-900"
+      class="pointer-events-none absolute inset-0 flex items-center justify-center pl-16 text-xl font-semibold text-danger-ink"
     >
       {{ props.label }}
     </span>
@@ -80,7 +80,7 @@ function onBlur() {
       aria-valuemax="100"
       :aria-valuenow="Math.round(value)"
       :aria-valuetext="`${props.label}, ${Math.round(value)}%`"
-      class="absolute inset-y-0 flex w-16 cursor-grab touch-none items-center justify-center rounded-md border-2 border-red-800 bg-red-700 text-xl font-semibold text-white focus:outline-2 focus:outline-offset-2 focus:outline-red-900"
+      class="absolute inset-y-0 flex w-16 cursor-grab touch-none items-center justify-center rounded-md border-2 border-danger-edge bg-danger text-xl font-semibold text-on-solid focus:outline-2 focus:outline-offset-2 focus:outline-danger-ink"
       :class="{ 'cursor-grabbing': dragging, 'transition-[left] duration-150': !dragging }"
       :style="{ left: `calc(${value / 100} * (100% - 4rem))` }"
       @pointerdown="onPointerDown"
