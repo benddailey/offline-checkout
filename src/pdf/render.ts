@@ -4,7 +4,8 @@ import type { SessionState } from "../log/types";
 import { blocksFromState } from "./blocks";
 import { CONTROL } from "../log/barcode";
 import { code128Modules, QUIET_MODULES } from "../print/code128";
-import { GEOMETRY, layout, MODULE_IN, SUMMARY_LINE_H } from "./layout";
+import { barcodeWidth, GEOMETRY, layout, MODULE_IN, SUMMARY_LINE_H } from "./layout";
+import { AVERY_5371, cardOrigin, STAFF_MODULE_IN, staffValue } from "./staff-cards";
 
 const BAR_FONT_PT = 8;
 const CARD_MODULE_IN = 0.015;
@@ -149,6 +150,34 @@ export function buildScannerCard(compress = true): jsPDF {
 
 export function renderScannerCard(): Blob {
   return buildScannerCard().output("blob");
+}
+
+const STAFF_BAR_H = 0.6;
+const STAFF_FONT_PT = 14;
+const STAFF_TEXT_GAP = 0.08;
+
+/** One card per value on an Avery 5371 sheet; empty values leave their card blank. */
+export function buildStaffCards(values: readonly string[], compress = true): jsPDF {
+  const doc = newDoc(compress);
+  const g = AVERY_5371;
+  const blockH = STAFF_BAR_H + STAFF_TEXT_GAP + STAFF_FONT_PT / 72;
+  doc.setTextColor(0, 0, 0).setFont("courier", "normal").setFontSize(STAFF_FONT_PT);
+  values.forEach((raw, i) => {
+    const text = staffValue(raw);
+    if (text === "") return;
+    const { x, y } = cardOrigin(i);
+    const barX = x + (g.cardW - barcodeWidth(text, STAFF_MODULE_IN)) / 2;
+    const barY = y + (g.cardH - blockH) / 2;
+    const bars = drawBars(doc, text, barX, barY, STAFF_MODULE_IN, STAFF_BAR_H);
+    drawText(doc, text, bars.left + bars.width / 2, barY + STAFF_BAR_H + STAFF_TEXT_GAP, {
+      align: "center",
+    });
+  });
+  return doc;
+}
+
+export function renderStaffCards(values: readonly string[]): Blob {
+  return buildStaffCards(values).output("blob");
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

@@ -34,7 +34,7 @@ import * as db from "../store/db";
 import type { SessionMeta, SessionStore, SessionSummary } from "../store/db";
 import { SyncEngine } from "../sync/sync";
 
-export type Screen = "launch" | "pair-invite" | "pair-join" | "scan" | "summary";
+export type Screen = "launch" | "pair-invite" | "pair-join" | "scan" | "summary" | "staff-cards";
 export type Message = { tone: "info" | "warn" | "error"; text: string };
 
 export interface SessionDeps {
