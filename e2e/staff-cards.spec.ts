@@ -30,7 +30,7 @@ test("staff barcodes: fill the rest, keep case, and print a scannable Avery 5371
   await card(3).fill("");
 
   const [download] = await Promise.all([page.waitForEvent("download"), generate.click()]);
-  expect(download.suggestedFilename()).toBe("staff-barcodes.pdf");
+  expect(download.suggestedFilename()).toMatch(/^staff-barcodes-\d{8}-\d{4}\.pdf$/);
   const pdf = await download.path();
   const words = (await pdfText(pdf)).split(/\s+/).filter(Boolean);
   expect(words).toEqual([...Array(4).fill("bdailey"), ...Array(5).fill("JDailey")]);

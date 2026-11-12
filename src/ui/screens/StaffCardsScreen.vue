@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { downloadBlob, renderStaffCards } from "../../pdf/render";
-import { CARD_COUNT, fillRest, staffCardError, staffValue } from "../../pdf/staff-cards";
+import {
+  CARD_COUNT,
+  fillRest,
+  staffCardError,
+  staffCardsFilename,
+  staffValue,
+} from "../../pdf/staff-cards";
 import ThemeButton from "../components/ThemeButton.vue";
 import { field, primary, secondary, tool } from "../classes";
 import { useSession } from "../session";
@@ -18,7 +24,7 @@ function fill(i: number) {
 }
 
 function generate() {
-  if (ready.value) downloadBlob(renderStaffCards(values.value), "staff-barcodes.pdf");
+  if (ready.value) downloadBlob(renderStaffCards(values.value), staffCardsFilename(new Date()));
 }
 </script>
 

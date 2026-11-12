@@ -50,3 +50,10 @@ export function staffCardError(raw: string): string | null {
 export function fillRest(values: readonly string[], i: number): string[] {
   return values.map((v, j) => (j > i ? values[i]! : v));
 }
+
+/** "staff-barcodes-20261112-0945.pdf" in local time, so each download keeps its own name. */
+export function staffCardsFilename(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  const ymd = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`;
+  return `staff-barcodes-${ymd}-${p(d.getHours())}${p(d.getMinutes())}.pdf`;
+}

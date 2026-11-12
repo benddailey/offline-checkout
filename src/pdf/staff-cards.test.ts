@@ -1,7 +1,13 @@
 import { describe, expect, test } from "vite-plus/test";
 import { code128Modules } from "../print/code128";
 import { buildStaffCards, renderStaffCards } from "./render";
-import { cardOrigin, fillRest, staffCardError, staffValue } from "./staff-cards";
+import {
+  cardOrigin,
+  fillRest,
+  staffCardError,
+  staffCardsFilename,
+  staffValue,
+} from "./staff-cards";
 
 const raw = (doc: { output(t: "arraybuffer"): ArrayBuffer }) =>
   new TextDecoder("latin1").decode(doc.output("arraybuffer"));
@@ -37,6 +43,13 @@ describe("staff cards", () => {
     expect(staffCardError("a".repeat(17))).toBe("Too long to fit on the card");
   });
 
+  test("download name carries the local date and time", () => {
+    expect(staffCardsFilename(new Date(2026, 0, 5, 7, 3))).toBe("staff-barcodes-20260105-0703.pdf");
+    expect(staffCardsFilename(new Date(2026, 10, 12, 21, 45))).toBe(
+      "staff-barcodes-20261112-2145.pdf",
+    );
+  });
+
   test("fill the rest overwrites every later box and nothing before", () => {
     const one = fillRest(Array<string>(10).fill(""), 0);
     expect(one).toEqual(Array(10).fill(""));
@@ -57,5 +70,12 @@ describe("staff cards", () => {
     expect(y0 - y2).toBeCloseTo(144, 1);
     expect(x0).toBeLessThan((0.75 + 1.75) * 72);
     expect(renderStaffCards(values).type).toBe("application/pdf");
+  });
+
+  test("pdf has faint dotted cut lines on every card edge, even with no names", () => {
+    const s = raw(buildStaffCards(Array<string>(10).fill(""), false));
+    expect(s).toMatch(/0\.78 G\s+[\d.]+ w\s+\[[\d. ]+\] 0\.? d/);
+    // 3 vertical + 6 horizontal edges, each a stroked line.
+    expect(s.match(/ l\s+S/g)).toHaveLength(9);
   });
 });
