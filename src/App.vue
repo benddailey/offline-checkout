@@ -5,6 +5,7 @@ import StatusBar from "./ui/components/StatusBar.vue";
 import LaunchScreen from "./ui/screens/LaunchScreen.vue";
 import PairScreen from "./ui/screens/PairScreen.vue";
 import ScanScreen from "./ui/screens/ScanScreen.vue";
+import StaffCardsScreen from "./ui/screens/StaffCardsScreen.vue";
 import SummaryScreen from "./ui/screens/SummaryScreen.vue";
 import { usePanelDrag } from "./ui/panel";
 import { useSession } from "./ui/session";
@@ -37,6 +38,7 @@ watch(() => [session.screen, currentBackground.value], drag.relayout, { flush: "
     <PairScreen v-else-if="session.screen === 'pair-invite'" key="invite" mode="invite" />
     <PairScreen v-else-if="session.screen === 'pair-join'" key="join" mode="join" />
     <SummaryScreen v-else-if="session.screen === 'summary'" />
+    <StaffCardsScreen v-else-if="session.screen === 'staff-cards'" />
     <FatalAlert v-if="session.fatal" :text="session.fatal" />
   </div>
 </template>

@@ -146,6 +146,9 @@ async function resume(id: string, form: HTMLFormElement) {
         >Workstation: <b class="text-ink">{{ session.workstationName }}</b></span
       >
       <button type="button" :class="tool" @click="renaming = true">Rename</button>
+      <button type="button" :class="[tool, 'ml-auto']" @click="session.screen = 'staff-cards'">
+        Print staff barcodes
+      </button>
     </p>
 
     <div v-if="named && !recentOpen" class="grid gap-6 md:grid-cols-2">

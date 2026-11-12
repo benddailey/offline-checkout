@@ -213,6 +213,15 @@ to the title on the start screen and on the Summary.
   appears, close every Offline Checkout window and open the app from that shortcut.
 - To change the receipt printer, repeat **Choose the receipt printer** from the setup.
 - Test the printed barcodes with your own scanners before you rely on them.
+- **Print staff barcodes** on the start screen makes login barcodes for Avery 5371 business cards
+  (10 per sheet).
+  - Type each login exactly as it should scan. Capital and small letters are kept; spaces before
+    and after are dropped.
+  - **Fill the rest** copies a card into every card after it. Cards run left to right, then top to
+    bottom, as on the sheet. Empty cards are left blank.
+  - Click **Generate PDF** and print it at **Actual size**, not **Fit to page**.
+  - Faint dotted lines mark the card edges, for cutting plain card stock by hand.
+  - Nothing typed there is saved.
 - **Theme** at the top of the screen opens a menu with two choices. You can change them even in
   the middle of a patron, and each PC remembers its own.
   - **Theme:** **Light** or **Dark**.

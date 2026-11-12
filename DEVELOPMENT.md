@@ -127,6 +127,11 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
   filled path in module units, scaled with `cm`, through the untyped `doc.internal.write`. A
   `rect()` call per bar was most of a large session's PDF time and size. Coordinates are kept to 3
   decimals of a point (`floatPrecision: 3`), far finer than a printer dot.
+  - Staff barcodes (`src/pdf/staff-cards.ts`, `StaffCardsScreen.vue`) print staff logins on an Avery
+    5371 sheet (2 × 5 cards of 3.5" × 2"), at 1/75" per module. They are not scans: they skip
+    `normalizeScan` and `validateBarcode`, keep the case as typed, and are only trimmed and limited
+    to printable ASCII and the card's width. Nothing typed on that screen is stored.
+    Every card edge gets a faint (20% grey) dotted cut line, for cutting plain stock by hand.
 - **CSV and Excel:** written by hand in `src/export/`, one row per item in the PDF's order.
   - The CSV has a UTF-8 BOM and CRLF lines. A cell starting with `=`, `+`, `-` or `@` gets a `'`
     in front so Excel doesn't run it as a formula.
