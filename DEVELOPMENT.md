@@ -54,6 +54,13 @@ file. Receipts are printed with the browser's print dialog, or silently with Chr
     stay on Pages for older versions of the app.
   - The e2e browsers can't reach Pages (`CHROMIUM_ARGS`). Tests that need photos call
     `servePhotos` (`e2e/helpers/photos.ts`), which downloads the release files once into `.cache/`.
+- **Version check:** the same workflow also runs for `v*` releases and writes `latest.json`
+  (`{"version":"X.Y.Z"}`, from the release marked latest) to the root of Pages. At launch
+  `src/update/latest.ts` fetches it once, with a 3 second timeout and no cookies, and ignores every
+  failure. If it names a newer version, the start screen links to
+  https://github.com/benddailey/offline-checkout/releases/latest. The request carries nothing about
+  the PC or its sessions. A release event runs the workflow from its tag, so the `github-pages`
+  environment allows deploys from `main` and from tags `v*` and `backgrounds-*`.
 - **Shelf backgrounds:** `scripts/shelves.ts` draws `shelf-light.svg` and `shelf-dark.svg` from
   `src/ui/backgrounds/evergreen_indiana_population.csv`, one book per library. Every build and
   `vp dev` hashes the CSV and the script, and redraws only when the hash differs from
@@ -269,6 +276,8 @@ the camera, and WebRTC on the local network. Build it with `npm run build:probe`
 5. From the tagged commit, run `npm run build && npm run package`, then publish the GitHub release
    with both files:
    `gh release create vX.Y.Z dist/offline-checkout.html dist/offline-checkout-vX.Y.Z.zip`.
+   Publishing it runs `.github/workflows/backgrounds.yml`, which updates `latest.json` on Pages;
+   check that run succeeds.
 6. Open the built file once from `file://` and do a quick check: start a session, scan a patron and
    an item, close the session and generate the PDF.
 

@@ -10,6 +10,7 @@ import { field, primary, secondary, secondaryOn, tool } from "../classes";
 import { useSession } from "../session";
 import { dateTime } from "../when";
 import { otherWorkstations, type OtherWorkstation } from "../workstations";
+import { newerVersion, RELEASES_URL } from "../../update/latest";
 
 /** An open session with no records for this long is not expanded, nor are its workstations listed. */
 const STALE_MS = 72 * 60 * 60 * 1000;
@@ -115,6 +116,15 @@ async function resume(id: string, form: HTMLFormElement) {
       <img :src="logoUrl" alt="" class="size-16" data-testid="app-logo" />
       <h1 class="text-4xl font-extrabold text-ink">Offline Checkout</h1>
       <span class="text-lg text-ink-4" data-testid="app-version">Version {{ version }}</span>
+      <a
+        v-if="newerVersion"
+        :href="RELEASES_URL"
+        target="_blank"
+        rel="noopener"
+        class="text-lg font-semibold text-accent-ink underline"
+        data-testid="newer-version"
+        >Version {{ newerVersion }} is available</a
+      >
       <ThemeButton class="ml-auto" />
     </div>
 
