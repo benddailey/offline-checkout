@@ -4,7 +4,9 @@ import { buildStaffCards, renderStaffCards } from "./render";
 import {
   cardOrigin,
   fillRest,
+  staffBarcode,
   staffCardError,
+  staffModule,
   staffCardsFilename,
   staffValue,
 } from "./staff-cards";
@@ -34,13 +36,27 @@ describe("staff cards", () => {
     expect(code128Modules(staffValue("bdailey"))).not.toBe(code128Modules(staffValue("BDailey")));
   });
 
+  test("bars encode the trimmed login followed by a tab", () => {
+    expect(staffBarcode("  BDailey \t")).toBe("BDailey\t");
+  });
+
+  test('bars are 1/75" while the login fits, then 1/100"', () => {
+    expect(staffModule(staffBarcode("a".repeat(14)))).toBe(1 / 75);
+    expect(staffModule(staffBarcode("a".repeat(15)))).toBe(1 / 100);
+    expect(staffModule(staffBarcode("wells-srinkenberger"))).toBe(1 / 100);
+    expect(staffModule(staffBarcode("a".repeat(23)))).toBeNull();
+  });
+
   test("errors: non-ASCII and too long; empty and punctuation are fine", () => {
     expect(staffCardError("")).toBeNull();
     expect(staffCardError("   ")).toBeNull();
-    expect(staffCardError("b.dailey-2_x@lib")).toBeNull();
+    expect(staffCardError("wells-srinkenberger")).toBeNull();
     expect(staffCardError("josé")).toBe('Can\'t go in a barcode: "é"');
-    expect(staffCardError("a".repeat(16))).toBeNull();
-    expect(staffCardError("a".repeat(17))).toBe("Too long to fit on the card");
+    // The tab is only in code set A, so small letters also pay for a shift; capitals don't.
+    expect(staffCardError("a".repeat(22))).toBeNull();
+    expect(staffCardError("a".repeat(23))).toBe("Too long to fit on the card");
+    expect(staffCardError("A".repeat(23))).toBeNull();
+    expect(staffCardError("A".repeat(24))).toBe("Too long to fit on the card");
   });
 
   test("download name carries the local date and time", () => {
