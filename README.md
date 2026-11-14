@@ -216,7 +216,8 @@ to the title on the start screen and on the Summary.
 - **Print staff barcodes** on the start screen makes login barcodes for Avery 5371 business cards
   (10 per sheet).
   - Type each login exactly as it should scan. Capital and small letters are kept; spaces before
-    and after are dropped.
+    and after are dropped. Each scan ends with a tab, which moves to the next box on the login
+    screen. Logins fit up to 22 characters (23 if all capitals).
   - **Fill the rest** copies a card into every card after it. Cards run left to right, then top to
     bottom, as on the sheet. Empty cards are left blank.
   - Click **Generate PDF** and print it at **Actual size**, not **Fit to page**.

@@ -27,17 +27,25 @@ test("staff barcodes: fill the rest, keep case, and print a scannable Avery 5371
   await card(3).fill("josé");
   await expect(page.getByText('Can\'t go in a barcode: "é"')).toBeVisible();
   await expect(generate).toBeDisabled();
-  await card(3).fill("");
+  await card(3).fill("wells-srinkenberger");
 
   const [download] = await Promise.all([page.waitForEvent("download"), generate.click()]);
   expect(download.suggestedFilename()).toMatch(/^staff-barcodes-\d{8}-\d{4}\.pdf$/);
   const pdf = await download.path();
   const words = (await pdfText(pdf)).split(/\s+/).filter(Boolean);
-  expect(words).toEqual([...Array(4).fill("bdailey"), ...Array(5).fill("JDailey")]);
+  expect(words).toEqual([
+    "bdailey",
+    "bdailey",
+    "wells-srinkenberger",
+    "bdailey",
+    "bdailey",
+    ...Array(5).fill("JDailey"),
+  ]);
   const decoded = await decodePdfBarcodes(pdf);
-  expect(decoded).toHaveLength(9);
-  expect(decoded.filter((t) => t === "bdailey")).toHaveLength(4);
-  expect(decoded.filter((t) => t === "JDailey")).toHaveLength(5);
+  expect(decoded).toHaveLength(10);
+  expect(decoded.filter((t) => t === "bdailey\t")).toHaveLength(4);
+  expect(decoded.filter((t) => t === "JDailey\t")).toHaveLength(5);
+  expect(decoded).toContain("wells-srinkenberger\t");
 
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("button", { name: "Print staff barcodes" })).toBeVisible();
