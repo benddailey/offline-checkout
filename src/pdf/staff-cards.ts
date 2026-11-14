@@ -12,11 +12,16 @@ export const AVERY_5371 = {
 
 export const CARD_COUNT = AVERY_5371.cols * AVERY_5371.rows;
 
-/** 1/75": every bar is a whole number of dots at 300 and 600 dpi. */
-export const STAFF_MODULE_IN = 1 / 75;
+/** Widest first; every bar is a whole number of dots at 300 and 600 dpi. 1/100" (10 mil) is the floor. */
+export const STAFF_MODULES_IN = [1 / 75, 1 / 100] as const;
 
 /** Room for the bars (quiet zones included) inside the card's side padding. */
 export const STAFF_BAR_MAX_W = AVERY_5371.cardW - 0.3;
+
+/** The widest bar width the card has room for, or null if even the narrowest is too wide. */
+export function staffModule(code: string): number | null {
+  return STAFF_MODULES_IN.find((m) => barcodeWidth(code, m) <= STAFF_BAR_MAX_W) ?? null;
+}
 
 /** Top-left of card `i` (0-based), filled left to right, then top to bottom. */
 export function cardOrigin(i: number): { x: number; y: number } {
@@ -32,6 +37,11 @@ export function staffValue(raw: string): string {
   return raw.trim();
 }
 
+/** What the bars encode: the login then a tab, so a scan moves the login form to its next field. */
+export function staffBarcode(raw: string): string {
+  return `${staffValue(raw)}\t`;
+}
+
 /** Printable ASCII only: Code 128 has no other characters, and jsPDF's fonts print them all. */
 const NOT_PRINTABLE = /[^\x20-\x7e]/gu;
 
@@ -42,7 +52,7 @@ export function staffCardError(raw: string): string | null {
   if (bad.length > 0) {
     return `Can't go in a barcode: ${bad.map((c) => `"${c}"`).join(", ")}`;
   }
-  if (barcodeWidth(v, STAFF_MODULE_IN) > STAFF_BAR_MAX_W) return "Too long to fit on the card";
+  if (staffModule(staffBarcode(v)) === null) return "Too long to fit on the card";
   return null;
 }
 
