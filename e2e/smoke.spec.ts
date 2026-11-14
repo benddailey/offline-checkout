@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { PHOTO_BASE, PHOTOS } from "../src/ui/backgrounds/photos";
+import { LATEST_URL } from "../src/update/latest";
 import { appUrl } from "./helpers/app";
 
-test("built file opens from file:// and reaches out only for the photo backgrounds", async ({
+test("built file opens from file:// and reaches out only for the photo backgrounds and the version check", async ({
   page,
 }) => {
   const external: string[] = [];
@@ -12,9 +13,11 @@ test("built file opens from file:// and reaches out only for the photo backgroun
   });
   await page.goto(appUrl());
   await expect(page.getByRole("heading", { name: "Offline Checkout" })).toBeVisible();
-  // The e2e browsers can't resolve Pages, so each photo is attempted once and fails.
-  await expect.poll(() => external.length).toBe(PHOTOS.length);
-  expect(external.sort()).toEqual(PHOTOS.map((p) => `${PHOTO_BASE}${p.id}.webp`).sort());
+  // The e2e browsers can't resolve Pages, so each request is attempted once and fails.
+  await expect.poll(() => external.length).toBe(PHOTOS.length + 1);
+  expect(external.sort()).toEqual(
+    [...PHOTOS.map((p) => `${PHOTO_BASE}${p.id}.webp`), LATEST_URL].sort(),
+  );
   // The requests are plain downloads: nothing about the session goes with them.
   expect(external.every((url) => !url.includes("?"))).toBe(true);
 });
