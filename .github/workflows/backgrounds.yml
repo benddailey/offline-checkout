@@ -1,8 +1,9 @@
 # Publishes the files attached to every backgrounds-* release to GitHub Pages, at
 # https://benddailey.github.io/offline-checkout/<tag>/<file>, where the app downloads its photo
-# backgrounds. Pages, unlike release downloads, sends the CORS header a file:// page needs.
-# Older sets stay published, so older app versions keep working.
-name: Publish photo backgrounds
+# backgrounds, and writes latest.json ({"version":"X.Y.Z"} from the latest v* release) for the app's
+# launch version check. Pages, unlike release downloads, sends the CORS header a file:// page
+# needs. Older sets stay published, so older app versions keep working.
+name: Publish photo backgrounds and latest version
 
 on:
   release:
@@ -20,7 +21,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'backgrounds-')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'backgrounds-') || startsWith(github.event.release.tag_name, 'v')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -35,6 +36,12 @@ jobs:
               -q '.[].tagName | select(startswith("backgrounds-"))'); do
             gh release download "$tag" -R "$GITHUB_REPOSITORY" -p '*.webp' -D "site/$tag"
           done
+          tag=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          case "$tag" in
+            v[0-9]*) printf '{"version":"%s"}\n' "${tag#v}" > site/latest.json ;;
+            *) echo "The latest release is $tag, not a v* release" >&2; exit 1 ;;
+          esac
+          cat site/latest.json
           ls -R site
       - uses: actions/upload-pages-artifact@v4
         with:

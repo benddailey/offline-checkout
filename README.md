@@ -96,7 +96,9 @@ The extracted folder is no longer needed after setup; you can delete it.
 ## Updating
 
 Every desk PC must run the same version, or they cannot join each other. The version is shown next
-to the title on the start screen and on the Summary.
+to the title on the start screen and on the Summary. When the PC is online and a newer version is
+out, the start screen also shows **Version X.Y.Z is available**, which opens the releases page.
+Offline, nothing is shown.
 
 1. Finish any running session first. Don't update during an outage.
 2. Download and extract the new zip and run its setup script, as in setup. Stored sessions and the

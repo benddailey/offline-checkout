@@ -5,6 +5,7 @@ import "./qr/zxing";
 import App from "./App.vue";
 import { downloadMissingPhotos, loadSavedPhotos } from "./ui/backgrounds/saved";
 import { applySavedTheme } from "./ui/theme";
+import { checkForUpdate } from "./update/latest";
 
 applySavedTheme();
 createApp(App).use(createPinia()).mount("#app");
@@ -15,3 +16,4 @@ void navigator.storage?.persist?.().catch(() => {});
 void loadSavedPhotos()
   .catch(() => {})
   .then(downloadMissingPhotos);
+void checkForUpdate();
