@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { openApp } from "./helpers/app";
 import { decodePdfBarcodes, pdfText } from "./helpers/pdf";
 
-test("staff barcodes: fill the rest, keep case, and print a scannable Avery 5371 sheet", async ({
+test("staff barcodes: fill the rest, keep case, optional tab, and print a scannable Avery 5371 sheet", async ({
   page,
 }) => {
   await openApp(page);
@@ -29,9 +29,21 @@ test("staff barcodes: fill the rest, keep case, and print a scannable Avery 5371
   await expect(generate).toBeDisabled();
   await card(3).fill("wells-srinkenberger");
 
-  const [download] = await Promise.all([page.waitForEvent("download"), generate.click()]);
-  expect(download.suggestedFilename()).toMatch(/^staff-barcodes-\d{8}-\d{4}\.pdf$/);
-  const pdf = await download.path();
+  const download = async () => {
+    const [d] = await Promise.all([page.waitForEvent("download"), generate.click()]);
+    expect(d.suggestedFilename()).toMatch(/^staff-barcodes-\d{8}-\d{4}\.pdf$/);
+    return d.path();
+  };
+  const tab = page.getByLabel("End each barcode with a tab");
+  await expect(tab).not.toBeChecked();
+  const plain = await decodePdfBarcodes(await download());
+  expect(plain).toHaveLength(10);
+  expect(plain.filter((t) => t === "bdailey")).toHaveLength(4);
+  expect(plain.filter((t) => t === "JDailey")).toHaveLength(5);
+  expect(plain).toContain("wells-srinkenberger");
+
+  await tab.check();
+  const pdf = await download();
   const words = (await pdfText(pdf)).split(/\s+/).filter(Boolean);
   expect(words).toEqual([
     "bdailey",

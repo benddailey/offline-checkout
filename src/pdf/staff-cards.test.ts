@@ -36,27 +36,36 @@ describe("staff cards", () => {
     expect(code128Modules(staffValue("bdailey"))).not.toBe(code128Modules(staffValue("BDailey")));
   });
 
-  test("bars encode the trimmed login followed by a tab", () => {
-    expect(staffBarcode("  BDailey \t")).toBe("BDailey\t");
+  test("bars encode the trimmed login, followed by a tab only when asked", () => {
+    expect(staffBarcode("  BDailey \t", false)).toBe("BDailey");
+    expect(staffBarcode("  BDailey \t", true)).toBe("BDailey\t");
   });
 
   test('bars are 1/75" while the login fits, then 1/100"', () => {
-    expect(staffModule(staffBarcode("a".repeat(14)))).toBe(1 / 75);
-    expect(staffModule(staffBarcode("a".repeat(15)))).toBe(1 / 100);
-    expect(staffModule(staffBarcode("wells-srinkenberger"))).toBe(1 / 100);
-    expect(staffModule(staffBarcode("a".repeat(23)))).toBeNull();
+    expect(staffModule(staffBarcode("a".repeat(16), false))).toBe(1 / 75);
+    expect(staffModule(staffBarcode("a".repeat(17), false))).toBe(1 / 100);
+    expect(staffModule(staffBarcode("a".repeat(25), false))).toBeNull();
+    expect(staffModule(staffBarcode("a".repeat(14), true))).toBe(1 / 75);
+    expect(staffModule(staffBarcode("a".repeat(15), true))).toBe(1 / 100);
+    expect(staffModule(staffBarcode("wells-srinkenberger", true))).toBe(1 / 100);
+    expect(staffModule(staffBarcode("a".repeat(23), true))).toBeNull();
   });
 
   test("errors: non-ASCII and too long; empty and punctuation are fine", () => {
-    expect(staffCardError("")).toBeNull();
-    expect(staffCardError("   ")).toBeNull();
-    expect(staffCardError("wells-srinkenberger")).toBeNull();
-    expect(staffCardError("josé")).toBe('Can\'t go in a barcode: "é"');
+    for (const tab of [false, true]) {
+      expect(staffCardError("", tab)).toBeNull();
+      expect(staffCardError("   ", tab)).toBeNull();
+      expect(staffCardError("wells-srinkenberger", tab)).toBeNull();
+      expect(staffCardError("josé", tab)).toBe('Can\'t go in a barcode: "é"');
+    }
+    expect(staffCardError("a".repeat(24), false)).toBeNull();
+    expect(staffCardError("a".repeat(25), false)).toBe("Too long to fit on the card");
+    expect(staffCardError("A".repeat(25), false)).toBe("Too long to fit on the card");
     // The tab is only in code set A, so small letters also pay for a shift; capitals don't.
-    expect(staffCardError("a".repeat(22))).toBeNull();
-    expect(staffCardError("a".repeat(23))).toBe("Too long to fit on the card");
-    expect(staffCardError("A".repeat(23))).toBeNull();
-    expect(staffCardError("A".repeat(24))).toBe("Too long to fit on the card");
+    expect(staffCardError("a".repeat(22), true)).toBeNull();
+    expect(staffCardError("a".repeat(23), true)).toBe("Too long to fit on the card");
+    expect(staffCardError("A".repeat(23), true)).toBeNull();
+    expect(staffCardError("A".repeat(24), true)).toBe("Too long to fit on the card");
   });
 
   test("download name carries the local date and time", () => {
@@ -77,7 +86,7 @@ describe("staff cards", () => {
 
   test("pdf draws each name as typed, centred in its card, and skips empty cards", () => {
     const values = ["bdailey", "", "BDailey", ...Array<string>(7).fill("")];
-    const t = placed(raw(buildStaffCards(values, false)));
+    const t = placed(raw(buildStaffCards(values, false, false)));
     expect(t.map((p) => p[0])).toEqual(["bdailey", "BDailey"]);
     const [x0, y0] = [t[0]![1], t[0]![2]];
     const [x2, y2] = [t[1]![1], t[1]![2]];
@@ -85,11 +94,11 @@ describe("staff cards", () => {
     expect(x2).toBeCloseTo(x0, 1);
     expect(y0 - y2).toBeCloseTo(144, 1);
     expect(x0).toBeLessThan((0.75 + 1.75) * 72);
-    expect(renderStaffCards(values).type).toBe("application/pdf");
+    expect(renderStaffCards(values, false).type).toBe("application/pdf");
   });
 
   test("pdf has faint dotted cut lines on every card edge, even with no names", () => {
-    const s = raw(buildStaffCards(Array<string>(10).fill(""), false));
+    const s = raw(buildStaffCards(Array<string>(10).fill(""), false, false));
     expect(s).toMatch(/0\.78 G\s+[\d.]+ w\s+\[[\d. ]+\] 0\.? d/);
     // 3 vertical + 6 horizontal edges, each a stroked line.
     expect(s.match(/ l\s+S/g)).toHaveLength(9);

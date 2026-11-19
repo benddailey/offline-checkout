@@ -14,7 +14,8 @@ import { useSession } from "../session";
 
 const session = useSession();
 const values = ref<string[]>(Array<string>(CARD_COUNT).fill(""));
-const errors = computed(() => values.value.map(staffCardError));
+const tab = ref(false);
+const errors = computed(() => values.value.map((v) => staffCardError(v, tab.value)));
 const ready = computed(
   () => errors.value.every((e) => e === null) && values.value.some((v) => staffValue(v) !== ""),
 );
@@ -24,7 +25,8 @@ function fill(i: number) {
 }
 
 function generate() {
-  if (ready.value) downloadBlob(renderStaffCards(values.value), staffCardsFilename(new Date()));
+  if (ready.value)
+    downloadBlob(renderStaffCards(values.value, tab.value), staffCardsFilename(new Date()));
 }
 </script>
 
@@ -43,6 +45,14 @@ function generate() {
     </p>
 
     <form class="flex flex-col gap-6" data-testid="staff-cards-form" @submit.prevent="generate">
+      <label class="flex items-center gap-3 self-start text-xl text-ink">
+        <input
+          v-model="tab"
+          type="checkbox"
+          class="size-6 accent-accent focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        />
+        End each barcode with a tab, to move to the next box after the login
+      </label>
       <ol class="grid gap-4 md:grid-cols-2">
         <li
           v-for="(_, i) in values"
