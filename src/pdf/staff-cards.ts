@@ -52,7 +52,11 @@ export function staffCardError(raw: string, tab: boolean): string | null {
   if (bad.length > 0) {
     return `Can't go in a barcode: ${bad.map((c) => `"${c}"`).join(", ")}`;
   }
-  if (staffModule(staffBarcode(v, tab)) === null) return "Too long to fit on the card";
+  if (staffModule(staffBarcode(v, tab)) === null) {
+    return tab && staffModule(staffBarcode(v, false)) !== null
+      ? "Too long to fit with a tab on the end"
+      : "Too long to fit on the card";
+  }
   return null;
 }
 

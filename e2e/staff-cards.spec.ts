@@ -27,6 +27,14 @@ test("staff barcodes: fill the rest, keep case, optional tab, and print a scanna
   await card(3).fill("josé");
   await expect(page.getByText('Can\'t go in a barcode: "é"')).toBeVisible();
   await expect(generate).toBeDisabled();
+  const tab = page.getByLabel("End each barcode with a tab");
+  await expect(tab).not.toBeChecked();
+  await card(3).fill("a".repeat(24));
+  await expect(generate).toBeEnabled();
+  await tab.check();
+  await expect(page.getByText("Too long to fit with a tab on the end")).toBeVisible();
+  await expect(generate).toBeDisabled();
+  await tab.uncheck();
   await card(3).fill("wells-srinkenberger");
 
   const download = async () => {
@@ -34,8 +42,6 @@ test("staff barcodes: fill the rest, keep case, optional tab, and print a scanna
     expect(d.suggestedFilename()).toMatch(/^staff-barcodes-\d{8}-\d{4}\.pdf$/);
     return d.path();
   };
-  const tab = page.getByLabel("End each barcode with a tab");
-  await expect(tab).not.toBeChecked();
   const plain = await decodePdfBarcodes(await download());
   expect(plain).toHaveLength(10);
   expect(plain.filter((t) => t === "bdailey")).toHaveLength(4);

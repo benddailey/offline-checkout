@@ -45,14 +45,21 @@ function generate() {
     </p>
 
     <form class="flex flex-col gap-6" data-testid="staff-cards-form" @submit.prevent="generate">
-      <label class="flex items-center gap-3 self-start text-xl text-ink">
-        <input
-          v-model="tab"
-          type="checkbox"
-          class="size-6 accent-accent focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        />
-        End each barcode with a tab, to move to the next box after the login
-      </label>
+      <div class="flex flex-col gap-1">
+        <label class="flex items-center gap-3 self-start text-xl text-ink">
+          <input
+            v-model="tab"
+            type="checkbox"
+            class="size-6 accent-accent focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            aria-describedby="staff-tab-hint"
+          />
+          End each barcode with a tab
+        </label>
+        <p id="staff-tab-hint" class="text-lg text-ink-3">
+          A scan then moves to the next box after the login. Leave it off if you can program the
+          Code 128 symbology on your scanner to do a tab instead of a carriage return.
+        </p>
+      </div>
       <ol class="grid gap-4 md:grid-cols-2">
         <li
           v-for="(_, i) in values"

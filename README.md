@@ -220,8 +220,10 @@ Offline, nothing is shown.
   - Type each login exactly as it should scan. Capital and small letters are kept; spaces before
     and after are dropped. Logins fit up to 24 characters.
   - Tick **End each barcode with a tab** to have each scan move to the next box on the login
-    screen. It is off each time you open the page. With it on, logins fit up to 22 characters (23
-    if all capitals).
+    screen. It is off each time you open the page. Leave it off if you can program the Code 128
+    symbology on your scanner to do a tab instead of a carriage return. With it on, logins fit up to 22 characters (23
+    if all capitals). If a login only fits without the tab, its card says **Too long to fit with a
+    tab on the end**.
   - **Fill the rest** copies a card into every card after it. Cards run left to right, then top to
     bottom, as on the sheet. Empty cards are left blank.
   - Click **Generate PDF** and print it at **Actual size**, not **Fit to page**.
