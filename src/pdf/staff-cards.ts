@@ -37,22 +37,26 @@ export function staffValue(raw: string): string {
   return raw.trim();
 }
 
-/** What the bars encode: the login then a tab, so a scan moves the login form to its next field. */
-export function staffBarcode(raw: string): string {
-  return `${staffValue(raw)}\t`;
+/** What the bars encode: the login, then optionally a tab so a scan moves the login form to its next field. */
+export function staffBarcode(raw: string, tab: boolean): string {
+  return tab ? `${staffValue(raw)}\t` : staffValue(raw);
 }
 
 /** Printable ASCII only: Code 128 has no other characters, and jsPDF's fonts print them all. */
 const NOT_PRINTABLE = /[^\x20-\x7e]/gu;
 
-export function staffCardError(raw: string): string | null {
+export function staffCardError(raw: string, tab: boolean): string | null {
   const v = staffValue(raw);
   if (v === "") return null;
   const bad = [...new Set(v.match(NOT_PRINTABLE))];
   if (bad.length > 0) {
     return `Can't go in a barcode: ${bad.map((c) => `"${c}"`).join(", ")}`;
   }
-  if (staffModule(staffBarcode(v)) === null) return "Too long to fit on the card";
+  if (staffModule(staffBarcode(v, tab)) === null) {
+    return tab && staffModule(staffBarcode(v, false)) !== null
+      ? "Too long to fit with a tab on the end"
+      : "Too long to fit on the card";
+  }
   return null;
 }
 

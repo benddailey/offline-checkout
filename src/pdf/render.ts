@@ -174,7 +174,10 @@ function drawCutLines(doc: jsPDF): void {
 }
 
 /** One card per value on an Avery 5371 sheet; empty values leave their card blank. */
-export function buildStaffCards(values: readonly string[], compress = true): jsPDF {
+export function buildStaffCards(
+  values: readonly string[],
+  { tab, compress = true }: { tab: boolean; compress?: boolean },
+): jsPDF {
   const doc = newDoc(compress);
   const g = AVERY_5371;
   const blockH = STAFF_BAR_H + STAFF_TEXT_GAP + STAFF_FONT_PT / 72;
@@ -184,7 +187,7 @@ export function buildStaffCards(values: readonly string[], compress = true): jsP
     const text = staffValue(raw);
     if (text === "") return;
     const { x, y } = cardOrigin(i);
-    const code = staffBarcode(raw);
+    const code = staffBarcode(raw, tab);
     const module = staffModule(code)!;
     const barX = x + (g.cardW - barcodeWidth(code, module)) / 2;
     const barY = y + (g.cardH - blockH) / 2;
@@ -196,8 +199,8 @@ export function buildStaffCards(values: readonly string[], compress = true): jsP
   return doc;
 }
 
-export function renderStaffCards(values: readonly string[]): Blob {
-  return buildStaffCards(values).output("blob");
+export function renderStaffCards(values: readonly string[], tab: boolean): Blob {
+  return buildStaffCards(values, { tab }).output("blob");
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
